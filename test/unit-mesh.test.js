@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Emitter, Mesh, MeshError, electRelay, forwardTargets } from '../src/mesh.js';
+import { Emitter, Mesh, MeshError, cleanAvatar, cleanExtras, electRelay, forwardTargets } from '../src/mesh.js';
 import { invitePayload, packCode, readInvite, readReply, replyPayload, unpackCode } from '../src/invite.js';
 import { FakeHub, settle } from './fake-transport.js';
 
@@ -234,5 +234,38 @@ describe('mesh introduction', () => {
     expect(linked(host)).toEqual([]);
     expect(online(host)).toEqual(['aa']);
     await expect(b.createInvite()).rejects.toMatchObject({ reason: 'closed' });
+  });
+
+  it('adopts a link opened before the conversation id was known', async () => {
+    const hub = new FakeHub();
+    const host = peer(hub, 'aa', { host: true });
+    const guest = peer(hub, 'bb');
+    const loose = hub.transport('aa').createLink();
+    const sdp = await loose.offer();
+    const reply = await guest.acceptInvite({ inviteId: 'x', den: DEN, host: host.self, sdp });
+    loose.onopen = () => host.adopt(loose, reply.peer);
+    await loose.complete(reply.sdp);
+    await settle();
+    expect(linked(host)).toEqual(['bb']);
+    expect(linked(guest)).toEqual(['aa']);
+    expect(guest.relay).toBe('aa');
+    guest.broadcast({ text: 'hi' });
+    await settle();
+    expect(host.inbox.map((m) => m.body.text)).toEqual(['hi']);
+  });
+
+  it('shares status and accent and cleans avatars', async () => {
+    const hub = new FakeHub();
+    const host = peer(hub, 'aa', { host: true });
+    const b = peer(hub, 'bb');
+    await join(host, b);
+    b.setProfile({ status: 'away for lunch', accent: '#12abef' });
+    await settle();
+    expect(host.memberList().find((m) => m.id === 'bb')).toMatchObject({ status: 'away for lunch', accent: '#12abef' });
+    expect(cleanAvatar('data:image/png;base64,AAAA')).toBe('data:image/png;base64,AAAA');
+    expect(cleanAvatar('data:text/html;base64,AAAA')).toBe('');
+    expect(cleanAvatar('data:image/svg+xml,<svg onload=x>')).toBe('');
+    expect(cleanAvatar('seed'.repeat(30)).length).toBe(64);
+    expect(cleanExtras({ status: 's'.repeat(300), accent: 'red' })).toEqual({ status: 's'.repeat(128), accent: '' });
   });
 });

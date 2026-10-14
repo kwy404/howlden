@@ -71,7 +71,19 @@ export class MeshError extends Error {
   }
 }
 
-const publicMember = (m) => ({ id: m.id, name: m.name, avatar: m.avatar, joinedAt: m.joinedAt, online: !!m.online });
+const publicMember = (m) => ({ id: m.id, name: m.name, avatar: m.avatar, status: m.status || '', accent: m.accent || '', joinedAt: m.joinedAt, online: !!m.online });
+
+/** Avatars are a seed or a small data:image URL; anything else is dropped. */
+export function cleanAvatar(v) {
+  const s = String(v || '');
+  if (s.startsWith('data:')) return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(s) && s.length <= 40000 ? s : '';
+  return s.slice(0, 64);
+}
+
+/** Optional profile extras: a short status line and an accent color. */
+export function cleanExtras(p) {
+  return { status: String(p?.status || '').slice(0, 128), accent: /^#[0-9a-f]{6}$/i.test(p?.accent || '') ? p.accent : '' };
+}
 
 export class Mesh extends Emitter {
   /**
@@ -90,7 +102,7 @@ export class Mesh extends Emitter {
     this.introTimeout = introTimeout;
     this.transport = transport;
     this.den = { ...den };
-    this.self = { id: self.id, name: self.name, avatar: self.avatar || '', joinedAt: host ? now() : null, online: true };
+    this.self = { id: self.id, name: self.name, avatar: cleanAvatar(self.avatar), ...cleanExtras(self), joinedAt: host ? now() : null, online: true };
     this.members = new Map([[this.self.id, this.self]]);
     this.links = new Map();
     this.peerLinks = new Map();
@@ -204,12 +216,29 @@ export class Mesh extends Emitter {
     return sent;
   }
 
-  /** Update my name or avatar and tell everyone. */
-  setProfile({ name, avatar }) {
+  /** Update my name, avatar, status or accent and tell everyone. */
+  setProfile({ name, avatar, status, accent }) {
     if (name) this.self.name = name;
-    if (avatar) this.self.avatar = avatar;
+    if (avatar) this.self.avatar = cleanAvatar(avatar);
+    Object.assign(this.self, cleanExtras({ status: status ?? this.self.status, accent: accent ?? this.self.accent }));
     for (const link of this.links.values()) this._send(link, { t: 'profile', peer: publicMember(this.self) });
     this.emit('members', this.memberList());
+  }
+
+  /**
+   * Take over a link that was opened outside this mesh (a direct conversation
+   * invite answered before its conversation id was known). This peer acts as
+   * the introducer of the other side.
+   */
+  adopt(link, peer) {
+    link.peerId = peer.id;
+    link.peer = peer;
+    link.introduce = true;
+    link.onopen = () => this._onOpen(link);
+    link.onmessage = (data) => this._onRaw(link, data);
+    link.onclose = () => this._onClose(link);
+    link.onfail = (reason) => this.emit('link-failed', { peerId: link.peerId, reason, link });
+    if (link.open) this._onOpen(link);
   }
 
   /** Leave the den: say goodbye and close every link. */
@@ -333,7 +362,8 @@ export class Mesh extends Emitter {
         if (p.id !== from) return;
         const m = this.members.get(from) || { id: from, joinedAt: null };
         m.name = String(p.name || m.name || 'member').slice(0, 32);
-        m.avatar = String(p.avatar || m.avatar || '');
+        m.avatar = cleanAvatar(p.avatar || m.avatar);
+        Object.assign(m, cleanExtras(p));
         if (m.joinedAt == null && typeof p.joinedAt === 'number') m.joinedAt = p.joinedAt;
         m.online = true;
         this.members.set(from, m);
@@ -351,7 +381,7 @@ export class Mesh extends Emitter {
           if (!m?.id || m.id === this.self.id) continue;
           const linked = this.links.has(m.id);
           const have = this.members.get(m.id);
-          this.members.set(m.id, { ...have, id: m.id, name: String(m.name || 'member').slice(0, 32), avatar: String(m.avatar || ''), joinedAt: m.joinedAt ?? null, online: linked });
+          this.members.set(m.id, { ...have, id: m.id, name: String(m.name || 'member').slice(0, 32), avatar: cleanAvatar(m.avatar), ...cleanExtras(m), joinedAt: m.joinedAt ?? null, online: linked });
           if (m.online && !linked) expected.push(m.id);
         }
         this.relay = msg.relay || from;
@@ -364,7 +394,7 @@ export class Mesh extends Emitter {
         const p = msg.peer;
         if (!p?.id || p.id === this.self.id) return;
         const have = this.members.get(p.id);
-        this.members.set(p.id, { ...have, id: p.id, name: String(p.name || 'member').slice(0, 32), avatar: String(p.avatar || ''), joinedAt: p.joinedAt ?? null, online: this.links.has(p.id) });
+        this.members.set(p.id, { ...have, id: p.id, name: String(p.name || 'member').slice(0, 32), avatar: cleanAvatar(p.avatar), ...cleanExtras(p), joinedAt: p.joinedAt ?? null, online: this.links.has(p.id) });
         this.emit('joined', publicMember(this.members.get(p.id)));
         this.emit('members', this.memberList());
         return;
@@ -383,7 +413,8 @@ export class Mesh extends Emitter {
         const m = this.members.get(from);
         if (!m || p?.id !== from) return;
         m.name = String(p.name || m.name).slice(0, 32);
-        m.avatar = String(p.avatar || m.avatar);
+        m.avatar = cleanAvatar(p.avatar || m.avatar);
+        Object.assign(m, cleanExtras(p));
         this.emit('members', this.memberList());
         return;
       }
