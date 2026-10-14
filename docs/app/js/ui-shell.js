@@ -29,7 +29,7 @@ export function initials(name) {
 }
 
 export function avatarImg(seed, { size = 32, speaking = false, cls = '' } = {}) {
-  return h('img', { class: `avatar${speaking ? ' speaking' : ''}${cls ? ` ${cls}` : ''}`, src: avatarSrc(seed), width: size, height: size, alt: '', draggable: 'false' });
+  return h('img', { class: `av${speaking ? ' speaking' : ''}${cls ? ` ${cls}` : ''}`, src: avatarSrc(seed), width: size, height: size, alt: '', draggable: 'false' });
 }
 
 function avatarWithStatus(m, size, app) {
@@ -54,7 +54,7 @@ export function closePopover() {
 
 export function popover(anchor, content, { placement = 'below', className = '' } = {}) {
   closePopover();
-  const el = h('div', { class: `popover ${className}`, role: 'dialog' }, content);
+  const el = h('div', { class: `hl-popover ${className}`, role: 'dialog' }, content);
   document.body.append(el);
   const r = anchor.getBoundingClientRect();
   const pw = el.offsetWidth;
@@ -100,14 +100,14 @@ export function popover(anchor, content, { placement = 'below', className = '' }
 function menu(items) {
   return h(
     'div',
-    { class: 'menu', role: 'menu' },
+    { class: 'hl-menu', role: 'menu' },
     items.filter(Boolean).map((it) =>
       it === '-'
         ? h('div', { class: 'menu-sep', role: 'separator' })
         : h(
             'button',
             {
-              class: `menu-item${it.danger ? ' danger' : ''}${it.brand ? ' brand' : ''}`,
+              class: `hl-menu-item${it.danger ? ' danger' : ''}${it.brand ? ' brand' : ''}`,
               type: 'button',
               role: 'menuitem',
               onclick: () => {
@@ -460,7 +460,7 @@ export function memberCard(app, s, m, anchor) {
     anchor,
     h(
       'div',
-      { class: 'card' },
+      { class: 'm-card' },
       h('div', { class: 'card-banner', style: { '--den-hue': avatarTraits(m.avatar || m.id).hue, background: m.accent || null } }),
       h('div', { class: 'card-avatar' }, avatarWithStatus(m, 80, app)),
       h('div', { class: 'card-inner' }, h('h3', { class: 'card-name' }, m.name, h('span', { class: 'friend-tag' }, `#${m.id.slice(0, 4)}`)), m.status ? h('p', { class: 'card-status' }, m.status) : null, self ? null : idBadgeLine(app, s, m.id), s.relay === m.id ? h('p', { class: 'card-tag' }, icon('relay', { size: 14 }), t('members.relay')) : null, s.verified.has(m.id) ? h('p', { class: 'card-tag ok' }, icon('shield', { size: 14 }), t('members.verified')) : null),

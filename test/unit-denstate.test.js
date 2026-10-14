@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { channelName, denConfig, mergeDen, newDen, visibleChannels } from '../src/denstate.js';
-import { buildIceServers, candidateTypes, diagnose, OPEN_RELAY, parseTurn, STUN_SERVERS } from '../src/rtc.js';
+import { buildIceServers, candidateTypes, diagnose, parseTurn, STUN_SERVERS } from '../src/rtc.js';
 
 const den = () => newDen({ id: 'd1', name: 'Night owls', now: 10, ids: ['c001', 'c002', 'c003', 'c004'] });
 
@@ -45,13 +45,14 @@ describe('den settings', () => {
 });
 
 describe('ICE configuration', () => {
-  it('lists Google STUN, custom TURN and Open Relay', () => {
+  it('lists Google STUN and the custom TURN servers', () => {
     const custom = parseTurn({ urls: 'turn:turn.example.com:3478 turns:turn.example.com:5349?transport=tcp', username: 'u', credential: 'p' });
     const servers = buildIceServers({ custom: [custom] });
     expect(servers[0].urls).toEqual(STUN_SERVERS);
     expect(servers[1]).toEqual({ urls: ['turn:turn.example.com:3478', 'turns:turn.example.com:5349?transport=tcp'], username: 'u', credential: 'p' });
-    expect(servers[2]).toBe(OPEN_RELAY);
-    expect(buildIceServers({ openRelay: false })).toHaveLength(1);
+    expect(servers).toHaveLength(2);
+    expect(buildIceServers()).toEqual([{ urls: STUN_SERVERS }]);
+    expect(JSON.stringify(buildIceServers())).not.toContain('openrelay');
   });
 
   it('validates TURN input with readable errors', () => {

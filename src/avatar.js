@@ -80,7 +80,7 @@ export function avatarUrl(seed) {
   return `data:image/svg+xml,${encodeURIComponent(avatarSvg(seed))}`;
 }
 
-/** A display color for a name, readable on dark and light backgrounds. */
+/** A display color for a name. The page sets --name-l lower on light backgrounds. */
 export function nameColor(seed) {
-  return `hsl(${avatarTraits(seed).hue} 70% 62%)`;
+  return `hsl(${avatarTraits(seed).hue} 70% var(--name-l, 62%))`;
 }

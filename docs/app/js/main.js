@@ -65,7 +65,7 @@ window.howlden = app;
 
 app.saveSettings = () => store.save('settings', { ...settings, showMembers: app.showMembers });
 
-app.iceServers = () => buildIceServers({ custom: settings.turn, openRelay: settings.openRelay });
+app.iceServers = () => buildIceServers({ custom: settings.turn });
 
 app.applyTheme = () => {
   const root = document.documentElement;
@@ -415,7 +415,7 @@ function handOffReply(code) {
       clearTimeout(timer);
       $('#boot').hidden = true;
       const gate = $('#gate');
-      replace(gate, h('main', { class: 'login' }, h('div', { class: 'login-card narrow' }, h('div', { class: 'login-form center' }, h('div', { class: 'pin-ico ok' }, icon('check', { size: 36 })), h('h1', { class: 'login-title' }, app.t('reply.handedTitle')), h('p', { class: 'login-lead' }, app.t('join.replyOpened'))))));
+      replace(gate, h('main', { class: 'login' }, h('div', { class: 'login-card narrow' }, h('div', { class: 'login-form is-center' }, h('div', { class: 'pin-ico ok' }, icon('check', { size: 36 })), h('h1', { class: 'login-title' }, app.t('reply.handedTitle')), h('p', { class: 'login-lead' }, app.t('join.replyOpened'))))));
       gate.hidden = false;
       resolve(true);
     };
@@ -588,8 +588,8 @@ function ringCheck(s) {
     const f = app.friends.get(peer) || s.member(peer) || { name: s.den.name };
     const card = h(
       'div',
-      { class: 'ring', role: 'alertdialog', 'aria-label': t('call.incoming', { name: f.name }) },
-      h('div', { class: 'ring-pulse' }, h('img', { class: 'avatar', src: '', alt: '', width: 64, height: 64 })),
+      { class: 'call-ring', role: 'alertdialog', 'aria-label': t('call.incoming', { name: f.name }) },
+      h('div', { class: 'ring-pulse' }, h('img', { class: 'av', src: '', alt: '', width: 64, height: 64 })),
       h('strong', null, f.name),
       h('span', { class: 'muted' }, t('call.incoming', { name: f.name })),
       h(

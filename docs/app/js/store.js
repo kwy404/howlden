@@ -202,7 +202,6 @@ export const DEFAULT_SETTINGS = {
   lang: null,
   theme: 'dark',
   turn: [],
-  openRelay: true,
   inputMode: 'voice',
   pttKey: 'Backquote',
   noiseSuppression: true,

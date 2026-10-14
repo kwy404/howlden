@@ -7,7 +7,7 @@ import { confirmDialog, modal, promptDialog, toast } from './ui-modal.js';
 import { avatarPicker } from './ui-account.js';
 import { keyName } from './ui-shell.js';
 import { LANGS } from './i18n.js';
-import { OPEN_RELAY, STUN_SERVERS, parseTurn } from '../core/rtc.js';
+import { STUN_SERVERS, parseTurn } from '../core/rtc.js';
 
 const SECTIONS = [
   ['user', [['profile', 'edit'], ['account', 'lock'], ['privacy', 'shield']]],
@@ -34,7 +34,7 @@ export async function testTurn(server, ms = 9000) {
 }
 
 function field(label, control, hint, id) {
-  return h('label', { class: 'field', for: id || null }, h('span', { class: 'field-label' }, label), control, hint ? h('span', { class: 'field-hint' }, hint) : null);
+  return h('label', { class: 'hl-field', for: id || null }, h('span', { class: 'field-label' }, label), control, hint ? h('span', { class: 'field-hint' }, hint) : null);
 }
 
 function toggleRow(label, checked, onchange, hint) {
@@ -98,7 +98,7 @@ export function openSettings(app, section = 'profile') {
       return h(
         'form',
         {
-          class: 'stack settings-form',
+          class: 'hl-stack settings-form',
           onsubmit: async (e) => {
             e.preventDefault();
             if (!name.value.trim()) return name.focus();
@@ -106,11 +106,11 @@ export function openSettings(app, section = 'profile') {
             toast(t('notice.saved'), 'ok');
           },
         },
-        h('div', { class: 'profile-preview', style: { '--accent': p.accent || 'var(--brand)' } }, h('div', { class: 'profile-banner' }), picker.el, h('div', null, h('strong', { class: 'profile-handle' }, `${p.name}#${p.tag}`), h('p', { class: 'muted' }, t('profile.tagHint')))),
+        h('div', { class: 'profile-preview', style: { '--banner': p.accent || null } }, h('div', { class: 'profile-banner' }), picker.el, h('div', null, h('strong', { class: 'profile-handle' }, `${p.name}#${p.tag}`), h('p', { class: 'muted' }, t('profile.tagHint')))),
         field(t('settings.name'), name, null, 'set-name'),
         field(t('profile.status'), status, t('profile.statusHint'), 'set-status'),
-        h('div', { class: 'field field-row' }, h('label', { class: 'switch-row' }, useAccent, h('span', null, t('login.accentUse'))), accent),
-        h('div', { class: 'field' }, h('span', { class: 'field-label' }, t('profile.key')), h('code', { class: 'fp' }, `${app.identity.alg}, ${app.identity.id}`), h('span', { class: 'field-hint' }, t('profile.keyHint'))),
+        h('div', { class: 'hl-field field-row' }, h('label', { class: 'switch-row' }, useAccent, h('span', null, t('login.accentUse'))), accent),
+        h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('profile.key')), h('code', { class: 'fp' }, `${app.identity.alg}, ${app.identity.id}`), h('span', { class: 'field-hint' }, t('profile.keyHint'))),
         h('div', null, h('button', { class: 'btn btn-brand', type: 'submit' }, t('common.save'))),
       );
     },
@@ -149,8 +149,8 @@ export function openSettings(app, section = 'profile') {
       renderPin();
       return h(
         'div',
-        { class: 'stack' },
-        h('div', { class: 'callout' }, icon('info', { size: 18 }), h('div', null, h('strong', null, t('account.localTitle')), h('p', null, t('account.local')))),
+        { class: 'hl-stack' },
+        h('div', { class: 'hl-callout' }, icon('info', { size: 18 }), h('div', null, h('strong', null, t('account.localTitle')), h('p', null, t('account.local')))),
         h('section', { class: 'set-sec' }, h('h2', null, t('account.pin')), h('p', { class: 'muted' }, t('account.pinText')), pinState),
         h(
           'section',
@@ -206,7 +206,7 @@ export function openSettings(app, section = 'profile') {
     },
 
     voice() {
-      const box = h('div', { class: 'stack' });
+      const box = h('div', { class: 'hl-stack' });
       const s = app.settings;
       const select = (label, kind, key, onchange) => {
         const el = h('select', { class: 'select', id: `set-${key}`, onchange: (e) => onchange(e.target.value) }, h('option', { value: '' }, t('settings.default')));
@@ -262,15 +262,15 @@ export function openSettings(app, section = 'profile') {
       });
       const mode = (value, label) => h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'mode', value, checked: s.inputMode === value, onchange: () => ((s.inputMode = value), app.saveSettings(), app.media._gate(), app.render(), renderMode()) }), label);
       const pttRow = h('div');
-      const renderMode = () => replace(pttRow, s.inputMode === 'ptt' ? h('div', { class: 'field' }, h('span', { class: 'field-label' }, t('settings.pttKey')), pttKey) : null);
+      const renderMode = () => replace(pttRow, s.inputMode === 'ptt' ? h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.pttKey')), pttKey) : null);
       renderMode();
       const proc = (key, label) => toggleRow(label, s[key], (v) => ((s[key] = v), app.saveSettings(), app.media.restartMic()));
       replace(
         box,
         h('div', { class: 'grid-2' }, select(t('settings.input'), 'audioinput', 'inputId', (v) => ((s.inputId = v), app.saveSettings(), app.media.restartMic())), select(t('settings.output'), 'audiooutput', 'outputId', (v) => app.media.setOutput(v))),
         select(t('settings.cameraDevice'), 'videoinput', 'cameraId', (v) => ((s.cameraId = v), app.saveSettings())),
-        h('div', { class: 'field' }, h('span', { class: 'field-label' }, t('settings.micTest')), h('p', { class: 'field-hint' }, t('settings.micTestHint')), h('div', { class: 'meter-row' }, testBtn, meter)),
-        h('fieldset', { class: 'field' }, h('legend', { class: 'field-label' }, t('settings.inputMode')), mode('voice', t('settings.voiceActivity')), mode('ptt', t('settings.ptt'))),
+        h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.micTest')), h('p', { class: 'field-hint' }, t('settings.micTestHint')), h('div', { class: 'meter-row' }, testBtn, meter)),
+        h('fieldset', { class: 'hl-field' }, h('legend', { class: 'field-label' }, t('settings.inputMode')), mode('voice', t('settings.voiceActivity')), mode('ptt', t('settings.ptt'))),
         pttRow,
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.processing')), h('p', { class: 'field-hint' }, t('settings.processingHint')), proc('noiseSuppression', t('settings.noise')), proc('echoCancellation', t('settings.echo')), proc('autoGainControl', t('settings.gain'))),
       );
@@ -334,17 +334,17 @@ export function openSettings(app, section = 'profile') {
       const user = h('input', { class: 'input field-input', id: 'turn-user', autocomplete: 'off' });
       const pass = h('input', { class: 'input field-input', id: 'turn-pass', type: 'password', autocomplete: 'new-password' });
       const err = h('p', { class: 'form-error', role: 'alert' });
-      const relayOut = h('span', { class: 'turn-result' });
       return h(
         'div',
-        { class: 'stack' },
+        { class: 'hl-stack' },
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.stun')), h('p', { class: 'muted' }, t('settings.stunHint')), h('ul', { class: 'mono-list' }, STUN_SERVERS.map((u) => h('li', null, h('code', null, u))))),
-        h('section', { class: 'set-sec' }, toggleRow(t('settings.openRelay'), s.openRelay, (v) => ((s.openRelay = v), app.saveSettings()), t('settings.openRelayHint')), h('div', { class: 'row-btns' }, testBtn(OPEN_RELAY, relayOut), relayOut)),
         h(
           'section',
           { class: 'set-sec' },
           h('h2', null, t('settings.turn')),
           h('p', { class: 'muted' }, t('settings.turnHint')),
+          h('p', { class: 'muted' }, t('settings.noPublicTurn')),
+          h('p', { class: 'muted' }, t('settings.turnRelayHint')),
           list,
           h(
             'form',
@@ -388,7 +388,7 @@ export function openSettings(app, section = 'profile') {
       } else rows.append(h('li', { class: 'muted' }, t('settings.noPeers')));
       return h(
         'div',
-        { class: 'stack' },
+        { class: 'hl-stack' },
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.security')), h('ul', { class: 'check-list' }, ['security1', 'security2', 'security3', 'security4', 'security5', 'security6'].map((k) => h('li', null, icon('check', { size: 16 }), t(`settings.${k}`))))),
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.fingerprints')), h('p', { class: 'muted' }, t('settings.fingerprintsHint')), rows),
       );
@@ -400,7 +400,7 @@ export function openSettings(app, section = 'profile') {
       if (typeof Notification !== 'undefined' && Notification.permission === 'denied') note.textContent = t('settings.notifyDenied');
       return h(
         'div',
-        { class: 'stack' },
+        { class: 'hl-stack' },
         toggleRow(
           t('settings.notify'),
           s.notify,
@@ -434,7 +434,7 @@ export function openSettings(app, section = 'profile') {
       const s = app.settings;
       return h(
         'div',
-        { class: 'stack' },
+        { class: 'hl-stack' },
         h('fieldset', { class: 'stack-sm' }, h('legend', { class: 'field-label' }, t('settings.theme')), ['dark', 'light', 'system'].map((key) => h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'theme', checked: s.theme === key, onchange: () => ((s.theme = key), app.saveSettings(), app.applyTheme()) }), icon(key === 'dark' ? 'moon' : key === 'light' ? 'sun' : 'palette', { size: 18 }), t(`settings.${key}`)))),
         toggleRow(t('settings.compact'), s.compact, (v) => ((s.compact = v), app.saveSettings(), app.applyTheme())),
       );
@@ -443,7 +443,7 @@ export function openSettings(app, section = 'profile') {
     storage() {
       return h(
         'div',
-        { class: 'stack' },
+        { class: 'hl-stack' },
         h('p', { class: 'muted' }, t('settings.storageHint')),
         h(
           'ul',

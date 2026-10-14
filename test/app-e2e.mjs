@@ -140,7 +140,7 @@ try {
   // Den and mesh
   await ana.page.click('.home-card');
   await ana.page.fill('#den-name', 'Night owls');
-  await ana.page.click('.modal button[type="submit"]');
+  await ana.page.click('.hl-modal button[type="submit"]');
   let link = await inviteLink(ana);
   ok(link.startsWith(`${base}#i=`), 'invite link format');
   const first = await acceptInvite(bia, link);
@@ -214,8 +214,8 @@ try {
   const dm = await acceptInvite(bia, link);
   ok(/Verified friend/.test(dm.hero), 'Bia sees Ana as a verified friend on the call invite');
   await pasteReply(ana, dm.reply);
-  await waitFor(bia, () => !!document.querySelector('.ring'));
-  await bia.page.click('.ring button[aria-label="Accept call"]');
+  await waitFor(bia, () => !!document.querySelector('.call-ring'));
+  await bia.page.click('.call-ring button[aria-label="Accept call"]');
   await waitFor(ana, () => window.howlden.activeDen?.isDirect && window.howlden.media.current);
   await waitFor(bia, () => window.howlden.activeDen?.isDirect && window.howlden.media.current);
   await ana.page.waitForTimeout(2500);

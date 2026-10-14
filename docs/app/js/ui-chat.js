@@ -28,7 +28,7 @@ export function createChat(app) {
   const sendBtn = h('button', { class: 'icon-btn composer-send', type: 'submit' }, icon('send', { size: 20 }));
   const form = h('form', { class: 'composer' }, replyBar, attachBar, suggest, h('div', { class: 'composer-box' }, attachBtn, input, sendBtn), fileInput, typingLine);
   const dropHint = h('div', { class: 'drop-hint', hidden: true }, h('div', null, icon('file', { size: 40 }), h('p', null, '')));
-  const el = h('section', { class: 'chat' }, scroller, form, dropHint);
+  const el = h('section', { class: 'hl-chat' }, scroller, form, dropHint);
 
   const state = {
     session: null,
@@ -141,7 +141,7 @@ export function createChat(app) {
 
   function lightbox(f, url) {
     modal({
-      className: 'lightbox',
+      className: 'hl-lightbox',
       closeLabel: t('common.close'),
       body: [h('img', { src: url, alt: f.name }), h('div', { class: 'lightbox-bar' }, h('span', null, `${f.name}, ${formatSize(f.size)}`), h('a', { class: 'btn btn-ghost btn-sm', href: url, download: f.name }, icon('download', { size: 16 }), t('chat.download')))],
     });
@@ -196,14 +196,14 @@ export function createChat(app) {
 
   function welcomeBlock() {
     const c = state.session.den.channels.find((x) => x.id === state.channel);
-    return h('div', { class: 'chat-start' }, h('div', { class: 'chat-start-ico' }, icon('hash', { size: 40 })), h('h2', null, t('channel.welcome', { name: c?.name || '' })), h('p', null, t('channel.start', { name: c?.name || '' })));
+    return h('div', { class: 'hl-chat-start' }, h('div', { class: 'chat-start-ico' }, icon('hash', { size: 40 })), h('h2', null, t('channel.welcome', { name: c?.name || '' })), h('p', null, t('channel.start', { name: c?.name || '' })));
   }
 
   /** Bring the DOM in line with the records, touching only what changed. */
   function sync({ keepScroll = false } = {}) {
     const s = state.session;
     if (!s) return;
-    const stick = nearBottom();
+    const stick = pinned || nearBottom();
     const records = s.channelMessages(state.channel);
     const shown = records.slice(-state.limit);
     const want = [];
@@ -214,10 +214,10 @@ export function createChat(app) {
     for (const rec of shown) {
       const day = new Date(rec.ts).toDateString();
       const newDay = !prev || new Date(prev.ts).toDateString() !== day;
-      if (newDay) want.push([`day:${day}`, null, () => h('div', { class: 'divider', role: 'separator' }, h('span', null, formatDay(rec.ts, app.lang)))]);
+      if (newDay) want.push([`day:${day}`, null, () => h('div', { class: 'day-divider', role: 'separator' }, h('span', null, formatDay(rec.ts, app.lang)))]);
       if (!dividerDone && state.newSince && rec.ts > state.newSince && rec.author !== app.profile.id) {
         dividerDone = true;
-        want.push(['new', null, () => h('div', { class: 'divider new', role: 'separator' }, h('span', null, t('chat.newMessages')))]);
+        want.push(['new', null, () => h('div', { class: 'day-divider new', role: 'separator' }, h('span', null, t('chat.newMessages')))]);
       }
       const grouped = !newDay && prev && prev.author === rec.author && !prev.deleted && !rec.reply && rec.ts - prev.ts < GROUP_MS;
       want.push([rec.id, rec, grouped]);
@@ -263,9 +263,17 @@ export function createChat(app) {
     if (state.session && document.visibilityState === 'visible' && nearBottom() && app.view === 'chat') state.session.markRead(state.channel);
   }
 
+  let pinned = true;
   scroller.addEventListener('scroll', () => {
-    if (nearBottom()) maybeRead();
+    pinned = nearBottom();
+    if (pinned) maybeRead();
   });
+  // Keep the newest message in view while images and files finish loading.
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => {
+      if (pinned) scrollBottom();
+    }).observe(list);
+  }
 
   function jumpTo(id) {
     const node = state.nodes.get(id);
@@ -661,7 +669,10 @@ export function createChat(app) {
       }
       labels();
       sync();
-      if (!same) scrollBottom();
+      if (!same) {
+        pinned = true;
+        scrollBottom();
+      }
       renderTyping();
     },
     refresh() {

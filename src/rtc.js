@@ -16,12 +16,10 @@ export const STUN_SERVERS = [
   'stun:stun4.l.google.com:19302',
 ];
 
-/** The free public Open Relay TURN service, used as a last resort fallback. */
-export const OPEN_RELAY = {
-  urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'],
-  username: 'openrelayproject',
-  credential: 'openrelayproject',
-};
+// Google runs public STUN servers but no public TURN server. The free Open
+// Relay TURN service (openrelay.metered.ca) was tested on 2026-10-14 and gave
+// no relay candidates: its name now resolves to reserved test addresses. So no
+// public TURN server is built in; people who need a relay add their own.
 
 /** Check one TURN server entered in settings. Returns a normalized entry or throws. */
 export function parseTurn({ urls, username = '', credential = '' }) {
@@ -34,11 +32,10 @@ export function parseTurn({ urls, username = '', credential = '' }) {
   return { urls: list, username: String(username), credential: String(credential) };
 }
 
-/** ICE servers: Google STUN, then the user's TURN servers, then Open Relay when allowed. */
-export function buildIceServers({ custom = [], openRelay = true } = {}) {
+/** ICE servers: Google STUN, then the TURN servers the user added in settings. */
+export function buildIceServers({ custom = [] } = {}) {
   const out = [{ urls: STUN_SERVERS }];
   for (const s of custom) out.push({ urls: s.urls, username: s.username, credential: s.credential });
-  if (openRelay) out.push(OPEN_RELAY);
   return out;
 }
 

@@ -107,7 +107,7 @@ export async function shareOrCopy(link, title) {
 export async function inviteModal(app, { session, friend = false, autoShare = false, title }) {
   const t = app.t;
   const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('invite.making'));
-  const body = h('div', { class: 'stack' }, status);
+  const body = h('div', { class: 'hl-stack' }, status);
   let invite = null;
   let done = false;
   let peerName = '';
@@ -182,10 +182,10 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
   replace(status, h('span', { class: 'dot alone' }), t('invite.waiting'));
   replace(
     body,
-    h('section', { class: 'step' }, h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '1'), t('invite.step1')), h('p', { class: 'muted' }, t('invite.step1Hint')), shareRow(app, invite.link, t('invite.step1')), session?.den.locked ? h('p', { class: 'callout-warn' }, icon('lock', { size: 16 }), t('invite.locked')) : null),
+    h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '1'), t('invite.step1')), h('p', { class: 'muted' }, t('invite.step1Hint')), shareRow(app, invite.link, t('invite.step1')), session?.den.locked ? h('p', { class: 'callout-warn' }, icon('lock', { size: 16 }), t('invite.locked')) : null),
     h(
       'section',
-      { class: 'step' },
+      { class: 'hl-step' },
       h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '2'), t('invite.step2')),
       h('p', { class: 'muted' }, t('invite.step2Hint')),
       replyInput,
@@ -221,7 +221,7 @@ export async function joinModal(app, invite) {
         : h('span', { class: 'new-tag' }, t('id.newPerson'));
   const pass = invite.den.locked ? h('input', { class: 'input field-input', type: 'password', autocomplete: 'off', required: true, id: 'join-pass' }) : null;
   const err = h('p', { class: 'form-error', role: 'alert' });
-  const body = h('div', { class: 'stack' });
+  const body = h('div', { class: 'hl-stack' });
   const hostName = invite.host.tag ? `${invite.host.name}#${invite.host.tag}` : invite.host.name;
   const accept = h('button', { class: 'btn btn-brand btn-lg btn-block', type: 'button' }, t(invite.kind === 'dm' ? 'join.acceptDm' : 'join.accept'));
   replace(
@@ -229,14 +229,14 @@ export async function joinModal(app, invite) {
     h(
       'div',
       { class: 'join-hero' },
-      h('img', { class: 'avatar', src: avatarSrc(invite.host.avatar || invite.host.id), alt: '', width: 72, height: 72 }),
+      h('img', { class: 'av', src: avatarSrc(invite.host.avatar || invite.host.id), alt: '', width: 72, height: 72 }),
       h('p', { class: 'muted' }, invite.kind === 'dm' ? t('join.dmFrom', { host: hostName }) : t('join.invited', { host: hostName })),
       invite.kind === 'dm' ? null : h('h3', { class: 'join-den' }, invite.den.name),
       badge,
     ),
     (known && !keyOk) || clash ? h('p', { class: 'callout-warn' }, icon('warning', { size: 16 }), t(known ? 'id.keyChangedHint' : 'id.nameClashHint', { name: invite.host.name })) : null,
-    pass ? h('label', { class: 'field', for: 'join-pass' }, h('span', { class: 'field-label' }, t('join.passphrase')), pass, h('span', { class: 'field-hint' }, t('join.passphraseHint'))) : null,
-    h('div', { class: 'join-as' }, h('span', { class: 'muted' }, t('join.as')), h('img', { class: 'avatar', src: avatarSrc(app.profile.avatar), alt: '', width: 24, height: 24 }), h('strong', null, `${app.profile.name}#${app.profile.tag}`)),
+    pass ? h('label', { class: 'hl-field', for: 'join-pass' }, h('span', { class: 'field-label' }, t('join.passphrase')), pass, h('span', { class: 'field-hint' }, t('join.passphraseHint'))) : null,
+    h('div', { class: 'join-as' }, h('span', { class: 'muted' }, t('join.as')), h('img', { class: 'av', src: avatarSrc(app.profile.avatar), alt: '', width: 24, height: 24 }), h('strong', null, `${app.profile.name}#${app.profile.tag}`)),
     err,
     accept,
   );
@@ -257,7 +257,7 @@ export async function joinModal(app, invite) {
     }
     if (!m.open) return;
     const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('join.waiting', { host: invite.host.name }));
-    replace(body, h('section', { class: 'step' }, h('h3', { class: 'step-title' }, t('join.replyTitle', { host: invite.host.name })), h('p', { class: 'muted' }, t('join.replyHint', { host: invite.host.name })), shareRow(app, reply.link, t('join.replyTitle', { host: invite.host.name }))), status);
+    replace(body, h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, t('join.replyTitle', { host: invite.host.name })), h('p', { class: 'muted' }, t('join.replyHint', { host: invite.host.name })), shareRow(app, reply.link, t('join.replyTitle', { host: invite.host.name }))), status);
     const offs = [
       session.on('link-open', (id) => {
         if (id !== invite.host.id) return;
@@ -293,7 +293,7 @@ export function pasteInviteModal(app) {
     title: t('join.title'),
     lead: t('home.joinHint'),
     closeLabel: t('common.close'),
-    body: [h('label', { class: 'field', for: 'paste-invite' }, h('span', { class: 'field-label' }, t('join.paste')), input), err],
+    body: [h('label', { class: 'hl-field', for: 'paste-invite' }, h('span', { class: 'field-label' }, t('join.paste')), input), err],
     footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.scanFlow((text) => go(text)) }, icon('scan', { size: 16 }), t('invite.scan')), h('button', { class: 'btn btn-brand', type: 'button', onclick: () => go(input.value) }, t('join.continue'))],
   });
   input.addEventListener('keydown', (e) => e.key === 'Enter' && go(input.value));
@@ -362,7 +362,7 @@ export function createDenModal(app) {
   const form = h(
     'form',
     {
-      class: 'stack',
+      class: 'hl-stack',
       onsubmit: async (e) => {
         e.preventDefault();
         if (!name.value.trim()) return name.focus();
@@ -371,8 +371,8 @@ export function createDenModal(app) {
       },
     },
     h('div', { class: 'create-ico' }, icon('logo', { size: 44 })),
-    h('label', { class: 'field', for: 'den-name' }, h('span', { class: 'field-label' }, t('create.name')), name),
-    h('label', { class: 'field', for: 'den-pass' }, h('span', { class: 'field-label' }, t('pass.optional')), pass, h('span', { class: 'field-hint' }, t('pass.optionalHint'))),
+    h('label', { class: 'hl-field', for: 'den-name' }, h('span', { class: 'field-label' }, t('create.name')), name),
+    h('label', { class: 'hl-field', for: 'den-pass' }, h('span', { class: 'field-label' }, t('pass.optional')), pass, h('span', { class: 'field-hint' }, t('pass.optionalHint'))),
     h('label', { class: 'check-row' }, show, t('pass.show')),
     h('div', { class: 'modal-foot flush' }, h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, t('common.cancel')), h('button', { class: 'btn btn-brand', type: 'submit' }, t('create.submit'))),
   );
@@ -395,7 +395,7 @@ export function createChannelModal(app, session, kind = 'text') {
   const form = h(
     'form',
     {
-      class: 'stack',
+      class: 'hl-stack',
       onsubmit: (e) => {
         e.preventDefault();
         const id = session.addChannel(kind, name.value);
@@ -405,7 +405,7 @@ export function createChannelModal(app, session, kind = 'text') {
       },
     },
     h('fieldset', { class: 'stack-sm' }, h('legend', { class: 'field-label' }, t('create.channelName')), radio('text', t('create.text'), t('create.textHint'), 'hash'), radio('voice', t('create.voice'), t('create.voiceHint'), 'speaker')),
-    h('label', { class: 'field', for: 'ch-name' }, h('span', { class: 'field-label' }, t('create.channelName')), name),
+    h('label', { class: 'hl-field', for: 'ch-name' }, h('span', { class: 'field-label' }, t('create.channelName')), name),
     h('div', { class: 'modal-foot flush' }, h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, t('common.cancel')), h('button', { class: 'btn btn-brand', type: 'submit' }, t('create.channelSubmit'))),
   );
   const m = modal({ title: t('create.channelTitle'), closeLabel: t('common.close'), body: [form] });
@@ -434,10 +434,10 @@ export function denSettingsModal(app, session) {
     title: t('den.settings'),
     closeLabel: t('common.close'),
     body: [
-      h('label', { class: 'field', for: 'ds-name' }, h('span', { class: 'field-label' }, t('settings.denName')), name),
+      h('label', { class: 'hl-field', for: 'ds-name' }, h('span', { class: 'field-label' }, t('settings.denName')), name),
       h(
         'div',
-        { class: 'field' },
+        { class: 'hl-field' },
         h('span', { class: 'field-label' }, t('settings.denPass')),
         h('p', null, icon(session.den.locked ? 'lock' : 'shield', { size: 16 }), ' ', t(session.den.locked ? 'settings.denPassOn' : 'settings.denPassOff')),
         session.den.locked ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => app.askPassphrase(session) }, t('settings.denPassSet')) : null,

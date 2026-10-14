@@ -73,6 +73,6 @@ describe('avatars', () => {
     const svg = avatarSvg('<script>alert(1)</script>');
     expect(svg).not.toContain('script');
     expect(avatarUrl('x').startsWith('data:image/svg+xml,')).toBe(true);
-    expect(nameColor('x')).toMatch(/^hsl\(\d+ 70% 62%\)$/);
+    expect(nameColor('x')).toMatch(/^hsl\(\d+ 70% var\(--name-l, 62%\)\)$/);
   });
 });

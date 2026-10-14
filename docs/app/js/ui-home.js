@@ -22,7 +22,7 @@ export function renderHomeSide(app) {
   const t = app.t;
   const dms = [...app.sessions.values()].filter((s) => s.isDirect).sort((a, b) => lastTs(b) - lastTs(a));
   return [
-    h('div', { class: 'side-head static' }, h('span', { class: 'side-title' }, 'howlden')),
+    h('div', { class: 'side-head is-static' }, h('span', { class: 'side-title' }, 'howlden')),
     h(
       'nav',
       { class: 'channels', 'aria-label': t('app.home') },
@@ -61,7 +61,7 @@ export function renderHome(app, el) {
   const tab = app.homeTab || 'all';
   const friends = app.friends.list();
   const online = friends.filter((f) => app.friends.isOnline(f.id));
-  const tabBtn = (key, label) => h('button', { class: `tab${tab === key ? ' active' : ''}${key === 'add' ? ' tab-add' : ''}`, type: 'button', role: 'tab', 'aria-selected': String(tab === key), onclick: () => ((app.homeTab = key), app.render()) }, label);
+  const tabBtn = (key, label) => h('button', { class: `hl-tab${tab === key ? ' active' : ''}${key === 'add' ? ' tab-add' : ''}`, type: 'button', role: 'tab', 'aria-selected': String(tab === key), onclick: () => ((app.homeTab = key), app.render()) }, label);
   const head = h('div', { class: 'home-tabs', role: 'tablist', 'aria-label': t('home.friends') }, icon('members', { size: 20, cls: 'muted' }), h('strong', null, t('home.friends')), h('span', { class: 'hd-divider' }), tabBtn('online', t('home.online')), tabBtn('all', t('home.all')), tabBtn('add', t('home.addFriend')));
   let body;
   if (tab === 'add' || !friends.length) {
@@ -120,11 +120,11 @@ export function renderHome(app, el) {
                           e.currentTarget,
                           h(
                             'div',
-                            { class: 'menu', role: 'menu' },
+                            { class: 'hl-menu', role: 'menu' },
                             h(
                               'button',
                               {
-                                class: 'menu-item danger',
+                                class: 'hl-menu-item danger',
                                 type: 'button',
                                 role: 'menuitem',
                                 onclick: async () => {

@@ -131,7 +131,7 @@ export function cropAvatar(t, file) {
       title: t('crop.title'),
       closeLabel: t('common.close'),
       className: 'crop-modal',
-      body: [h('div', { class: 'crop-wrap' }, canvas, h('div', { class: 'crop-ring', 'aria-hidden': 'true' })), h('label', { class: 'field' }, h('span', { class: 'field-label' }, t('crop.zoom')), zoom), h('p', { class: 'field-hint' }, t('crop.hint'))],
+      body: [h('div', { class: 'crop-wrap' }, canvas, h('div', { class: 'crop-ring', 'aria-hidden': 'true' })), h('label', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('crop.zoom')), zoom), h('p', { class: 'field-hint' }, t('crop.hint'))],
       footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, t('common.cancel')), h('button', { class: 'btn btn-brand', type: 'button', onclick: save }, t('crop.apply'))],
       onClose: () => {
         URL.revokeObjectURL(url);
@@ -144,7 +144,7 @@ export function cropAvatar(t, file) {
 /** The avatar picker used on the login card and in settings. */
 export function avatarPicker(t, initial, onChange) {
   let value = initial || randomId(6);
-  const img = h('img', { class: 'avatar avatar-lg', src: avatarSrc(value), alt: t('settings.avatar'), width: 88, height: 88 });
+  const img = h('img', { class: 'av av-lg', src: avatarSrc(value), alt: t('settings.avatar'), width: 88, height: 88 });
   const file = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', hidden: true });
   const set = (v) => {
     value = v;
@@ -219,9 +219,9 @@ export function loginCard(app, { invite } = {}) {
     },
     h('h1', { class: 'login-title' }, t('login.title')),
     h('p', { class: 'login-lead' }, invite ? t('login.leadInvite', { host: invite.host.name }) : t('login.lead')),
-    h('label', { class: 'field', for: 'login-name' }, h('span', { class: 'field-label' }, t('login.username'), h('span', { class: 'req', 'aria-hidden': 'true' }, ' *')), name),
-    h('div', { class: 'field' }, h('span', { class: 'field-label' }, t('settings.avatar')), picker.el),
-    h('div', { class: 'field field-row' }, h('label', { class: 'switch-row' }, useAccent, h('span', null, t('login.accentUse'))), accent),
+    h('label', { class: 'hl-field', for: 'login-name' }, h('span', { class: 'field-label' }, t('login.username'), h('span', { class: 'req', 'aria-hidden': 'true' }, ' *')), name),
+    h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.avatar')), picker.el),
+    h('div', { class: 'hl-field field-row' }, h('label', { class: 'switch-row' }, useAccent, h('span', null, t('login.accentUse'))), accent),
     check.el,
     error,
     submit,
@@ -235,12 +235,12 @@ export function loginCard(app, { invite } = {}) {
     'div',
     { class: 'login-side' },
     h('div', { class: 'login-qr' }, h('div', { class: 'qr-frame' }, icon('scan', { size: 64 })), h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.scanFlow((text) => ((paste.value = text), useCode())) }, icon('camera', { size: 18 }), t('login.scan'))),
-    h('h2', { class: 'login-title sm' }, t('login.joinTitle')),
+    h('h2', { class: 'login-title small' }, t('login.joinTitle')),
     h('p', { class: 'login-lead' }, t('login.joinLead')),
-    h('label', { class: 'field', for: 'login-invite' }, h('span', { class: 'field-label' }, t('join.paste')), paste),
+    h('label', { class: 'hl-field', for: 'login-invite' }, h('span', { class: 'field-label' }, t('join.paste')), paste),
     joinMsg,
     h('button', { class: 'btn btn-ghost btn-block', type: 'button', onclick: () => useCode() }, t('join.continue')),
-    invite ? h('div', { class: 'login-invite' }, h('img', { class: 'avatar', src: avatarSrc(invite.host.avatar || invite.host.id), alt: '', width: 40, height: 40 }), h('div', null, h('strong', null, invite.kind === 'dm' ? t('login.friendInvite', { host: invite.host.name }) : t('login.denInvite', { host: invite.host.name, den: invite.den.name })), h('p', null, t('login.inviteHold')))) : null,
+    invite ? h('div', { class: 'login-invite' }, h('img', { class: 'av', src: avatarSrc(invite.host.avatar || invite.host.id), alt: '', width: 40, height: 40 }), h('div', null, h('strong', null, invite.kind === 'dm' ? t('login.friendInvite', { host: invite.host.name }) : t('login.denInvite', { host: invite.host.name, den: invite.den.name })), h('p', null, t('login.inviteHold')))) : null,
   );
 
   async function useCode() {
@@ -304,7 +304,7 @@ export function pinScreen(app) {
             }
           },
         },
-        h('div', { class: 'login-form' }, h('div', { class: 'pin-ico' }, icon('lock', { size: 36 })), h('h1', { class: 'login-title' }, t('pin.title')), h('p', { class: 'login-lead' }, t('pin.lead')), h('label', { class: 'field', for: 'pin' }, h('span', { class: 'field-label' }, t('pin.label')), pin), error, btn, h('p', { class: 'login-fine' }, h('button', { class: 'link-btn', type: 'button', onclick: () => app.forgotPinFlow() }, t('pin.forgot')))),
+        h('div', { class: 'login-form' }, h('div', { class: 'pin-ico' }, icon('lock', { size: 36 })), h('h1', { class: 'login-title' }, t('pin.title')), h('p', { class: 'login-lead' }, t('pin.lead')), h('label', { class: 'hl-field', for: 'pin' }, h('span', { class: 'field-label' }, t('pin.label')), pin), error, btn, h('p', { class: 'login-fine' }, h('button', { class: 'link-btn', type: 'button', onclick: () => app.forgotPinFlow() }, t('pin.forgot')))),
       ),
     ),
   );
