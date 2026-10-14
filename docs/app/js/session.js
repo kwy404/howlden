@@ -154,6 +154,10 @@ export class DenSession extends Emitter {
     this.verified.clear();
     mesh.on('members', (list) => {
       this._rememberMembers(list);
+      for (const m of list) {
+        const f = m.online && app.friends?.get(m.id);
+        if (f && (f.name !== m.name || f.avatar !== m.avatar || f.status !== m.status || f.accent !== m.accent)) app.friends.touch(m.id, { name: m.name, avatar: m.avatar, status: m.status, accent: m.accent });
+      }
       this.emit('members');
     });
     mesh.on('relay', () => this.emit('members'));

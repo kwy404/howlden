@@ -115,7 +115,7 @@ export async function exportAccount(password, profile) {
   const { row, pkcs8 } = await privateBytes();
   const friends = await store.listFriends();
   const dens = (await store.listDens()).map((d) => ({ id: d.id, name: d.name, nameV: d.nameV, kind: d.kind, peer: d.peer, locked: d.locked, channels: d.channels, members: d.members, createdAt: d.createdAt }));
-  const text = await exportBackup({ kind: 'howlden-account', profile, alg: row.alg, publicKey: row.publicKey, pkcs8: Array.from(pkcs8), friends, dens });
+  const text = await exportBackup({ kind: 'howlden-account', profile, alg: row.alg, publicKey: row.publicKey, pkcs8: Array.from(pkcs8), friends, dens }, password);
   pkcs8.fill(0);
   return text;
 }

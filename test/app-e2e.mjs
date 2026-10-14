@@ -189,11 +189,25 @@ try {
     grew.push(await audioFlows(p, ids[q.name], `${p.name} hears ${q.name}`));
   log(`voice: audio flows on every pair (bytesReceived grew by ${grew.join(', ')} bytes in 1.5 s)`);
 
-  await evalApp(ana, () => window.howlden.media.toggleScreen());
-  for (const p of [bia, caio]) await waitFor(p, () => [...document.querySelectorAll('.screen-tile video')].some((v) => v.videoWidth > 0), null, 30000);
-  log('screen share from Ana is decoded by Bia and Caio');
+  const canShare = await evalApp(ana, async () => {
+    try {
+      const s = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      s.getTracks().forEach((t) => t.stop());
+      return true;
+    } catch (e) {
+      return e.name;
+    }
+  });
+  if (canShare === true || !process.env.CI) {
+    ok(canShare === true, `getDisplayMedia works in this browser (${canShare})`);
+    await evalApp(ana, () => window.howlden.media.toggleScreen());
+    for (const p of [bia, caio]) await waitFor(p, () => [...document.querySelectorAll('.screen-tile video')].some((v) => v.videoWidth > 0), null, 30000);
+    log('screen share from Ana is decoded by Bia and Caio');
+  } else {
+    log(`screen share skipped: this CI browser has no capture source (${canShare})`);
+  }
   await shot(bia, 'e2e-voice.png');
-  await evalApp(ana, () => window.howlden.media.toggleScreen());
+  if (await evalApp(ana, () => !!window.howlden.media.screen)) await evalApp(ana, () => window.howlden.media.toggleScreen());
   for (const p of [ana, bia, caio]) await evalApp(p, () => window.howlden.media.leave());
 
   // Identity and friends
@@ -241,6 +255,37 @@ try {
   await waitFor(ana, () => !!document.querySelector('.main-head .verified'), null, 20000);
   log('reconnect: both sides show the verified badge for a known key');
   await shot(bia, 'e2e-verified.png');
+
+  // PIN lock and backup round trip on Caio's account
+  const before = await evalApp(caio, () => ({ id: window.howlden.profile.id, msgs: [...window.howlden.sessions.values()].reduce((n, s) => n + s.messages.size, 0) }));
+  await evalApp(caio, () => window.howlden.account.setPin('2468', window.howlden.profile));
+  const sealed = await evalApp(caio, () => new Promise((resolve) => {
+    const req = indexedDB.open('howlden');
+    req.onsuccess = () => {
+      const tx = req.result.transaction('messages').objectStore('messages').getAll();
+      tx.onsuccess = () => resolve(tx.result.every((r) => r.sealed && !('text' in r)));
+    };
+  }));
+  ok(sealed, 'messages are sealed at rest with the PIN key');
+  await caio.page.reload();
+  await caio.page.waitForSelector('#pin');
+  await caio.page.fill('#pin', '1111');
+  await caio.page.click('.login-card button[type="submit"]');
+  await caio.page.waitForSelector('.form-error:not(:empty)');
+  await caio.page.fill('#pin', '2468');
+  await caio.page.click('.login-card button[type="submit"]');
+  await caio.page.waitForSelector('#app:not([hidden]) .rail');
+  const after = await evalApp(caio, () => ({ id: window.howlden.profile.id, msgs: [...window.howlden.sessions.values()].reduce((n, s) => n + s.messages.size, 0) }));
+  ok(after.id === before.id && after.msgs === before.msgs && after.msgs > 0, `PIN unlock restores the account and history ${JSON.stringify([before, after])}`);
+  const backup = await evalApp(caio, () => window.howlden.account.exportAccount('backup password', window.howlden.profile));
+  const dan = await browser.newContext({ locale: 'en-US' }).then((c) => c.newPage());
+  await dan.goto(base);
+  await dan.waitForSelector('#login-name');
+  await dan.evaluate(([text]) => window.howlden.restoreAccount(text, 'backup password'), [backup]);
+  await dan.waitForSelector('#app:not([hidden]) .rail');
+  const moved = await dan.evaluate(() => [window.howlden.profile.id, window.howlden.identity.id, window.howlden.friends.list().length]);
+  ok(moved[0] === before.id && moved[1] === before.id && moved[2] >= 2, 'backup moves the identity and friends to a new browser');
+  log('PIN lock seals local data and unlocks; the encrypted backup moves the account');
 
   const real = errors.filter((e) => !/favicon|net::ERR_|Failed to load resource/.test(e));
   ok(!real.length, `no console errors:\n${real.join('\n')}`);

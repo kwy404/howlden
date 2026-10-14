@@ -148,13 +148,16 @@ export async function rewriteAll(oldVault, newVault) {
 export async function getAccount(k) {
   const db = await open();
   const row = await request(db.transaction('account').objectStore('account').get(k));
-  if (row?.sealed) return { k, ...(await unpack('account', { id: k, sealed: row.sealed })) };
+  if (row?.sealed) {
+    if (!vault) throw new Error('locked');
+    return { ...JSON.parse(dec.decode(await unseal(vault, row.sealed, `account:${k}`))), k };
+  }
   return row;
 }
 
 export async function putAccount(k, value, { sealed = false } = {}) {
   const db = await open();
-  const row = sealed && vault ? { k, sealed: (await pack('account', { ...value, id: k })).sealed } : { ...value, k };
+  const row = sealed && vault ? { k, sealed: await seal(vault, enc.encode(JSON.stringify(value)), `account:${k}`) } : { ...value, k };
   const tx = db.transaction('account', 'readwrite');
   tx.objectStore('account').put(row);
   return done(tx);
