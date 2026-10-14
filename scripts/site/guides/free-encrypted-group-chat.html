@@ -1,0 +1,77 @@
+<!--meta
+{
+  "slug": "free-encrypted-group-chat",
+  "title": "Free encrypted group chat with no account | howlden",
+  "description": "A free encrypted group chat in your browser: what end to end encryption covers, how to add a passphrase and check fingerprints, and what no tool can protect.",
+  "h1": "Free encrypted group chat",
+  "lede": "What \"encrypted\" really means for a small group, how howlden layers its protection, and a short checklist for a den you can trust.",
+  "short": "Free encrypted group chat",
+  "icon": "lock",
+  "scene": "sealed-tunnel",
+  "keywords": ["encrypted group chat free", "free encrypted group chat", "end to end encrypted group chat", "private group chat", "secure group chat no account", "encrypted chat in browser"],
+  "faq": [
+    { "q": "Is howlden end to end encrypted?", "a": "Yes. Every connection in a den is a WebRTC connection, which browsers always encrypt with DTLS, and SRTP for audio and video. You can add a passphrase for a second AES-GCM layer on messages and files." },
+    { "q": "How can an encrypted group chat be free?", "a": "howlden has no backend to pay for. The site is static files on GitHub Pages, and your messages travel directly between browsers, so there are no servers storing or relaying chats for us to run." },
+    { "q": "Can anyone read my messages if they use a TURN relay?", "a": "A TURN relay only forwards packets that are already encrypted. It can see that traffic is passing, but it cannot read the messages, voice or files inside." },
+    { "q": "Does encryption protect me if my phone is hacked?", "a": "No. Encryption protects data while it travels. If a device in the den is compromised, whoever controls it can read what that device can read." }
+  ]
+}
+-->
+<section id="what-encrypted-means"><h2>What "encrypted" should mean for a group chat</h2>
+<p>Lots of apps say they are encrypted, and the word covers very different things. Sometimes it only means the link between your phone and the company's server is protected, while the server itself can read everything. That is called encryption in transit, and it is useful, but it still puts a readable copy of your chat somewhere you do not control.</p>
+<p><strong>End to end encryption</strong> is the stronger promise: data is encrypted on the sender's device and only decrypted on the receiver's device. Anything in the middle sees scrambled bytes. Apps like Signal and WhatsApp offer end to end encryption on top of a server that stores and delivers messages, which is how they reach people who are offline.</p>
+<p><a href="app/">howlden</a> takes a different route: there is no message server at all. Each member's browser talks directly to each other member's browser, and each of those direct connections is end to end encrypted. Below is exactly how, layer by layer.</p>
+</section>
+<section id="three-layers"><h2>Three layers of protection in a den</h2>
+<h3>Layer one: WebRTC encryption, always on</h3>
+<p>Every connection in a den uses WebRTC, the real time standard built into modern browsers. WebRTC encrypts text and files with <strong>DTLS</strong> and audio and video with <strong>SRTP</strong>. This is part of the standard, so it cannot be turned off by us, by you, or by a misconfigured setting. If you want to read the details, the <a href="https://webrtc.org/">webrtc.org</a> site is a good starting point.</p>
+<h3>Layer two: an optional den passphrase</h3>
+<p>You can give a den a passphrase. howlden runs it through <strong>PBKDF2</strong> to derive a key, then encrypts messages and files a second time with <strong>AES-GCM</strong> before they even enter the WebRTC connection. Only members who know the passphrase can read them. Share the passphrase in person or over a channel different from the one you used for the invite link, so one leaked chat does not reveal both.</p>
+<h3>Layer three: a fingerprint you can check</h3>
+<p>Encryption is only as good as knowing who is on the other end. howlden shows a short <strong>connection fingerprint</strong>. Read it aloud on a voice call or compare it side by side on screen. If both sides match, nobody slipped into the middle of your connection when you exchanged invites.</p>
+<figure data-scene="fingerprint"></figure>
+</section>
+<section id="why-free"><h2>Why it can be free (and stay free)</h2>
+<p>Running a chat service usually costs money because someone has to pay for servers that store messages, relay calls and keep accounts. Those costs are why many services need ads, subscriptions or data.</p>
+<p>howlden avoids almost all of that by design:</p>
+<ul>
+<li>The website is <strong>static files on GitHub Pages</strong>. There is no howlden backend, no database, no analytics and no tracking.</li>
+<li>Messages, voice, video and files go <strong>directly between browsers</strong>, so there is nothing for us to store or relay.</li>
+<li>There are <strong>no accounts</strong>. Your display name, avatar, settings and den list live in your browser's local storage.</li>
+<li>The code is <strong>open source under the MIT license</strong>, so anyone can read how it works.</li>
+</ul>
+<p>The only outside helper is a public <strong>STUN</strong> server (Google's free ones), which answers one question: what is my public address? It never sees your messages or calls.</p>
+</section>
+<section id="what-is-not-protected"><h2>What encryption cannot do</h2>
+<p>An honest security page lists the gaps too. Here are the ones that matter for a small private group:</p>
+<ul>
+<li><strong>Your device is the weak point.</strong> If a phone or laptop in the den has malware, or someone else is holding it unlocked, they can read what that member reads. Keep devices updated and locked.</li>
+<li><strong>Members can share what they see.</strong> Any member can screenshot, copy or forward a message. Encryption keeps outsiders out; it does not control insiders.</li>
+<li><strong>Direct connections reveal network addresses.</strong> In a peer to peer connection, the devices learn each other's internet address so they can talk. That is another reason to invite only people you actually know.</li>
+<li><strong>Relays see that traffic exists.</strong> If you add a TURN relay for a strict network, it forwards encrypted packets it cannot read, but it can see that you are connected and how much data flows.</li>
+<li><strong>Nothing is a magic shield.</strong> No chat tool is perfectly secure. howlden aims to remove the middle server and use strong, standard encryption, and to be clear about the rest.</li>
+</ul>
+</section>
+<section id="checklist"><h2>A checklist for a den you can trust</h2>
+<ol>
+<li><strong>Send each invite one to one.</strong> Invites in howlden are already invite only, and nobody can find a den without one. Do not post invite links in public groups.</li>
+<li><strong>Set a passphrase</strong> for dens where the topic is sensitive, and share it through a different path than the link.</li>
+<li><strong>Compare fingerprints</strong> the first time someone joins, especially if the invite traveled through an app you do not fully trust.</li>
+<li><strong>Keep the group small and known.</strong> A den holds up to 8 people anyway, which suits close friends, a family, a project team or a study group.</li>
+<li><strong>Remember that nobody stores history for you.</strong> Everyone has to be online at the same time to receive messages, and clearing your browser data clears your den list.</li>
+</ol>
+</section>
+<section id="when-to-choose-what"><h2>Choosing the right kind of encrypted chat</h2>
+<table>
+<thead><tr><th>You need</th><th>A good fit</th></tr></thead>
+<tbody>
+<tr><td>Messages that wait for people who are offline</td><td>A server based end to end encrypted messenger</td></tr>
+<tr><td>Groups of dozens or hundreds</td><td>A server based tool built for large groups</td></tr>
+<tr><td>A small group, live voice and text, no accounts, no message server</td><td>A peer to peer den like howlden</td></tr>
+</tbody>
+</table>
+<p>Neither approach is better everywhere. They solve different problems, and many people use both. If you want to understand the direct approach more deeply, read <a href="peer-to-peer-chat-explained.html">peer to peer chat explained</a>, or see <a href="private-group-voice-call.html">private group voice calls</a> for the voice side of things.</p>
+</section>
+<section id="try-it"><h2>Light the campfire</h2>
+<p>Creating a den takes a name, an avatar and one invite round trip. Add a passphrase if you like, compare fingerprints with your first guest, and you have a small encrypted space that lives only on your pack's devices. <a href="app/">Open a den</a> when you are ready.</p>
+</section>

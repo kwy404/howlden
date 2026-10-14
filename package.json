@@ -47,7 +47,10 @@
     "core": "node scripts/sync-core.mjs",
     "core:check": "node scripts/sync-core.mjs --check",
     "e2e": "node test/app-e2e.mjs",
-    "serve": "node scripts/serve.mjs"
+    "serve": "node scripts/serve.mjs",
+    "site": "node scripts/site/build-site.mjs",
+    "site:check": "node scripts/site/build-site.mjs --check && node scripts/site/check-links.mjs",
+    "site:images": "node scripts/site/render-images.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

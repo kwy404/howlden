@@ -1,0 +1,70 @@
+<!--meta
+{
+  "slug": "webrtc-connection-failed-strict-nat",
+  "title": "WebRTC connection failed? Strict NAT and TURN | howlden",
+  "description": "WebRTC connection failed? Learn how strict NAT blocks direct calls, what to try first, and when you really need a TURN server, explained in plain words.",
+  "h1": "WebRTC connection failed: strict NAT and TURN",
+  "lede": "Why two browsers sometimes cannot reach each other, the quick checks that fix many cases, and how a TURN relay gets you through when nothing else does.",
+  "short": "Connection failed and strict NAT",
+  "icon": "strict-nat",
+  "scene": "relay-bridge",
+  "keywords": ["webrtc connection failed", "strict nat webrtc", "when do you need a turn server", "webrtc turn server", "symmetric nat webrtc", "ice failed webrtc"],
+  "faq": [
+    { "q": "What does WebRTC connection failed mean?", "a": "It means ICE tried every possible network path between the two browsers and none of them worked. The usual cause is a strict NAT or firewall on both sides." },
+    { "q": "What is strict NAT?", "a": "A router or firewall that hands out a different public port for every destination, or blocks unexpected incoming traffic and UDP. Direct connections through it are unreliable, especially when the other person is behind one too." },
+    { "q": "Do I always need a TURN server for WebRTC?", "a": "No. Most home networks connect directly using STUN alone. You only need TURN when the direct path fails, typically when both people are on strict networks." },
+    { "q": "Can a TURN server read my messages or hear my calls?", "a": "No. WebRTC traffic is encrypted end to end with DTLS and SRTP, so the relay only forwards encrypted packets. It can see IP addresses, timing and how much data moved." }
+  ]
+}
+-->
+<section id="what-the-error-means"><h2>What "connection failed" actually means</h2>
+<p>You sent the invite, your friend sent back the reply code, and then nothing: the call never connects, or howlden tells you the connection failed. In a direct connection app, this message almost always has the same cause. The two browsers could not find any network path to each other. The invite and reply exchange worked fine (that part travels through your messenger), but the actual connection between the two devices was blocked somewhere along the way.</p>
+<p>This guide explains why that happens, how to tell what kind of network you are on, and when a TURN server is the real fix. A quick refresher first: howlden has no server in the middle. Each pair of people connects directly with WebRTC, so if two browsers cannot reach each other, there is nothing to fall back on unless you provide one. If that model is new to you, <a href="peer-to-peer-chat-explained.html">peer to peer chat explained</a> covers the basics.</p>
+</section>
+<section id="nat-in-plain-words"><h2>NAT in plain words</h2>
+<p>Your phone or laptop almost never has its own public internet address. It sits behind a router that does NAT (network address translation): many devices share one public address, and the router keeps a table of which outgoing conversation belongs to which device. Replies to something you sent get through. Unexpected packets from outside are dropped.</p>
+<p>That is a problem for direct calls, because each side looks like a stranger to the other. WebRTC works around it with ICE. Both browsers ask a STUN server "what is my public address?", the addresses travel inside the invite and reply codes, and then both browsers send probes to each other at about the same moment. Each router sees an outgoing packet first, opens a door for the reply, and the probes meet in the middle. This trick works on most home networks.</p>
+<p>It fails on what people call <strong>strict NAT</strong> (one technical name is symmetric NAT). These routers pick a different public port for every destination, so the address STUN reported is not the one your friend's probes need to hit. Some networks also block UDP, the transport WebRTC prefers, or allow only ordinary web traffic. You find this on some corporate offices, schools, hotels, airports and mobile carriers. If only one side is strict, the other side can often still get through. When both sides are strict, the direct path is usually gone.</p>
+</section>
+<section id="candidate-types"><h2>The three ways ICE can connect</h2>
+<p>Every possible address ICE gathers is called a candidate. There are three kinds:</p>
+<table><thead><tr><th>Candidate type</th><th>Where it comes from</th><th>When it works</th></tr></thead><tbody>
+<tr><td>Host</td><td>Your device's local address</td><td>Both people on the same network</td></tr>
+<tr><td>Server reflexive (srflx)</td><td>Your public address, learned from STUN</td><td>Most home networks and many mobile ones</td></tr>
+<tr><td>Relay</td><td>An address on a TURN server you configured</td><td>Nearly everywhere, including strict NAT on both sides</td></tr>
+</tbody></table>
+<p>howlden gets the first two for free: it asks Google's public STUN servers one question, and they never see your messages or calls. The third only exists if a TURN server is set up, because a relay has to be a real machine on the internet that forwards traffic, and howlden deliberately runs no servers of its own.</p>
+</section>
+<section id="try-these-first"><h2>Things to try before setting up TURN</h2>
+<ol>
+<li><strong>Switch one person's network.</strong> Moving one side to a different network, like a phone hotspot or home Wi-Fi, is the fastest test. If it connects, the original network was the blocker. Mobile carriers differ a lot, so try it rather than assume.</li>
+<li><strong>Turn the VPN off.</strong> Some VPNs block UDP or route traffic in ways that break the probes. Test with it off first, then on, and compare.</li>
+<li><strong>Check browser extensions and settings.</strong> Some privacy extensions limit or disable WebRTC to hide your local address. Try a private window with extensions off, or another browser.</li>
+<li><strong>Make a fresh invite.</strong> The addresses inside an old invite can go stale when a laptop changes Wi-Fi or a phone moves to mobile data. A new invite and reply code collects fresh ones.</li>
+<li><strong>Look at the details.</strong> In Chrome, open <code>chrome://webrtc-internals</code>, and in Firefox, <code>about:webrtc</code>. If you see candidates of type "srflx" on both sides but no pair ever succeeds, strict NAT is the likely cause. If you see no srflx candidates at all, something is blocking STUN, often a firewall.</li>
+</ol>
+<p>In a den, remember that every pair of members has its own connection. It is common for one person on a strict network to reach some members but not others. That pattern is a strong hint that the network is the issue, not the app.</p>
+</section>
+<section id="adding-a-turn-server"><h2>Adding a TURN server in howlden</h2>
+<p>When both sides really are stuck, a TURN relay is the fix. It receives the encrypted packets from one browser and forwards them to the other. Because WebRTC encrypts every connection end to end with DTLS (and SRTP for audio and video), the relay cannot read your messages or hear your call. It does see what any network operator would see: the IP addresses involved, when you connected and roughly how much data moved. A relay you run yourself, or one run by someone you trust, is the best choice.</p>
+<p>howlden notices when a connection fails, explains it in plain words, and lets you add your own TURN server in settings. The details are stored only in your browser's local storage. You need three things from whoever runs the server:</p>
+<ul>
+<li>a server address such as <code>turn:turn.example.com:3478</code>, and ideally a <code>turns:</code> address on port 443 for networks that only allow web traffic,</li>
+<li>a username,</li>
+<li>a credential (the password for the relay).</li>
+</ul>
+<p>Often one person having a TURN server configured is enough, since the other side can usually reach the relay's public address. Adding it on both sides is the most reliable setup when both networks are strict.</p>
+<aside class="note"><p>A relay only gets used by the pairs that need it. ICE prefers direct paths, so members who can connect directly still will, and only the stuck pair takes the detour.</p></aside>
+</section>
+<section id="where-turn-servers-come-from"><h2>Where TURN servers come from, honestly</h2>
+<p>There is no magic free relay we can point you to, and we will not promise that any particular free server works or keeps working. Your realistic options are:</p>
+<ul>
+<li><strong>Run your own.</strong> coturn is a widely used open source TURN server. A small cloud machine with a public IP address is plenty for a few friends. The main cost is bandwidth, because every relayed call passes through that machine, and video adds up quickly.</li>
+<li><strong>Use a hosted TURN service.</strong> Several companies sell TURN access billed by traffic. Read their privacy terms, since they will see connection metadata.</li>
+<li><strong>Ask your organization.</strong> If the strict network is at your workplace or school, the IT team may already run a relay or be willing to allow WebRTC traffic.</li>
+</ul>
+<p>Keep in mind that a relay adds a little delay, because packets take a detour, so a direct path is still the nicer experience when you can get one.</p>
+</section>
+<section id="try-again"><h2>Give it another go</h2>
+<p>Many connection failures come down to one strict network, and switching networks fixes a good share of them. <a href="app/">Open your den</a>, try a fresh invite from a different network, and if that works, you know exactly what to bring up with IT or the hotel front desk. To understand the moving parts in more depth, read <a href="how-webrtc-voice-works.html">how WebRTC voice chat works</a>, and for planning a call with friends, see <a href="private-group-voice-call.html">private group voice calls</a>. Then <a href="app/">jump back into the den</a>.</p>
+</section>

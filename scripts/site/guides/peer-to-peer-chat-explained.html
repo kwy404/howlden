@@ -1,0 +1,69 @@
+<!--meta
+{
+  "slug": "peer-to-peer-chat-explained",
+  "title": "Peer to peer chat explained: how P2P chat works | howlden",
+  "description": "Peer to peer chat explained in plain words: how P2P chat works in the browser, how two devices find each other, what STUN and TURN do, and where its limits are.",
+  "h1": "Peer to peer chat explained",
+  "lede": "How two browsers talk straight to each other, what has to happen before they can, and why that changes who can see your conversation.",
+  "short": "Peer to peer chat explained",
+  "icon": "mesh",
+  "scene": "pack-mesh",
+  "keywords": ["peer to peer chat explained", "how p2p chat works", "p2p chat", "peer to peer messaging", "serverless chat", "webrtc chat"],
+  "faq": [
+    { "q": "What does peer to peer chat mean?", "a": "It means your messages, voice and files travel directly from your device to the other person's device, instead of being uploaded to a company server that passes them along." },
+    { "q": "Is peer to peer chat safer than a normal chat app?", "a": "It removes one place where your data could be stored or read: the middle server. In howlden every connection is also end to end encrypted by WebRTC. Your own device and browser still need to be safe, so it is a different trade off, not magic." },
+    { "q": "Why do both people need to be online for P2P chat?", "a": "Because there is no server holding messages while you are away. If your friend is offline, there is simply nobody on the other end to receive the message yet." },
+    { "q": "Can peer to peer chat work through any network?", "a": "Most home and phone networks work fine. When both sides are behind strict NAT, a direct path can fail and a TURN relay is needed. See <a href=\"webrtc-connection-failed-strict-nat.html\">the strict NAT guide</a>." }
+  ]
+}
+-->
+<section id="two-ways-to-send-a-message"><h2>Two ways to send a message</h2>
+<p>Almost every chat app you have used works like a post office. You write a message, your phone uploads it to the company's servers, and those servers deliver it to your friend, often keeping a copy so it can show up later on another device. That design is good at a lot of things: huge groups, message history, people who are offline for days.</p>
+<p>Peer to peer (often shortened to P2P) works more like two people passing notes across a table. Your device sends the message straight to your friend's device. There is no post office in the middle sorting the mail. In <a href="app/">howlden</a>, that is true for text, voice, video, screen share and files: they all go from browser to browser.</p>
+<p>The idea sounds simple, but the internet was not built to make it easy. The interesting part of P2P chat is everything that has to happen before those two devices can talk.</p>
+</section>
+<section id="finding-each-other"><h2>Problem one: finding each other</h2>
+<p>Your laptop does not have a public phone number on the internet. Behind your router it has a private address that only makes sense inside your home network. Your router uses something called NAT (network address translation) to share one public address among every device in the house. That is great for the router, and awkward for anyone trying to reach your laptop from outside.</p>
+<p>So the first question a browser asks is: "what does my address look like from the outside?" To answer it, howlden asks a public <strong>STUN</strong> server (Google runs free ones). The STUN server replies with your public address and port, and that is all it does. It never sees your messages or your calls, and it is not involved once the conversation starts.</p>
+<p>Your browser then gathers a few possible routes to reach you (local address, public address, and a relay route if you configured one) and packs them into a <strong>connection offer</strong>. In WebRTC terms these routes are called ICE candidates, if you want to read more on <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Connectivity">MDN</a>.</p>
+</section>
+<section id="the-handshake"><h2>Problem two: the handshake</h2>
+<p>Both browsers need each other's offer before they can connect. Most P2P apps solve this with a "signaling server" that quietly passes the offers back and forth. howlden has no server at all, so it lets <em>you</em> be the messenger. That is why inviting someone takes one round trip:</p>
+<ol>
+<li>A den member creates an invite. howlden compresses the connection offer into a link and a QR code. You send the link through any messenger you already use, or let your friend scan the QR.</li>
+<li>Your friend opens the link. Their browser builds a short <strong>reply code</strong>, also a link or QR, and sends it back the same way.</li>
+<li>You paste or scan the reply code. The two browsers now know how to reach each other, and they connect directly. If scanning is awkward, a manual paste option is always there.</li>
+</ol>
+<p>You never see raw technical text, only a link or a picture. It is a small extra step compared to a server based app, and it is also the reason nobody can wander into a den uninvited: without that exchange, there is no way in.</p>
+</section>
+<section id="locking-the-line"><h2>Problem three: keeping the line private</h2>
+<p>Once a route is found, WebRTC sets up encryption before anything else flows. Data channels (text and files) use <strong>DTLS</strong>, and audio and video use <strong>SRTP</strong> with keys agreed through that DTLS handshake. This is built into every modern browser and cannot be switched off. The result is that the connection is end to end encrypted between the two browsers.</p>
+<p>How do you know the other end is really your friend and not someone sitting in between? howlden shows a short <strong>connection fingerprint</strong>. Read it aloud on the call or compare it on screen. If both of you see the same thing, the line is the one you think it is.</p>
+<aside class="note"><p>Want a second lock? A den can have an optional <strong>passphrase</strong>. howlden derives a key from it with PBKDF2 and adds an AES-GCM layer to messages and files, so only people who know the passphrase can read them. The <a href="free-encrypted-group-chat.html">encrypted group chat guide</a> covers this in detail.</p></aside>
+</section>
+<section id="from-two-to-a-pack"><h2>From two people to a whole pack</h2>
+<p>A chat between two people is one connection. A den with five people is a <strong>mesh</strong>: every member keeps a direct, encrypted connection to every other member. When a new friend joins through an invite, howlden uses the connections that already exist to introduce them to everyone else automatically, so you only do the link and reply code dance once per newcomer.</p>
+<figure data-scene="pack-mesh"></figure>
+<p>A mesh has a cost that grows with the group. If you share your camera in a den of six, your device sends your video five separate times, once to each friend. Audio is light, so a voice chat stays comfortable, but video eats upload bandwidth fast. That is why a howlden den holds <strong>up to 8 people</strong>. Bigger groups are a job for a server based tool, which can receive one stream and copy it out to hundreds of listeners.</p>
+</section>
+<section id="when-the-direct-path-fails"><h2>When the direct path fails</h2>
+<p>Most home and mobile networks let two browsers connect directly after the STUN step. Some networks are stricter: certain office, school, hotel and mobile carrier networks use what is called strict NAT, and when <em>both</em> people are behind one, the direct route can fail.</p>
+<p>The fix is a <strong>TURN relay</strong>, a server that forwards packets between the two sides. Because the traffic is already encrypted, the relay only sees scrambled packets and cannot read them. howlden notices when a connection fails, tells you in plain words, and lets you add your own TURN server in settings, stored only in your browser. The <a href="webrtc-connection-failed-strict-nat.html">strict NAT guide</a> walks through it.</p>
+</section>
+<section id="trade-offs"><h2>The honest trade offs</h2>
+<p>Peer to peer is not "better" in every way. It is a different approach, and it shines in some places and not in others.</p>
+<table>
+<thead><tr><th>Question</th><th>Server based chat</th><th>Peer to peer (howlden)</th></tr></thead>
+<tbody>
+<tr><td>Who holds your messages?</td><td>The service's servers</td><td>Only the devices in the den</td></tr>
+<tr><td>Friend offline?</td><td>Message waits on the server</td><td>Everyone must be online at the same time</td></tr>
+<tr><td>Group size</td><td>Can be very large</td><td>Up to 8 people</td></tr>
+<tr><td>Account needed?</td><td>Usually yes</td><td>No, just a display name in your browser</td></tr>
+<tr><td>Joining</td><td>Search or a public invite link</td><td>One round trip invite, nobody else can find the den</td></tr>
+</tbody>
+</table>
+<p>Two more things worth saying plainly. Encryption protects the connection, not your device: if a phone or laptop is compromised, no protocol can fix that. And because nothing is stored online, your name, settings and den list live in your browser's local storage, so clearing site data clears them too.</p>
+</section>
+<section id="try-it"><h2>See it for yourself</h2>
+<p>The fastest way to understand P2P chat is to watch it happen. Open a den on your laptop, invite your own phone with the QR code, and send a message from one to the other. If you want to know how voice travels over the same connection, read <a href="how-webrtc-voice-works.html">how WebRTC voice works</a> next. When you are ready, <a href="app/">open a den</a> and invite a friend.</p>
+</section>

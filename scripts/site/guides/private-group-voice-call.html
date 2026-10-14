@@ -1,0 +1,75 @@
+<!--meta
+{
+  "slug": "private-group-voice-call",
+  "title": "Private group voice call: invite only and encrypted | howlden",
+  "description": "How to set up a private group voice call: invite only, end to end encrypted in the browser, no server of ours in the middle, plus the limits you should know.",
+  "h1": "A private group voice call",
+  "lede": "Private means more than a hidden link. This guide breaks a group call into its layers (who can join, who can listen, who sits in the middle) and shows how to lock down each one.",
+  "short": "Private group voice call",
+  "icon": "lock",
+  "scene": "sealed-tunnel",
+  "keywords": ["private group voice call", "private voice call", "encrypted group call", "secure group voice chat", "private voice chat with friends", "invite only voice call"],
+  "faq": [
+    { "q": "How do I make a private group voice call?", "a": "Use a tool where only invited people can join and the audio is end to end encrypted. In howlden you <a href=\"app/\">open a den</a>, send invites through a messenger you trust, and talk in a voice channel encrypted with DTLS and SRTP." },
+    { "q": "Can anyone else listen to a howlden voice call?", "a": "Audio travels directly between members, encrypted by the browser. No server of ours sees it, and a TURN relay, if used, only forwards encrypted packets. A compromised device or a member recording the call are risks encryption cannot remove." },
+    { "q": "How can I check nobody is intercepting the call?", "a": "Compare the short connection fingerprint howlden shows. Read it aloud on the call or compare screens. If it matches on both sides, nobody is sitting in the middle of that connection." },
+    { "q": "Is a private voice call the same as an anonymous call?", "a": "No. A direct connection means members' devices exchange network addresses, and the people you invite know who you are. howlden is private and encrypted, not anonymous." }
+  ]
+}
+-->
+<section id="what-private-means"><h2>What "private" means for a group call</h2>
+<p>People use the word private loosely. For a group voice call it helps to split it into four separate questions, because each one has its own answer:</p>
+<ol>
+<li><strong>Who can join?</strong> Can a stranger find the call or guess a link?</li>
+<li><strong>Who can listen on the way?</strong> Is the audio readable by anyone between the speakers?</li>
+<li><strong>Is anyone in the middle?</strong> Could someone pose as your friend and quietly relay the call?</li>
+<li><strong>What is left behind?</strong> Is there a recording, a log or a stored history somewhere?</li>
+</ol>
+<p>A call is only as private as its weakest answer. Below is how howlden handles each one, and where the limits are.</p>
+</section>
+<section id="who-can-join"><h2>Who can join: invite only, one round trip</h2>
+<p>A howlden den has no public address and no directory. Nobody can search for it, and there is no static link that stays valid forever. To bring someone in, a member creates an invite: a link and QR code that carry a connection offer. The friend opens it, their browser makes a reply code, and they send it back. Only when the member pastes or scans that reply does the friend join.</p>
+<p>That round trip is a quiet privacy feature. You choose the channel the invite travels through, so send it through a messenger you already trust, or show the QR code in person. There are no accounts behind any of this, so nobody needs to hand over an email or phone number to the call.</p>
+<p>A den also holds at most 8 people. That limit comes from the direct design, and for a private call it is rarely a problem: small groups are easier to keep track of.</p>
+</section>
+<section id="who-can-listen"><h2>Who can listen: encryption the browser enforces</h2>
+<p>Voice in howlden travels over WebRTC. Every modern browser encrypts WebRTC connections end to end, using DTLS to set up keys and SRTP for audio and video. This is not a setting you might forget to turn on. It is built into the browser and cannot be turned off.</p>
+<p>Just as important is the path the audio takes. There is no howlden server relaying your call, because there is no howlden backend at all: the website is static files on GitHub Pages, with no database, no analytics and no tracking. Each member's browser connects directly to every other member's browser.</p>
+<p>Two helpers do touch the network, and it is worth knowing exactly what they do:</p>
+<ul>
+<li><strong>STUN</strong>: the app asks public STUN servers (Google's free ones) one question, "what is my public address?". They never see your call.</li>
+<li><strong>TURN</strong>: if both people sit behind a strict NAT, a direct connection may fail. A TURN relay you add in settings can forward the traffic. It only forwards encrypted packets and cannot read them. The guide on <a href="webrtc-connection-failed-strict-nat.html">strict NAT and TURN</a> explains when you need one.</li>
+</ul>
+</section>
+<section id="middle"><h2>Is anyone in the middle: compare the fingerprint</h2>
+<p>Encryption protects a connection, but you still want to know the connection really goes to your friend. howlden shows a short connection fingerprint for that. Both sides see it, and if it matches, nobody has slipped in between.</p>
+<p>The simplest habit: at the start of the call, one person reads the fingerprint aloud and the others check it on their screens. If you are in the same room, compare screens side by side. It takes ten seconds and turns "probably fine" into "checked".</p>
+<aside class="note"><p>Exchanging the invite through a channel you trust and comparing the fingerprint once covers the two places someone could most easily sneak in.</p></aside>
+</section>
+<section id="passphrase"><h2>Adding a passphrase for text and files</h2>
+<p>A voice call rarely stays only voice. Someone pastes an address, drops a document, shares a photo. For those, a den can have an optional passphrase. howlden derives a key from it with PBKDF2 and adds a second AES-GCM encryption layer on top of the WebRTC encryption for messages and files, so only people who know the passphrase can read them.</p>
+<p>Share the passphrase separately from the invite, ideally out loud. More on how the layers fit together is in <a href="free-encrypted-group-chat.html">encrypted group chat for free</a>.</p>
+</section>
+<section id="limits"><h2>What no app can do for you</h2>
+<p>Honesty matters most here, because privacy promises are easy to oversell:</p>
+<ul>
+<li><strong>Your device is part of the call.</strong> If a phone or laptop is compromised, encryption cannot help: the audio is readable where it is played. Keep the browser and system updated.</li>
+<li><strong>Members can record.</strong> Anyone in the call can record it with another device. Invite people you trust.</li>
+<li><strong>Private is not anonymous.</strong> In a direct connection, members' devices learn each other's network addresses, and your friends know who you are. howlden is private and end to end encrypted, not anonymous.</li>
+<li><strong>Everyone must be online.</strong> Nothing is stored for latecomers, which is good for privacy and a limit for convenience.</li>
+<li><strong>Video is heavy.</strong> Audio is light, but camera video for several people uses a lot of upload bandwidth.</li>
+</ul>
+<p>Server based tools like Zoom, Google Meet, Signal or Jitsi each make their own trade offs and are strong at larger meetings or offline delivery. The direct approach fits a small group that wants the shortest possible path between voices. <a href="peer-to-peer-chat-explained.html">Peer to peer chat explained</a> goes deeper into that design.</p>
+</section>
+<section id="checklist"><h2>A quick checklist before you talk</h2>
+<ol>
+<li><a href="app/">Open a den</a> and set a passphrase if you will share text or files.</li>
+<li>Send each invite through a messenger you trust, or show the QR in person.</li>
+<li>Join the voice channel and compare the connection fingerprint out loud.</li>
+<li>Wear earphones so the call does not leak into the room.</li>
+<li>Mute when you are not speaking, and hang up when you are done.</li>
+</ol>
+</section>
+<section id="try-it"><h2>Try a private call tonight</h2>
+<p>It takes a couple of minutes and no account. <a href="app/">Open a den</a>, invite the people you actually want to hear, check the fingerprint, and talk. When the call ends, there is no server holding a copy of what was said.</p>
+</section>

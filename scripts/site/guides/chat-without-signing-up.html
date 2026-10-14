@@ -1,0 +1,66 @@
+<!--meta
+{
+  "slug": "chat-without-signing-up",
+  "title": "Chat without signing up: free group chat, no account | howlden",
+  "description": "Chat without signing up: open a private group chat in your browser with no account, email or phone number. See how it works and what you give up.",
+  "h1": "Chat without signing up",
+  "lede": "No email, no password, no phone number. Pick a name, invite your friends, and start talking in your browser. Here is how that works, and what it costs you.",
+  "short": "Chat without signing up",
+  "icon": "no-account",
+  "scene": "owl-invite",
+  "keywords": ["chat without signing up", "chat room with no registration", "chat no registration", "group chat without account", "free chat no sign up", "chat without email"],
+  "faq": [
+    { "q": "Can I chat online without creating an account?", "a": "Yes. In howlden you only pick a display name and an avatar, which stay in your own browser. There is no email, password or phone number, and you can <a href=\"app/\">open a den</a> right away." },
+    { "q": "Do my friends need an account to join my chat room?", "a": "No. You send them an invite link or QR code through any messenger, they send back a short reply code, and they are in. Nobody signs up for anything." },
+    { "q": "How many people can join a chat with no registration?", "a": "A howlden den holds up to 8 people, because every member connects directly to every other member. Larger communities are better served by a server based tool." },
+    { "q": "Is a chat room without sign up safe?", "a": "howlden dens are invite only and every connection is end to end encrypted by the browser with DTLS. Your safety still depends on your device and on who you invite, so only send invites to people you know." }
+  ]
+}
+-->
+<section id="why-accounts"><h2>Why almost every chat app asks you to sign up</h2>
+<p>Most chat rooms start with a form: email, password, maybe a phone number, then a code sent by text message. There are good reasons for that. A chat service that keeps your messages on its servers needs to know who you are so it can show the same history on your laptop and your phone, let you reset a forgotten password, and keep spam accounts out of big public rooms. The account is the key to a locker the company holds for you.</p>
+<p>A lot of the time, though, you do not need a locker. You want to talk with four friends tonight, plan a trip with your cousins, or run a quick study session. Filling in a sign up form, confirming an email and convincing everyone else to do the same can take longer than the conversation itself. And every account is one more copy of your email and phone number sitting in someone else's database.</p>
+<p>howlden takes a different route. It has no servers that hold messages, so it has nothing to put in a locker, and it does not need to know who you are.</p>
+</section>
+<section id="what-you-pick"><h2>What you give howlden instead of an account</h2>
+<p>When you <a href="app/">open the app</a> for the first time, you choose two things: a display name and an avatar. That is the whole setup. No email field, no password, no phone number, no step that asks for your birthday.</p>
+<p>Both choices are saved in your own browser's local storage, along with your settings and the list of dens you belong to. They are not uploaded anywhere, because there is nowhere to upload them: the howlden website is a set of static files on GitHub Pages with no backend, no database and no analytics. When you change your name, the change happens on your device and your friends see it the next time you are connected.</p>
+<p>A practical consequence: names are not reserved. Two people in different dens can both be called Luna. Inside a den you know who is who because you invited each other personally, not because a server checked a username.</p>
+</section>
+<section id="invite-round-trip"><h2>How friends join without signing up</h2>
+<p>If there is no account and no server, how does anyone find your chat room? They do not. A den is invite only, and nobody can stumble into it from a search or a public list. Joining takes one short round trip:</p>
+<ol>
+<li><strong>You create an invite.</strong> howlden packs the connection offer into a link and a QR code. Send the link through whatever you already use (a text message, WhatsApp, Signal, email) or let your friend scan the QR from your screen.</li>
+<li><strong>Your friend opens the link.</strong> Their browser makes a short reply code, also a link or a QR code, and they send it back to you the same way.</li>
+<li><strong>You paste or scan the reply code.</strong> Your friend is in. If a messenger mangles links, a manual paste box is always there.</li>
+</ol>
+<p>The codes are compressed so they fit comfortably in a link, and you never have to look at raw technical text. Once one new person is connected, howlden introduces them to everyone else in the den automatically, over the encrypted connections that already exist. You do the round trip once per new member, not once for every pair of people.</p>
+<p>If you are curious about what happens under the hood during that exchange, <a href="peer-to-peer-chat-explained.html">peer to peer chat explained</a> walks through it in plain words.</p>
+</section>
+<section id="what-you-can-do"><h2>What you can do once everyone is in</h2>
+<p>A den looks a lot like a Discord server, so it should feel familiar. You get a list of text channels and voice channels, plus a member list. In text channels you can:</p>
+<ul>
+<li>write with simple formatting: bold, italic, strike, spoilers, code, quotes, lists and links;</li>
+<li>mention someone, reply to a specific message, and add reactions;</li>
+<li>share files, which travel straight from one browser to another instead of being uploaded to a cloud folder.</li>
+</ul>
+<p>Hop into a voice channel and you can talk, with a ring lighting up around whoever is speaking, plus mute and deafen buttons. Camera video and screen sharing live in voice channels too. Everything travels over WebRTC connections, which every modern browser encrypts end to end with DTLS (and SRTP for audio and video). That encryption is built in and cannot be switched off.</p>
+</section>
+<section id="trade-offs"><h2>The honest trade offs of chatting without an account</h2>
+<p>Skipping sign up is not free magic. Removing the account also removes the things an account usually pays for. Here is what to expect:</p>
+<ul>
+<li><strong>Everyone has to be online together.</strong> No server holds messages for people who are away. If a friend closes their laptop, they miss what is said while they are gone, and there is no inbox waiting for them later.</li>
+<li><strong>Your setup lives on one device.</strong> Your name, avatar and den list are in this browser on this device. Open howlden on your phone and it is a fresh start there. Clearing your browser data clears them too, and there is no password reset link to bring them back.</li>
+<li><strong>Small groups only.</strong> A den holds up to 8 people. Every member connects directly to every other member, and that only scales so far. A community of fifty needs a server based tool.</li>
+<li><strong>Some networks get in the way.</strong> When both people are behind a strict NAT (some school, office, hotel or mobile carrier networks), the direct connection can fail. howlden tells you in plain words when that happens and lets you add your own TURN relay in settings.</li>
+</ul>
+<p>For a group of friends who meet up at the same time anyway, these limits rarely matter. For a team that needs a searchable archive from last spring, they matter a lot.</p>
+</section>
+<section id="when-accounts-win"><h2>When an account based chat is the better pick</h2>
+<p>It is worth being clear about this. Services built around accounts and servers, such as Discord, WhatsApp or Signal, are very good at things howlden deliberately does not try to do: delivering messages to someone who is offline, syncing history across all your devices, hosting large public communities, and helping you get back in after you lose a phone. If you need any of those, the account is doing real work for you, and signing up is a fair deal.</p>
+<p>howlden fits the other case: a small, invited group, talking right now, that would rather not hand out email addresses to make that happen. Plenty of people use both, an account based app for long running group threads and a den for the evening call or a one time planning session.</p>
+<aside class="note"><p>Because the invite travels through a messenger you already trust, the people in your den are exactly the people you chose to send it to. Want to double check that nobody sits in the middle? Compare the short connection fingerprint howlden shows, out loud or side by side.</p></aside>
+</section>
+<section id="try-it"><h2>Try it in a minute</h2>
+<p>There is nothing to install. <a href="app/">Open a den</a>, pick a name and an avatar, create an invite and send it to one friend. When their reply code comes back, you are chatting. If you would rather talk than type, the guide on <a href="voice-chat-in-browser-no-download.html">voice chat in the browser with no download</a> covers microphones and permissions, and <a href="free-encrypted-group-chat.html">encrypted group chat for free</a> explains the optional passphrase.</p>
+</section>

@@ -1,0 +1,71 @@
+<!--meta
+{
+  "slug": "pt/chat-sem-cadastro",
+  "lang": "pt-BR",
+  "en": "chat-without-signing-up",
+  "title": "Chat sem cadastro: bate-papo em grupo grátis, sem conta | howlden",
+  "description": "Chat sem cadastro e grátis: converse em grupo por texto, voz e vídeo direto no navegador, sem e-mail, sem telefone e sem baixar nada. Veja como funciona.",
+  "h1": "Chat sem cadastro",
+  "lede": "Converse em grupo por texto, voz e vídeo sem criar conta, sem e-mail e sem número de telefone. Veja como o howlden faz isso e quais são os limites de verdade.",
+  "short": "Chat sem cadastro",
+  "icon": "no-account",
+  "scene": "owl-invite",
+  "keywords": ["chat sem cadastro", "bate-papo sem cadastro", "chat online grátis sem cadastro", "sala de bate-papo sem registro", "chat em grupo sem conta"],
+  "faq": [
+    { "q": "Existe chat online grátis sem cadastro?", "a": "Sim. O howlden é gratuito, de código aberto e funciona no navegador sem e-mail, telefone ou senha. Você só escolhe um nome e um avatar, que ficam salvos no seu próprio navegador. <a href=\"../app/\">Abra uma den</a> para testar." },
+    { "q": "Preciso baixar algum aplicativo para usar o chat?", "a": "Não. Tudo roda no navegador do computador ou do celular. Se quiser, dá para instalar como PWA pelo próprio navegador, mas não é obrigatório." },
+    { "q": "Um desconhecido pode entrar na minha sala de bate-papo?", "a": "Não sem um convite. Não existe lista pública de dens, e para entrar a pessoa precisa receber um convite seu e mandar de volta um código de resposta." },
+    { "q": "As mensagens ficam salvas em algum servidor?", "a": "Não. Não existe servidor do howlden guardando mensagens. Elas vão direto de navegador para navegador, então todo mundo precisa estar online ao mesmo tempo para receber." }
+  ]
+}
+-->
+<section id="por-que-sem-cadastro"><h2>Por que procurar um chat sem cadastro</h2>
+<p>Você só quer conversar com uns amigos. Combinar a partida de hoje à noite, mandar um arquivo para o grupo do trabalho da faculdade, bater papo com a família sem criar mais uma conta. Mas quase todo aplicativo começa do mesmo jeito: e-mail, senha, código por SMS, foto de perfil, aceitar termos. Quando a conversa é rápida ou casual, esse caminho todo cansa antes mesmo de começar.</p>
+<p>Além da preguiça, existe um motivo bem razoável: cada cadastro é mais um lugar guardando dados seus. Um número de telefone aqui, um e-mail ali, uma lista de contatos sincronizada acolá. Um chat sem cadastro resolve as duas coisas de uma vez: você entra mais rápido e deixa menos rastro pelo caminho.</p>
+<p>O <strong>howlden</strong> foi feito exatamente para isso. É um chat em grupo gratuito e de código aberto (licença MIT), com texto, voz e vídeo, que roda direto no navegador e não pede conta nenhuma. Nem e-mail, nem telefone, nem senha.</p>
+</section>
+<section id="como-funciona"><h2>Como funciona um chat sem conta</h2>
+<p>Ao abrir o howlden pela primeira vez, você escolhe um nome de exibição e um avatar. É só isso. Esses dados ficam guardados apenas no armazenamento local do seu navegador. Não existe um banco de dados do howlden com o seu nome, porque simplesmente não existe servidor do howlden: o site é um conjunto de arquivos estáticos hospedados no GitHub Pages.</p>
+<p>Então como as mensagens chegam aos seus amigos? Pela tecnologia WebRTC, que já vem embutida em todo navegador moderno. Ela permite que dois navegadores conversem diretamente, de ponto a ponto (P2P), sem um servidor no meio guardando ou repassando o conteúdo. Se quiser entender os detalhes, o guia <a href="../peer-to-peer-chat-explained.html">peer to peer chat explained</a> (em inglês) mostra tudo passo a passo.</p>
+<p>Para descobrir o próprio endereço público na internet, o app faz uma única pergunta a servidores STUN públicos e gratuitos (os do Google): "qual é o meu endereço?". Esses servidores não veem suas mensagens nem suas chamadas. Eles só respondem essa pergunta e mais nada.</p>
+</section>
+<section id="convite"><h2>Como chamar os amigos sem cadastro</h2>
+<p>Sem conta, não dá para procurar alguém pelo nome de usuário. E isso é proposital: ninguém encontra nem entra numa den sem convite. Den é o nome que o howlden dá para um espaço de grupo, parecido com um servidor do Discord (em inglês, den é a toca do lobo). O convite funciona numa ida e volta:</p>
+<ol>
+<li>Alguém que já está na den cria um convite. O howlden transforma isso em um link e em um QR code. Você manda o link pelo WhatsApp, Telegram, e-mail ou qualquer mensageiro que já usa, ou mostra o QR code na tela.</li>
+<li>Seu amigo abre o link. O navegador dele gera um <strong>código de resposta</strong>, também em forma de link ou QR code, que ele manda de volta pelo mesmo caminho.</li>
+<li>Você cola ou escaneia esse código de resposta e pronto, seu amigo entrou. Sempre existe a opção de colar manualmente, caso a câmera não ajude.</li>
+</ol>
+<p>Depois disso, o howlden conecta o novo membro a todas as outras pessoas da den de forma automática, usando as conexões criptografadas que já existem. Cada membro fica com uma conexão direta com cada um dos outros, numa malha completa. Os códigos são comprimidos para caber num link e num QR code, então ninguém precisa lidar com texto técnico esquisito.</p>
+</section>
+<section id="o-que-da-para-fazer"><h2>O que dá para fazer dentro de uma den</h2>
+<p>Uma den tem a cara que você já conhece de outros apps de comunidade: uma lista de canais de texto, canais de voz e a lista de membros ao lado. Cabem até 8 pessoas.</p>
+<ul>
+<li><strong>Canais de texto</strong> com formatação simples: negrito, itálico, tachado, spoiler, código, citação, listas e links.</li>
+<li><strong>Menções, respostas e reações</strong> nas mensagens, para a conversa não virar bagunça.</li>
+<li><strong>Envio de arquivos</strong> que vão direto de um navegador para o outro, sem passar por nenhuma nuvem.</li>
+<li><strong>Canais de voz</strong> com botões de mudo e de ensurdecer, e um anel que acende em volta de quem está falando.</li>
+<li><strong>Câmera e compartilhamento de tela</strong> dentro dos canais de voz.</li>
+</ul>
+<p>Funciona no computador e no celular. Como é um PWA, dá para instalar pelo próprio navegador, e ele abre até offline depois de carregado uma vez (as chamadas, claro, precisam de internet). Para saber mais sobre a parte de voz, veja o guia de <a href="chamada-de-voz-no-navegador.html">chamada de voz no navegador</a>.</p>
+</section>
+<section id="privacidade"><h2>Sem cadastro também significa menos dados espalhados</h2>
+<p>Não ter conta não é só comodidade. Como não existe backend do howlden, não há banco de dados, não há analytics e não há rastreamento. Nenhum servidor nosso vê suas mensagens, sua voz, seu vídeo ou seus arquivos.</p>
+<p>Toda conexão WebRTC é criptografada de ponta a ponta com DTLS (e SRTP para áudio e vídeo). Isso faz parte do navegador e não pode ser desligado. Se quiser uma camada extra, a den pode ter uma <strong>frase secreta</strong>: o howlden deriva uma chave com PBKDF2 e adiciona uma segunda criptografia AES-GCM às mensagens e aos arquivos, de modo que só quem conhece a frase consegue ler.</p>
+<p>Também aparece uma <strong>impressão digital da conexão</strong>, um código curto que os dois lados podem comparar, lendo em voz alta numa chamada ou olhando na tela, para ter certeza de que ninguém está no meio do caminho.</p>
+<aside class="note"><p>Sem cadastro não quer dizer anônimo. Seus amigos sabem quem você é, e a segurança ainda depende do seu aparelho e do seu navegador. Se o celular ou o computador estiver comprometido, nenhuma criptografia resolve.</p></aside>
+</section>
+<section id="limites"><h2>Limites que vale conhecer antes</h2>
+<p>Um chat direto entre navegadores tem vantagens, mas também tem regras próprias. Melhor saber antes de chamar a turma:</p>
+<ul>
+<li><strong>Até 8 pessoas por den.</strong> Na malha, cada membro manda áudio e vídeo diretamente para todos os outros. Para grupos grandes, uma ferramenta com servidor é a escolha certa.</li>
+<li><strong>Todo mundo precisa estar online ao mesmo tempo.</strong> Não há servidor guardando mensagens para quem está ausente. Se você mandar algo e seu amigo estiver offline, ele não recebe depois.</li>
+<li><strong>Algumas redes bloqueiam a conexão direta.</strong> Com NAT restrito dos dois lados (comum em algumas empresas, escolas, operadoras de celular e hotéis), a conexão pode falhar. O howlden avisa em palavras simples e deixa você adicionar seu próprio servidor TURN nas configurações. Um TURN só repassa pacotes criptografados e não consegue lê-los. O guia sobre <a href="../webrtc-connection-failed-strict-nat.html">conexão WebRTC que falhou</a> (em inglês) explica o que fazer.</li>
+<li><strong>Vídeo com muita gente pesa no upload.</strong> Áudio é leve, mas várias câmeras ligadas ao mesmo tempo exigem uma boa conexão de envio.</li>
+</ul>
+<p>Para um grupo de amigos, uma turma de estudos ou uma partida com o pessoal, esses limites raramente atrapalham. Para uma comunidade aberta com centenas de pessoas, outro tipo de ferramenta faz mais sentido. Se você está comparando opções, o guia de <a href="alternativa-ao-discord-sem-conta.html">alternativa ao Discord sem conta</a> mostra as diferenças de abordagem.</p>
+</section>
+<section id="experimente"><h2>Experimente agora</h2>
+<p>Não precisa baixar nada nem preencher formulário. <a href="../app/">Abra o howlden</a>, escolha um nome e um avatar, crie uma den e mande o convite para um amigo pelo mensageiro que vocês já usam. Em um minuto vocês estão conversando em volta da mesma fogueira.</p>
+<p>Ficou alguma dúvida? Dê uma olhada nas <a href="../#faq">perguntas frequentes</a> ou simplesmente <a href="../app/">crie sua primeira den</a> e teste com alguém de confiança.</p>
+</section>
