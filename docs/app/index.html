@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>howlden</title>
+  <meta name="description" content="howlden: group chat, voice, video and screen sharing straight between browsers. No server, no account, end to end encrypted with WebRTC.">
+  <meta name="theme-color" content="#0c0a20">
+  <meta name="color-scheme" content="dark light">
+  <link rel="canonical" href="https://kwy404.github.io/howlden/app/">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500..900&family=Figtree:ital,wght@0,400..800;1,400..600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/monsooncss@0.2.0/dist/monsoon.min.css">
+  <link rel="stylesheet" href="app.css">
+  <script>
+    try {
+      var s = JSON.parse(localStorage.getItem('howlden:settings') || '{}');
+      var th = s.theme === 'light' || (s.theme === 'system' && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      document.documentElement.dataset.theme = th;
+    } catch (e) {}
+  </script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <a id="skip" class="skip" href="#content">Skip to chat</a>
+  <div id="boot" class="boot" role="status">
+    <svg viewBox="0 0 24 24" width="64" height="64" aria-hidden="true"><path d="M3 2.5 8.6 7.6 12 6.8l3.4.8L21 2.5l-.6 8 1.6 2.7-4.4 2.2-3.4 6L12 22l-2.2-.6-3.4-6L2 13.2l1.6-2.7z" fill="currentColor"/><path d="M7.1 11.3l3.5 1.4-2.8.6zM16.9 11.3l-3.5 1.4 2.8.6zM10.6 18.4h2.8L12 20zM5.2 5.6l2.4 2.7-1.9 1.1zM18.8 5.6l-2.4 2.7 1.9 1.1z" fill="#0c0a20"/></svg>
+    <p>howlden</p>
+  </div>
+  <div id="gate" class="gate" hidden></div>
+  <div id="app" class="hd" hidden>
+    <nav id="rail" class="rail" aria-label="Dens"></nav>
+    <aside id="side" class="side"></aside>
+    <main class="main">
+      <header id="header" class="main-head"></header>
+      <div id="content" class="content" tabindex="-1"></div>
+    </main>
+    <aside id="members" class="members" aria-label="Members"></aside>
+    <button id="scrim" class="scrim" type="button" tabindex="-1" aria-label="Close"></button>
+  </div>
+  <div id="toasts" class="toasts"></div>
+  <noscript><p style="padding:24px">howlden runs entirely in your browser and needs JavaScript.</p></noscript>
+</body>
+</html>

@@ -80,15 +80,22 @@ describe('deflate-raw', () => {
 
 describe('codes', () => {
   const den = { id: 'a1b2c3d4e5f60718', name: 'Night owls', locked: true };
-  const host = { id: '0011223344556677', name: 'Ana', avatar: 'seed1' };
-  const peer = { id: '8899aabbccddeeff', name: 'Bruno', avatar: 'seed2' };
+  const host = { id: '0011223344556677', name: 'Ana', avatar: 'seed1', publicKey: '', alg: '', tag: '' };
+  const peer = { id: '8899aabbccddeeff', name: 'Bruno', avatar: 'seed2', publicKey: 'BAc_key-1', alg: 'Ed25519', tag: '8899' };
 
   it('packs an invite into a short url safe code and reads it back', async () => {
     const code = await packCode(invitePayload({ inviteId: 'x1', den, host, sdp: SDP }));
     expect(code).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(code.length).toBeLessThan(SDP.length);
     const invite = readInvite(await unpackCode(code));
-    expect(invite).toEqual({ inviteId: 'x1', den, host, sdp: SDP });
+    expect(invite).toEqual({ inviteId: 'x1', kind: 'den', den, host, sdp: SDP });
+  });
+
+  it('marks direct conversation invites and carries identity keys', async () => {
+    const code = await packCode(invitePayload({ inviteId: 'x2', den, host: { ...peer, avatar: 'data:image/png;base64,AAAA' }, sdp: 'v=0', kind: 'dm' }));
+    const invite = readInvite(await unpackCode(code));
+    expect(invite.kind).toBe('dm');
+    expect(invite.host).toEqual({ ...peer, avatar: '' });
   });
 
   it('packs a reply', async () => {

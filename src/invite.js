@@ -84,20 +84,40 @@ export function findCode(input) {
   return null;
 }
 
-/** Build the invite payload. */
-export function invitePayload({ inviteId, den, host, sdp }) {
-  return {
+// People in codes: id, name, avatar seed, and when known the identity public
+// key (k), its algorithm (g) and tag (t). Uploaded avatars are left out to keep
+// codes short; they arrive over the connection.
+const personOut = (p) => {
+  const out = { id: p.id, n: p.name, a: String(p.avatar || '').startsWith('data:') ? '' : p.avatar };
+  if (p.publicKey) Object.assign(out, { k: p.publicKey, g: p.alg, t: p.tag });
+  return out;
+};
+
+const personIn = (p, fallback) => ({
+  id: String(p.id),
+  name: String(p.n || fallback).slice(0, 32),
+  avatar: String(p.a || '').slice(0, 64),
+  publicKey: typeof p.k === 'string' ? p.k.slice(0, 200) : '',
+  alg: typeof p.g === 'string' ? p.g.slice(0, 20) : '',
+  tag: typeof p.t === 'string' && /^[0-9a-f]{4}$/.test(p.t) ? p.t : '',
+});
+
+/** Build the invite payload. kind is 'den' or 'dm' (a 1 to 1 conversation). */
+export function invitePayload({ inviteId, den, host, sdp, kind = 'den' }) {
+  const out = {
     k: 'i',
     x: inviteId,
     d: { id: den.id, n: den.name, l: den.locked ? 1 : 0 },
-    h: { id: host.id, n: host.name, a: host.avatar },
+    h: personOut(host),
     s: sdp,
   };
+  if (kind === 'dm') out.m = 1;
+  return out;
 }
 
 /** Build the reply payload. */
 export function replyPayload({ inviteId, denId, peer, sdp }) {
-  return { k: 'r', x: inviteId, d: denId, p: { id: peer.id, n: peer.name, a: peer.avatar }, s: sdp };
+  return { k: 'r', x: inviteId, d: denId, p: personOut(peer), s: sdp };
 }
 
 /** Validate and normalize an unpacked invite. */
@@ -107,8 +127,9 @@ export function readInvite(data) {
   }
   return {
     inviteId: String(data.x),
+    kind: data.m === 1 ? 'dm' : 'den',
     den: { id: String(data.d.id), name: String(data.d.n || 'den').slice(0, 60), locked: data.d.l === 1 },
-    host: { id: String(data.h.id), name: String(data.h.n || 'host').slice(0, 32), avatar: String(data.h.a || '') },
+    host: personIn(data.h, 'host'),
     sdp: data.s,
   };
 }
@@ -121,7 +142,7 @@ export function readReply(data) {
   return {
     inviteId: String(data.x),
     denId: String(data.d || ''),
-    peer: { id: String(data.p.id), name: String(data.p.n || 'guest').slice(0, 32), avatar: String(data.p.a || '') },
+    peer: personIn(data.p, 'guest'),
     sdp: data.s,
   };
 }
