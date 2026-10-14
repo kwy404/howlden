@@ -19,9 +19,9 @@ const head = `data:image/svg+xml,${encodeURIComponent(mascotHead('dark'))}`;
 const meta = (dir) => readdirSync(dir).filter((f) => f.endsWith('.html')).map((f) => JSON.parse(/^<!--meta\n([\s\S]*?)\n-->/.exec(readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n'))[1]));
 
 const jobs = [
-  { out: 'docs/og.png', size: [1200, 630], title: 'Group chat for your pack. No server in sight.', sub: 'Text and voice channels, video and screen share in your browser. No email, no password, no phone.', kind: '', sceneName: 'campfire-voice' },
+  { out: 'docs/og.png', size: [1200, 630], title: 'A den for your pack. No server in sight.', sub: 'Text and voice channels, video and screen share in your browser. No email, no password, no phone.', kind: '', sceneName: 'campfire-voice' },
   { out: 'docs/og/guides.png', size: [1200, 630], title: 'Guides from the den', sub: 'Private group chat, voice and video in the browser, explained in plain words.', kind: 'Guides', sceneName: 'moonlit-den' },
-  { out: 'assets/social-preview.png', size: [1280, 640], title: 'Group chat for your pack. No server in sight.', sub: 'Serverless peer to peer chat, voice and video in the browser. End to end encrypted, invite only.', kind: 'Open source', sceneName: 'campfire-voice' },
+  { out: 'assets/social-preview.png', size: [1280, 640], title: 'A den for your pack. No server in sight.', sub: 'Serverless peer to peer chat, voice and video in the browser. End to end encrypted, invite only.', kind: 'Open source', sceneName: 'campfire-voice' },
 ];
 for (const m of [...meta(join(here, 'guides')), ...meta(join(here, 'guides', 'pt'))]) {
   const pt = m.lang === 'pt-BR';

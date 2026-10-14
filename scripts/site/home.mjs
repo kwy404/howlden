@@ -179,7 +179,7 @@ function voiceMock() {
   ${ch('Howl lounge', [['luna', 'Luna', 'speaking'], ['fang', 'Fang', ''], ['nova', 'Nova', 'live']])}
   ${ch('Study burrow', [['pip', 'Pip', 'muted']])}
   ${ch('Quiet cave', [])}
-  <div class="mk-join">${icon('speaker')}<span>Click a channel to drop in. Leave whenever you like.</span></div>
+  <div class="mk-join">${icon('speaker')}<span>One click to take a seat by the fire. One click to slip away.</span></div>
 </div>`;
 }
 
@@ -230,14 +230,14 @@ export function homeBody({ guides, qr }) {
   const rows = COMPARE.map(([k, a, b]) => `<tr><th scope="row">${k}</th><td data-label="Server based">${esc(a)}</td><td data-label="howlden">${esc(b)}</td></tr>`).join('');
   const faq = FAQ.map(([q, a], i) => `<details class="faq-item"${i === 0 ? ' open' : ''}><summary><h3>${esc(q)}</h3>${icon('chevron', 'ic chev')}</summary><div class="faq-a"><p>${esc(a)}</p></div></details>`).join('');
   const gl = guides.slice(0, 6).map((g) => `<li><a href="${g.slug}.html" class="guide-card">${art(g.icon, 'hi hi-lg')}<span><b>${esc(g.short)}</b><small>${esc(g.description)}</small></span></a></li>`).join('');
-  const words = ['Talk', 'Play', 'Hang out', 'Study', 'Howl', 'Share screens', 'Plan', 'Laugh'];
+  const words = ['Howl', 'Play', 'Study', 'Plan', 'Share screens', 'Gather the pack', 'No server', 'Invite only'];
   const band = words.map((w) => `<span>${w}</span><svg class="mq-mark" aria-hidden="true"><use href="#mark"/></svg>`).join('');
   return `
 <section class="hx" aria-labelledby="hero-title">
   <div class="hx-sky" aria-hidden="true">${floaters(FLOAT)}</div>
   <div class="wrap hx-grid">
     <div class="hx-copy">
-      <h1 id="hero-title" class="mega">Group chat for your pack. <span class="mega-glow">No server in sight.</span></h1>
+      <h1 id="hero-title" class="mega">A den for your pack. <span class="mega-glow">No server in sight.</span></h1>
       <p class="hx-lede">howlden is a den for you and your friends: text and voice channels, video and screen share, right in your browser. No email, no password, no phone. Invite your pack with a link or a QR code and everything flows straight between you, end to end encrypted.</p>
       <div class="hx-cta">
         <a href="app/" class="btn-big btn-white">${art('den')}Open howlden in your browser</a>
@@ -267,9 +267,9 @@ export function homeBody({ guides, qr }) {
 
 <div class="panels">
 ${panel({ id: 'chat', tone: 'pink', media: chatMock(), kicker: `${art('text-channel')}Text channels`, title: 'Chat, react, howl', text: 'Text channels with bold, italic, spoilers, code and quotes. Reply to a friend, mention the whole pack, react with a howl or a campfire, drop a file that goes straight from your browser to theirs. It all feels like the chat app you know, minus the company in the middle.', extra: `<a href="chat-without-signing-up.html" class="more">Chat without signing up${icon('arrow')}</a>` })}
-${panel({ id: 'share', flip: true, tone: 'mint', media: shareMock(), kicker: `${art('screen-share')}Voice, video, screen share`, title: 'Stream like you share the same couch', text: 'Share a game, a tab or your whole screen while everyone talks. Turn on cameras, watch the ring light up around whoever speaks. Every stream travels directly between you, sealed with DTLS and SRTP.', extra: `<a href="screen-share-without-app.html" class="more">Screen share without an app${icon('arrow')}</a>` })}
-${panel({ id: 'voice', tone: 'fire', media: voiceMock(), kicker: `${art('voice-channel')}Voice channels`, title: 'Drop into voice anytime', text: 'Voice channels are always open. See who is already talking, click to join, click to leave. No calling, no ringing, no scheduling. Mute and deafen are one click away, and a call works just as well with one friend as with the whole pack.', extra: `<a href="voice-chat-in-browser-no-download.html" class="more">Voice chat with no download${icon('arrow')}</a>` })}
-${panel({ id: 'around', flip: true, tone: 'night', media: membersMock(), kicker: `${art('pack')}Members`, title: 'See who is around', text: 'The member list shows who is online, who is in voice, who is sharing a screen and who stepped away. A den holds up to 8, so it always feels like your people, never a crowd.', extra: `<a href="#mesh" class="more">Why a den holds 8${icon('arrow')}</a>` })}
+${panel({ id: 'share', flip: true, tone: 'mint', media: shareMock(), kicker: `${art('screen-share')}Voice, video, screen share`, title: 'Show the pack your screen, no server watching', text: 'Share a game, a tab or your whole screen while the den talks it over. Turn on cameras, watch the ring light up around whoever speaks. Every stream travels directly between you, sealed with DTLS and SRTP.', extra: `<a href="screen-share-without-app.html" class="more">Screen share without an app${icon('arrow')}</a>` })}
+${panel({ id: 'voice', tone: 'fire', media: voiceMock(), kicker: `${art('voice-channel')}Voice channels`, title: 'Take a seat by the fire', text: 'Voice channels are campfires that never go out. See which wolves are already howling, click to sit down, click to leave. No ringing, no meeting links, no scheduling. Mute and deafen are one click away, and a call works just as well with one friend as with the whole pack.', extra: `<a href="voice-chat-in-browser-no-download.html" class="more">Voice chat with no download${icon('arrow')}</a>` })}
+${panel({ id: 'around', flip: true, tone: 'night', media: membersMock(), kicker: `${art('pack')}Members`, title: 'Know your whole pack at a glance', text: 'The member list shows which wolves are in the den, who is howling in voice, who is sharing a screen and who wandered off. A den holds up to 8, invite only, so every name on the list is someone you let in.', extra: `<a href="#mesh" class="more">Why a den holds 8${icon('arrow')}</a>` })}
 </div>
 
 <div class="marquee" aria-hidden="true"><div class="mq-track"><div class="mq-row">${band}</div><div class="mq-row">${band}</div></div></div>

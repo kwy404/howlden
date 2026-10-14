@@ -27,7 +27,7 @@
 **howlden is a free, open source group chat that runs entirely in your browser, with the layout you know from gaming chat apps: dens (servers), text channels, voice channels, video and screen share.** There is no account and no sign up: you create a local profile (a username, an avatar and an identity key made on your device). You invite friends with a link or a QR code, and everything flows directly between your browsers over WebRTC, end to end encrypted. No server of ours ever sees your messages, voice, video or files. A den holds up to 8 people, or just you and one friend.
 
 <p align="center">
-  <a href="https://kwy404.github.io/howlden/"><img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/social-preview.png" width="820" alt="The howlden website: group chat for your pack, no server in sight, with a pack of wolves around a campfire"></a>
+  <a href="https://kwy404.github.io/howlden/"><img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/social-preview.png" width="820" alt="The howlden website: a den for your pack, no server in sight, with a pack of wolves around a campfire"></a>
 </p>
 
 ## Table of contents
@@ -57,7 +57,7 @@ Go to **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)**,
 | --- | --- |
 | **Dens** | A group space with text channels, voice channels and a member list. Each den is its own private circle of up to 8 people. |
 | **Text channels** | Messages with bold, italic, strike, spoilers, code, quotes, lists and links. Mentions, replies, edits, deletes and reactions. |
-| **Voice channels** | Drop in and talk. A ring lights up around whoever is speaking. Mute and deafen are one click away. |
+| **Voice channels** | Take a seat and howl. A ring lights up around whoever is speaking. Mute and deafen are one click away. |
 | **Video and screen share** | Turn on a camera or share a window, a tab or the whole screen inside any voice channel. |
 | **Files** | Drop a file in the chat and it goes straight from your browser to your friends. Nothing is uploaded anywhere. |
 | **Local profile** | A username, an avatar and a signing key pair (Ed25519 where the browser supports it) made on your device. Your tag, like `luna#7c1f`, comes from that key. Lock it with a PIN, or move it with an encrypted backup file. |
