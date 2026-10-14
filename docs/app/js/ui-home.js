@@ -6,6 +6,7 @@ import { avatarImg, closePopover, popover } from './ui-shell.js';
 import { confirmDialog } from './ui-modal.js';
 import { avatarTraits } from '../core/avatar.js';
 import { DM_TEXT } from './session.js';
+import { MAX_MEMBERS } from '../core/mesh.js';
 
 const ago = (app, ts) => {
   if (!ts) return '';
@@ -82,6 +83,7 @@ export function renderHome(app, el) {
         h('button', { class: 'home-card', type: 'button', onclick: () => app.createDenFlow() }, h('span', { class: 'home-card-ico' }, icon('plus', { size: 28 })), h('strong', null, t('home.create')), h('span', null, t('home.createHint'))),
         h('button', { class: 'home-card', type: 'button', onclick: () => app.joinFlow() }, h('span', { class: 'home-card-ico' }, icon('compass', { size: 28 })), h('strong', null, t('home.join')), h('span', null, t('home.joinHint'))),
       ),
+      h('p', { class: 'muted' }, t('home.lead', { max: MAX_MEMBERS })),
       h('section', { class: 'home-how' }, h('h3', null, t('home.howTitle')), h('ol', null, h('li', null, t('home.how1')), h('li', null, t('home.how2')), h('li', null, t('home.how3')))),
       h('p', { class: 'home-privacy' }, icon('shield', { size: 18 }), t('home.privacy')),
     );

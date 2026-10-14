@@ -113,6 +113,7 @@ export function invitePayload({ inviteId, den, host, sdp, kind = 'den' }) {
     s: sdp,
   };
   if (kind === 'dm') out.m = 1;
+  if (den.full) out.d.f = [den.count, den.max];
   return out;
 }
 
@@ -120,6 +121,9 @@ export function invitePayload({ inviteId, den, host, sdp, kind = 'den' }) {
 export function replyPayload({ inviteId, denId, peer, sdp }) {
   return { k: 'r', x: inviteId, d: denId, p: personOut(peer), s: sdp };
 }
+
+// An invite made while the den was full carries [count, max].
+const fullOf = (f) => (Array.isArray(f) && f.length === 2 && f.every((n) => Number.isInteger(n) && n > 0 && n < 100) ? { full: { count: f[0], max: f[1] } } : {});
 
 /** Validate and normalize an unpacked invite. */
 export function readInvite(data) {
@@ -129,7 +133,7 @@ export function readInvite(data) {
   return {
     inviteId: String(data.x),
     kind: data.m === 1 ? 'dm' : 'den',
-    den: { id: String(data.d.id), name: String(data.d.n || 'den').slice(0, 60), locked: data.d.l === 1 },
+    den: { id: String(data.d.id), name: String(data.d.n || 'den').slice(0, 60), locked: data.d.l === 1, ...fullOf(data.d.f) },
     host: personIn(data.h, 'host'),
     sdp: data.s,
   };

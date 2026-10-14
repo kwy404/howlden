@@ -98,6 +98,13 @@ describe('codes', () => {
     expect(invite.host).toEqual({ ...peer, avatar: '' });
   });
 
+  it('marks invites made while the den is full', async () => {
+    const code = await packCode(invitePayload({ inviteId: 'x3', den: { ...den, full: true, count: 5, max: 5 }, host, sdp: 'v=0' }));
+    expect(readInvite(await unpackCode(code)).den.full).toEqual({ count: 5, max: 5 });
+    const bogus = readInvite({ k: 'i', x: 'a', s: 'v=0', d: { id: 'd', f: ['x', 5] }, h: { id: 'h' } });
+    expect(bogus.den.full).toBeUndefined();
+  });
+
   it('packs a reply', async () => {
     const code = await packCode(replyPayload({ inviteId: 'x1', denId: den.id, peer, sdp: SDP }));
     const reply = readReply(await unpackCode(code));

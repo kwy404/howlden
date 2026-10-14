@@ -1,7 +1,7 @@
 // One den on this device: its settings, messages, mesh connection, typing and
 // voice state, file transfers and the optional passphrase layer.
 
-import { Emitter, Mesh } from '../core/mesh.js';
+import { DIRECT_MEMBERS, Emitter, MAX_MEMBERS, Mesh } from '../core/mesh.js';
 import { RtcLink } from '../core/rtc.js';
 import {
   HistorySync,
@@ -70,6 +70,16 @@ export class DenSession extends Emitter {
 
   get isDirect() {
     return this.den.kind === 'dm';
+  }
+
+  /** The people limit: MAX_MEMBERS for dens, two for direct conversations. */
+  get maxMembers() {
+    return this.isDirect ? DIRECT_MEMBERS : MAX_MEMBERS;
+  }
+
+  /** People online now, me included. */
+  get onlineCount() {
+    return this.mesh && !this.mesh.closed ? this.mesh.onlineCount() : 1;
   }
 
   /** Me as I appear in codes: profile plus identity public key. */
@@ -148,6 +158,7 @@ export class DenSession extends Emitter {
       den: { id: this.id, name: this.den.name, locked: !!this.den.locked },
       transport: { createLink: () => new RtcLink({ iceServers: app.iceServers() }) },
       host,
+      max: this.maxMembers,
     });
     mesh.addKnownMembers(this.den.members);
     this.mesh = mesh;
@@ -180,7 +191,8 @@ export class DenSession extends Emitter {
       this.sync.start(mesh.introducer);
       this.emit('welcome');
     });
-    mesh.on('full', () => this.emit('notice', { kind: 'full' }));
+    mesh.on('full', (f) => this.emit('notice', { kind: 'full', ...f }));
+    mesh.on('rejected', (r) => this.emit('notice', { kind: 'rejected', name: r.peer.name, peerId: r.peer.id, count: r.count, max: r.max }));
     mesh.on('message', ({ from, body }) => this._receive(from, body));
     mesh.on('error', (err) => console.warn('howlden mesh:', err));
     this.emit('status');
@@ -208,9 +220,11 @@ export class DenSession extends Emitter {
 
   async createInvite() {
     const mesh = this.ensureMesh(true);
-    const { inviteId, sdp } = await mesh.createInvite();
-    const code = await packCode(invitePayload({ inviteId, den: { id: this.id, name: this.isDirect ? this.self.name : this.den.name, locked: !!this.den.locked }, host: this.selfCard, sdp, kind: this.isDirect ? 'dm' : 'den' }));
-    return { inviteId, code, link: codeLink(this.app.baseUrl, 'i', code) };
+    const { inviteId, sdp, full } = await mesh.createInvite();
+    const count = mesh.onlineCount();
+    const max = this.maxMembers;
+    const code = await packCode(invitePayload({ inviteId, den: { id: this.id, name: this.isDirect ? this.self.name : this.den.name, locked: !!this.den.locked, full, count, max }, host: this.selfCard, sdp, kind: this.isDirect ? 'dm' : 'den' }));
+    return { inviteId, code, link: codeLink(this.app.baseUrl, 'i', code), full, count, max };
   }
 
   cancelInvite(inviteId) {

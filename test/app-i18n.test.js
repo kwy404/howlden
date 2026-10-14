@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DICTS, translator } from '../docs/app/js/i18n.js';
+import { MAX_MEMBERS } from '../src/mesh.js';
 
 const dir = new URL('../docs/app/js/', import.meta.url);
 const sources = readdirSync(dir).map((f) => readFileSync(new URL(f, dir), 'utf8'));
@@ -36,5 +37,16 @@ describe('interface text', () => {
     expect(all).not.toMatch(/impossible to hack|unhackable|100% secure|military grade/);
     expect(DICTS.en['settings.security3']).toMatch(/cannot read/);
     expect(DICTS.en['login.checkHint']).toMatch(/not a security feature/);
+  });
+
+  it('states the den limit from the single constant, everywhere', () => {
+    expect(MAX_MEMBERS).toBe(5);
+    expect(translator('en')('home.lead', { max: MAX_MEMBERS })).toContain('up to 5 people');
+    expect(translator('pt')('notice.full', { count: 5, max: 5 })).toBe('Esta toca está cheia (5 de 5).');
+    expect(translator('en')('fail.full', { count: 5, max: 5 })).toBe('This den is full (5 of 5).');
+    const old = /(up to|até) (8|eight|oito)|(8|eight) (people|peers|members)|8 pessoas/i;
+    expect(JSON.stringify(DICTS)).not.toMatch(old);
+    const site = ['README.md', 'i18n/README.pt-BR.md', ...readdirSync(new URL('../docs/', import.meta.url)).filter((f) => f.endsWith('.html')).map((f) => `docs/${f}`)];
+    for (const f of site) expect(readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'), f).not.toMatch(old);
   });
 });

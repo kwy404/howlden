@@ -1,7 +1,7 @@
 // Copied from src/ by scripts/sync-core.mjs. Edit the file in src/ instead.
 // The mesh introduction protocol.
 //
-// A den is a full mesh of up to 8 peers, built without a signaling server:
+// A den is a full mesh of up to MAX_MEMBERS peers (5), built without a signaling server:
 // 1. The host makes an invite (a WebRTC offer). The guest answers with a
 //    reply code. That single manual round trip opens a link host <-> guest.
 // 2. The introducer (whoever made the invite) welcomes the newcomer with the
@@ -18,7 +18,10 @@
 
 import { randomId } from './crypto.js';
 
-export const MAX_MEMBERS = 8;
+/** The most people online in one den, the host included. Change it here only. */
+export const MAX_MEMBERS = 5;
+/** Direct conversations and 1 to 1 calls always have exactly two people. */
+export const DIRECT_MEMBERS = 2;
 export const INTRO_TIMEOUT = 30000;
 
 /** The online member who joined first, by joinedAt then id. */
@@ -148,16 +151,24 @@ export class Mesh extends Emitter {
 
   // Invites (manual signaling)
 
-  /** Create a link for a new invite. Returns { inviteId, sdp } to pack into the invite code. */
+  /** Whether the den has no room for one more person right now. */
+  get full() {
+    return this.onlineCount() >= this.max;
+  }
+
+  /**
+   * Create a link for a new invite. Returns { inviteId, sdp, full } to pack
+   * into the invite code. An invite made while the den is full still works if
+   * someone leaves before the guest connects; full tells the UI to say so.
+   */
   async createInvite() {
     if (this.closed) throw new MeshError('closed', 'This den was closed.');
-    if (this.onlineCount() >= this.max) throw new MeshError('full', `This den already has ${this.max} people online.`);
     const inviteId = randomId(6);
     const link = this._newLink();
     link.introduce = true;
     this.pending.set(inviteId, { link, createdAt: this.now() });
     const sdp = await link.offer();
-    return { inviteId, sdp };
+    return { inviteId, sdp, full: this.full };
   }
 
   /** Cancel a pending invite. */
@@ -175,7 +186,8 @@ export class Mesh extends Emitter {
     if (reply.denId && reply.denId !== this.den.id) throw new MeshError('den', 'This reply is for a different den.');
     if (reply.peer.id === this.self.id) throw new MeshError('self', 'This is your own reply code.');
     if (this.links.has(reply.peer.id)) throw new MeshError('already', `${reply.peer.name} is already connected.`);
-    if (this.onlineCount() >= this.max) throw new MeshError('full', `This den already has ${this.max} people online.`);
+    // When the den is full the link still opens, only to tell the guest why
+    // they cannot join (see _onOpen); then it closes.
     this.pending.delete(reply.inviteId);
     p.link.peerId = reply.peer.id;
     p.link.peer = reply.peer;
@@ -296,9 +308,11 @@ export class Mesh extends Emitter {
     this.links.set(id, link);
     if (link.introduce) {
       if (this.onlineCount() >= this.max && !this.members.get(id)?.online) {
-        this._send(link, { t: 'full', max: this.max });
+        const count = this.onlineCount();
+        this._send(link, { t: 'full', max: this.max, count });
         this.links.delete(id);
-        setTimeout(() => link.close(), 50);
+        this.emit('rejected', { peer: { id, name: link.peer?.name || 'guest' }, max: this.max, count });
+        setTimeout(() => link.close(), 200);
         return;
       }
       const have = this.members.get(id);
@@ -349,6 +363,8 @@ export class Mesh extends Emitter {
     }
     if (!msg || typeof msg.t !== 'string') return;
     const from = link.peerId;
+    // Only links that made it into the mesh may talk (a refused guest may not).
+    if (!from || this.links.get(from) !== link) return;
     try {
       await this._handle(link, from, msg);
     } catch (err) {
@@ -426,7 +442,8 @@ export class Mesh extends Emitter {
         return;
       }
       case 'full':
-        this.emit('full', { max: msg.max });
+        if (from !== this.introducer) return;
+        this.emit('full', { max: Number(msg.max) || this.max, count: Number(msg.count) || Number(msg.max) || this.max });
         return;
       case 'signal':
         return this._onSignal(link, msg);

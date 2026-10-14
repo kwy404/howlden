@@ -395,6 +395,7 @@ export function renderHeader(app, el) {
     h('h1', { class: 'hd-title' }, c?.name || t('channel.empty')),
     h('span', { class: 'hd-divider', 'aria-hidden': 'true' }),
     h('span', { class: `hd-status ${s.status}` }, h('span', { class: `dot ${s.status}` }), status, s.den.locked ? h('span', { class: 'hd-lock', title: t('den.locked') }, icon('lock', { size: 14 })) : null),
+    h('span', { class: `hd-count${s.onlineCount >= s.maxMembers ? ' full' : ''}`, title: t('den.countLabel', { count: s.onlineCount, max: s.maxMembers }), 'aria-label': t('den.countLabel', { count: s.onlineCount, max: s.maxMembers }) }, icon('members', { size: 14 }), t('den.count', { count: s.onlineCount, max: s.maxMembers })),
     h('span', { class: 'hd-spacer' }),
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('den.invite'), 'data-tip': t('den.invite'), onclick: () => app.inviteFlow(s) }, icon('invite', { size: 22 })),
     h('button', { class: `icon-btn${app.showMembers ? ' on' : ''}`, type: 'button', 'aria-pressed': String(app.showMembers), 'aria-label': t('members.toggle'), 'data-tip': t('members.toggle'), onclick: () => app.toggleMembers() }, icon('members', { size: 22 })),
@@ -430,7 +431,7 @@ export function renderMembers(app, el) {
     );
   replace(
     el,
-    h('h2', { class: 'members-head' }, t('members.online', { n: online.length })),
+    h('h2', { class: 'members-head', 'aria-label': t('den.countLabel', { count: online.length, max: s.maxMembers }) }, t('members.online', { n: t('den.count', { count: online.length, max: s.maxMembers }) })),
     h('ul', { class: 'member-list' }, online.map(row)),
     offline.length ? h('h2', { class: 'members-head' }, t('members.offline', { n: offline.length })) : null,
     offline.length ? h('ul', { class: 'member-list' }, offline.map(row)) : null,

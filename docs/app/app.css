@@ -3989,3 +3989,25 @@ p > .ico,
 [data-theme="light"] {
   --name-l: 36%;
 }
+
+.hd-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  color: var(--tx-2);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hd-count.full {
+  background: rgb(255 138 61 / .18);
+  color: var(--orange);
+}
+
+.invite-status.bad {
+  color: var(--bad);
+}

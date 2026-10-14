@@ -251,8 +251,8 @@ function wireSession(s) {
   });
   s.on('call-declined', () => toast(t('call.declined'), 'info'));
   s.on('notice', (n) => {
-    const key = { decrypt: 'notice.decrypt', 'bad-passphrase': 'notice.badPassphrase', full: 'notice.full' }[n.kind];
-    if (key) toast(t(key), 'error', 7000);
+    const key = { decrypt: 'notice.decrypt', 'bad-passphrase': 'notice.badPassphrase', full: 'notice.full', rejected: 'notice.rejected' }[n.kind];
+    if (key) toast(t(key, { name: n.name || '', count: n.count || s.maxMembers, max: n.max || s.maxMembers }), n.kind === 'rejected' ? 'info' : 'error', 7000);
     if (n.kind === 'bad-passphrase') s.leave();
   });
   s.on('incoming', (rec) => notify(s, rec));
@@ -553,6 +553,16 @@ app.removeDenFlow = async (s) => {
   app.sessions.delete(s.id);
   await store.deleteDen(s.id);
   app.openHome();
+};
+
+/** Forget a den that was created only for a join that did not happen. */
+app.discardEmptyDen = async (s) => {
+  if (s.isDirect || s.messages.size || s.den.channels.length) return;
+  s.leave();
+  app.sessions.delete(s.id);
+  await store.deleteDen(s.id);
+  if (app.activeDen === s) app.openHome();
+  else app.render();
 };
 
 app.messageFriend = async (friend) => {

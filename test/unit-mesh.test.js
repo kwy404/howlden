@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Emitter, Mesh, MeshError, cleanAvatar, cleanExtras, electRelay, forwardTargets } from '../src/mesh.js';
+import { DIRECT_MEMBERS, Emitter, MAX_MEMBERS, Mesh, cleanAvatar, cleanExtras, electRelay, forwardTargets } from '../src/mesh.js';
 import { invitePayload, packCode, readInvite, readReply, replyPayload, unpackCode } from '../src/invite.js';
 import { FakeHub, settle } from './fake-transport.js';
 
@@ -81,7 +81,7 @@ describe('mesh introduction', () => {
   it('builds a full mesh where only the host exchanged codes', async () => {
     const hub = new FakeHub();
     const host = peer(hub, 'aa', { host: true });
-    const guests = ['bb', 'cc', 'dd', 'ee', 'ff', 'gg', 'hh'].map((id) => peer(hub, id));
+    const guests = ['bb', 'cc', 'dd', 'ee'].map((id) => peer(hub, id));
     for (const g of guests) await join(host, g);
     await settle();
     const all = [host, ...guests];
@@ -95,17 +95,79 @@ describe('mesh introduction', () => {
     for (const m of all) expect(m.memberList().map((x) => x.id)).toEqual(order);
   });
 
-  it('refuses a ninth member', async () => {
+  it('holds at most five people, the host included, and tells the sixth why', async () => {
+    expect(MAX_MEMBERS).toBe(5);
+    expect(DIRECT_MEMBERS).toBe(2);
     const hub = new FakeHub();
-    const host = peer(hub, 'aa', { host: true, max: 3 });
+    const host = peer(hub, 'aa', { host: true });
+    const rejected = [];
+    host.on('rejected', (r) => rejected.push(r));
+    for (const id of ['bb', 'cc', 'dd', 'ee']) await join(host, peer(hub, id));
+    expect(host.onlineCount()).toBe(5);
+    expect(host.full).toBe(true);
+    const sixth = peer(hub, 'ff');
+    const told = [];
+    sixth.on('full', (f) => told.push(f));
+    const invite = await host.createInvite();
+    expect(invite.full).toBe(true);
+    const reply = await sixth.acceptInvite({ inviteId: invite.inviteId, den: DEN, host: host.self, sdp: invite.sdp });
+    await host.acceptReply(reply);
+    await new Promise((r) => setTimeout(r, 300));
+    await settle();
+    expect(told).toEqual([{ max: 5, count: 5 }]);
+    expect(rejected).toEqual([{ peer: { id: 'ff', name: 'FF' }, max: 5, count: 5 }]);
+    expect(host.onlineCount()).toBe(5);
+    expect(host.members.has('ff')).toBe(false);
+    expect(linked(sixth)).toEqual([]);
+  });
+
+  it('lets a new person in once someone leaves a full den', async () => {
+    const hub = new FakeHub();
+    const host = peer(hub, 'aa', { host: true });
+    const guests = [];
+    for (const id of ['bb', 'cc', 'dd', 'ee']) {
+      const g = peer(hub, id);
+      guests.push(g);
+      await join(host, g);
+    }
+    const invite = await host.createInvite();
+    expect(invite.full).toBe(true);
+    guests[3].leave();
+    await settle();
+    const late = peer(hub, 'ff');
+    const reply = await late.acceptInvite({ inviteId: invite.inviteId, den: DEN, host: host.self, sdp: invite.sdp });
+    await host.acceptReply(reply);
+    await settle(400);
+    expect(linked(late)).toEqual(['aa', 'bb', 'cc', 'dd']);
+    expect(host.onlineCount()).toBe(5);
+  });
+
+  it('keeps direct conversations to two people', async () => {
+    const hub = new FakeHub();
+    const host = peer(hub, 'aa', { host: true, max: DIRECT_MEMBERS });
     await join(host, peer(hub, 'bb'));
-    const { inviteId, sdp } = await host.createInvite();
-    await join(host, peer(hub, 'cc'));
-    expect(host.onlineCount()).toBe(3);
-    await expect(host.createInvite()).rejects.toThrow(MeshError);
-    const late = peer(hub, 'dd');
-    const reply = await late.acceptInvite({ inviteId, den: DEN, host: host.self, sdp });
-    await expect(host.acceptReply(reply)).rejects.toMatchObject({ reason: 'full' });
+    const third = peer(hub, 'cc');
+    const told = [];
+    third.on('full', (f) => told.push(f));
+    const invite = await host.createInvite();
+    await host.acceptReply(await third.acceptInvite({ inviteId: invite.inviteId, den: DEN, host: host.self, sdp: invite.sdp }));
+    await new Promise((r) => setTimeout(r, 300));
+    await settle();
+    expect(told).toEqual([{ max: 2, count: 2 }]);
+  });
+
+  it('ignores a full notice from anyone but the introducer', async () => {
+    const hub = new FakeHub();
+    const host = peer(hub, 'aa', { host: true });
+    const b = peer(hub, 'bb');
+    const c = peer(hub, 'cc');
+    await join(host, b);
+    await join(host, c);
+    const told = [];
+    c.on('full', (f) => told.push(f));
+    b.links.get('cc').send(JSON.stringify({ t: 'full', max: 1 }));
+    await settle();
+    expect(told).toEqual([]);
   });
 
   it('delivers broadcasts once to everyone and direct messages to one peer', async () => {

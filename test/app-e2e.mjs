@@ -69,6 +69,7 @@ async function person(name) {
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(`${name}: ${m.text()}`);
+    if (process.env.E2E_VERBOSE) console.log(`[${name}] ${m.text()}`);
   });
   await page.goto(base);
   await page.fill('#login-name', name);
@@ -133,9 +134,12 @@ try {
   const ana = await person('Ana');
   const bia = await person('Bia');
   const caio = await person('Caio');
+  const dani = await person('Dani');
+  const edu = await person('Edu');
+  const fabi = await person('Fabi');
   const ids = {};
-  for (const p of [ana, bia, caio]) ids[p.name] = await evalApp(p, () => window.howlden.profile.id);
-  log('three profiles created with identity keys');
+  for (const p of [ana, bia, caio, dani, edu, fabi]) ids[p.name] = await evalApp(p, () => window.howlden.profile.id);
+  log('six profiles created with identity keys');
 
   // Den and mesh
   await ana.page.click('.home-card');
@@ -156,6 +160,38 @@ try {
   for (const p of [ana, bia, caio]) await waitFor(p, () => window.howlden.activeDen?.mesh?.links.size === 2);
   log('Caio joined; the host introduced Bia and Caio over data channels (full mesh of 3)');
 
+  for (const guest of [dani, edu]) {
+    await ana.page.click('.main-head button[aria-label="Invite people"]');
+    const l = await inviteLink(ana);
+    const j = await acceptInvite(guest, l);
+    await pasteReply(ana, j.reply);
+  }
+  const five = [ana, bia, caio, dani, edu];
+  for (const p of five) await waitFor(p, () => window.howlden.activeDen?.mesh?.links.size === 4);
+  for (const p of five) await waitFor(p, () => document.querySelector('.hd-count')?.textContent === '5/5');
+  ok((await ana.page.locator('.members-head').first().innerText()).includes('5/5'), 'member list shows 5/5');
+  log('Dani and Edu joined: full mesh of 5, header and member list show 5/5');
+
+  await ana.page.click('.main-head button[aria-label="Invite people"]');
+  const fullLink = await inviteLink(ana);
+  ok(/full \(5 of 5\)/.test(await ana.page.locator('.invite-modal .full-note').innerText()), 'invite made while full says so');
+  await fabi.page.goto(fullLink);
+  await fabi.page.waitForSelector('.join-modal');
+  ok(/was full when the invite was made \(5 of 5\)/.test(await fabi.page.locator('.join-modal').innerText()), 'the guest sees that the invite was made while full');
+  await fabi.page.click('.join-modal .btn-block');
+  const fullReply = fabi.page.locator('.join-modal .share-side input');
+  await fullReply.waitFor({ timeout: 30000 });
+  await ana.page.fill('.invite-modal textarea', await fullReply.inputValue());
+  await ana.page.click('.invite-modal button:text-is("Connect")');
+  await fabi.page.waitForSelector('.join-modal .full-msg', { timeout: 40000 });
+  ok((await fabi.page.locator('.join-modal .full-msg').innerText()) === 'This den is full (5 of 5). Ask the host for a new invite once someone leaves.', 'the sixth person gets the full message');
+  await ana.page.waitForSelector('.invite-modal .invite-status.bad');
+  ok(/Fabi could not join: this den is full \(5 of 5\)/.test(await ana.page.locator('.invite-modal .invite-status').innerText()), 'the host sees the rejection');
+  await ana.page.keyboard.press('Escape');
+  for (const p of five) ok((await evalApp(p, () => window.howlden.activeDen.mesh.onlineCount())) === 5, `${p.name} still counts 5 online`);
+  await fabi.context.close();
+  log('a 6th joiner is refused with "This den is full (5 of 5)"; the host sees a notice');
+
   // Chat
   await ana.page.fill('.composer-input', 'Hello **pack** <img src=x onerror=alert(1)>');
   await ana.page.press('.composer-input', 'Enter');
@@ -174,20 +210,20 @@ try {
   await shot(ana, 'e2e-chat.png');
 
   // Voice
-  for (const p of [ana, bia, caio]) {
+  for (const p of five) {
     await p.page.click('.ch-row.voice .ch >> nth=0');
     await waitFor(p, () => !!window.howlden.media.current);
   }
-  for (const p of [ana, bia, caio]) await waitFor(p, () => document.querySelectorAll('.stage .tile').length === 3, null, 30000);
-  await ana.page.waitForTimeout(2500);
+  for (const p of five) await waitFor(p, () => document.querySelectorAll('.stage .tile').length === 5, null, 40000);
+  await ana.page.waitForTimeout(3000);
   const grew = [];
-  for (const [p, q] of [
-    [ana, bia],
-    [bia, caio],
-    [caio, ana],
-  ])
-    grew.push(await audioFlows(p, ids[q.name], `${p.name} hears ${q.name}`));
-  log(`voice: audio flows on every pair (bytesReceived grew by ${grew.join(', ')} bytes in 1.5 s)`);
+  for (let i = 0; i < five.length; i++) {
+    for (let k = i + 1; k < five.length; k++) {
+      const [p, q] = [five[i], five[k]];
+      grew.push(await audioFlows(p, ids[q.name], `${p.name} hears ${q.name}`));
+    }
+  }
+  log(`voice with 5 people: audio flows on all 10 pairs (bytesReceived grew by ${Math.min(...grew)} to ${Math.max(...grew)} bytes in 1.5 s)`);
 
   const canShare = await evalApp(ana, async () => {
     try {
@@ -208,7 +244,7 @@ try {
   }
   await shot(bia, 'e2e-voice.png');
   if (await evalApp(ana, () => !!window.howlden.media.screen)) await evalApp(ana, () => window.howlden.media.toggleScreen());
-  for (const p of [ana, bia, caio]) await evalApp(p, () => window.howlden.media.leave());
+  for (const p of five) await evalApp(p, () => window.howlden.media.leave());
 
   // Identity and friends
   for (const [p, q] of [
@@ -293,6 +329,7 @@ try {
   console.log('e2e: all checks passed');
 } catch (err) {
   console.error(err.message);
+  if (shots) for (const [i, pg] of browser.contexts().flatMap((c) => c.pages()).entries()) await pg.screenshot({ path: join(shots, `e2e-fail-${i}.png`) }).catch(() => {});
   if (errors.length) console.error(errors.join('\n'));
   process.exitCode = 1;
 } finally {

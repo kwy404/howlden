@@ -133,6 +133,12 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
         status.className = 'invite-status ok';
         setTimeout(() => m.close(), 1300);
       }),
+      s.on('notice', (n) => {
+        if (n.kind !== 'rejected' || n.peerId !== peerId || done) return;
+        done = true;
+        replace(status, icon('warning', { size: 18 }), t('invite.rejected', { name: n.name, count: n.count, max: n.max }));
+        status.className = 'invite-status bad';
+      }),
       s.on('link-failed', (f) => {
         if (f.peerId !== peerId || done) return;
         replace(body, failureBox(app, f.diagnosis, () => (m.close(), inviteModal(app, { session, friend, title }))));
@@ -182,7 +188,7 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
   replace(status, h('span', { class: 'dot alone' }), t('invite.waiting'));
   replace(
     body,
-    h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '1'), t('invite.step1')), h('p', { class: 'muted' }, t('invite.step1Hint')), shareRow(app, invite.link, t('invite.step1')), session?.den.locked ? h('p', { class: 'callout-warn' }, icon('lock', { size: 16 }), t('invite.locked')) : null),
+    h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '1'), t('invite.step1')), h('p', { class: 'muted' }, t('invite.step1Hint')), shareRow(app, invite.link, t('invite.step1')), session?.den.locked ? h('p', { class: 'callout-warn' }, icon('lock', { size: 16 }), t('invite.locked')) : null, invite.full ? h('p', { class: 'callout-warn full-note', role: 'status' }, icon('members', { size: 16 }), t('invite.full', { count: invite.count, max: invite.max })) : null),
     h(
       'section',
       { class: 'hl-step' },
@@ -234,6 +240,7 @@ export async function joinModal(app, invite) {
       invite.kind === 'dm' ? null : h('h3', { class: 'join-den' }, invite.den.name),
       badge,
     ),
+    invite.den.full ? h('p', { class: 'callout-warn', role: 'status' }, icon('members', { size: 16 }), t('join.fullInvite', invite.den.full)) : null,
     (known && !keyOk) || clash ? h('p', { class: 'callout-warn' }, icon('warning', { size: 16 }), t(known ? 'id.keyChangedHint' : 'id.nameClashHint', { name: invite.host.name })) : null,
     pass ? h('label', { class: 'hl-field', for: 'join-pass' }, h('span', { class: 'field-label' }, t('join.passphrase')), pass, h('span', { class: 'field-hint' }, t('join.passphraseHint'))) : null,
     h('div', { class: 'join-as' }, h('span', { class: 'muted' }, t('join.as')), h('img', { class: 'av', src: avatarSrc(app.profile.avatar), alt: '', width: 24, height: 24 }), h('strong', null, `${app.profile.name}#${app.profile.tag}`)),
@@ -259,8 +266,7 @@ export async function joinModal(app, invite) {
     const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('join.waiting', { host: invite.host.name }));
     replace(body, h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, t('join.replyTitle', { host: invite.host.name })), h('p', { class: 'muted' }, t('join.replyHint', { host: invite.host.name })), shareRow(app, reply.link, t('join.replyTitle', { host: invite.host.name }))), status);
     const offs = [
-      session.on('link-open', (id) => {
-        if (id !== invite.host.id) return;
+      session.on('welcome', () => {
         offs.forEach((off) => off());
         replace(status, icon('check', { size: 18 }), t('join.connected', { den: session.isDirect ? invite.host.name : session.den.name }));
         status.className = 'invite-status ok';
@@ -268,6 +274,12 @@ export async function joinModal(app, invite) {
           m.close();
           app.openSession(session);
         }, 900);
+      }),
+      session.on('notice', (n) => {
+        if (n.kind !== 'full') return;
+        offs.forEach((off) => off());
+        app.discardEmptyDen(session);
+        replace(body, h('div', { class: 'fail-box', role: 'alert' }, h('div', { class: 'fail-head' }, icon('members', { size: 20 }), h('strong', { class: 'full-msg' }, t('join.full', { count: n.count, max: n.max })))));
       }),
       session.on('link-failed', (f) => {
         if (f.peerId !== invite.host.id) return;
