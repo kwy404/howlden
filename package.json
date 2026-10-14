@@ -1,0 +1,60 @@
+{
+  "name": "howlden",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serverless peer to peer group chat, voice and video in the browser. Create a den, share an invite link or QR code and talk over encrypted WebRTC with no accounts, no sign up and no server.",
+  "keywords": [
+    "p2p chat",
+    "peer to peer chat",
+    "serverless chat",
+    "webrtc chat",
+    "webrtc voice chat",
+    "webrtc video call",
+    "group video call without account",
+    "voice chat in browser",
+    "screen share in browser",
+    "private chat app",
+    "encrypted chat",
+    "end to end encrypted chat",
+    "chat without server",
+    "chat without sign up",
+    "mesh network chat",
+    "discord alternative",
+    "self hosted chat alternative",
+    "pwa chat",
+    "qr code invite",
+    "offline first chat"
+  ],
+  "homepage": "https://kwy404.github.io/howlden/",
+  "bugs": {
+    "url": "https://github.com/kwy404/howlden/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kwy404/howlden.git"
+  },
+  "license": "MIT",
+  "author": "Alexandre Kohler (https://github.com/kwy404)",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "rules": "node scripts/check-rules.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "core": "node scripts/sync-core.mjs",
+    "core:check": "node scripts/sync-core.mjs --check",
+    "e2e": "node test/app-e2e.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "jsdom": "^26.1.0",
+    "playwright-core": "1.62.1",
+    "vitest": "^3.2.7"
+  }
+}
