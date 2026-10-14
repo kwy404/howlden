@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/banner-dark.svg">
-    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/banner.svg" width="880" alt="Banner do howlden: a loba Luna uiva no microfone do headset. Chat em grupo, voz e vídeo sem servidor, direto no navegador">
+    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/banner-dark.svg">
+    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/banner.svg" width="880" alt="Banner do howlden: a loba Luna uiva no microfone do headset. Chat em grupo, voz e vídeo sem servidor, direto no navegador">
   </picture>
 </p>
 

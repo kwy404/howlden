@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/banner-dark.svg">
-    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/banner.svg" width="880" alt="howlden banner: Luna the wolf howls into her headset mic. Serverless group chat, voice and video in your browser, with no account, end to end encryption, invites only and up to 5 people">
+    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/banner-dark.svg">
+    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/banner.svg" width="880" alt="howlden banner: Luna the wolf howls into her headset mic. Serverless group chat, voice and video in your browser, with no account, end to end encryption, invites only and up to 5 people">
   </picture>
 </p>
 
@@ -27,7 +27,7 @@
 **howlden is a free, open source group chat that runs entirely in your browser, with the layout you know from gaming chat apps: dens (servers), text channels, voice channels, video and screen share.** There is no account and no sign up: you create a local profile (a username, an avatar and an identity key made on your device). You invite friends with a link or a QR code, and everything flows directly between your browsers over WebRTC, end to end encrypted. No server of ours ever sees your messages, voice, video or files. A den holds up to 5 people, or just you and one friend.
 
 <p align="center">
-  <a href="https://kwy404.github.io/howlden/"><img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/social-preview.png" width="820" alt="The howlden website: a den for your pack, no server in sight, with a pack of wolves around a campfire"></a>
+  <a href="https://kwy404.github.io/howlden/"><img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/social-preview.png" width="820" alt="The howlden website: a den for your pack, no server in sight, with a pack of wolves around a campfire"></a>
 </p>
 
 ## Table of contents
@@ -179,8 +179,8 @@ Luna (a young wolf with a gaming headset), her pack, 44 icons and 14 night scene
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/icons-sheet-dark.svg">
-    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/icons-sheet.svg" width="640" alt="The howlden icon set: den, text and voice channels, mute, deafen, screen share, camera, invite, QR, lock, fingerprint, mesh, campfire, relay and more">
+    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/icons-sheet-dark.svg">
+    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/icons-sheet.svg" width="640" alt="The howlden icon set: den, text and voice channels, mute, deafen, screen share, camera, invite, QR, lock, fingerprint, mesh, campfire, relay and more">
   </picture>
 </p>
 
