@@ -10,10 +10,14 @@ describe('interface text', () => {
   it('has every key used in the code, in both languages', () => {
     const used = new Set();
     for (const src of sources) {
-      for (const m of src.matchAll(/'((?:app|onboard|home|rail|den|channel|chat|members|voice|user|invite|join|fail|notice|scan|pass|create|common|settings|account|call|crop|id|login|pin|profile|reply)\.[A-Za-z0-9.-]+)'/g)) used.add(m[1]);
+      for (const m of src.matchAll(/'((?:app|onboard|home|rail|den|channel|chat|members|voice|user|invite|join|fail|notice|scan|pass|create|common|settings|account|call|crop|id|login|pin|profile|reply|pair|words|sound)\.[A-Za-z0-9.-]+)'/g)) used.add(m[1]);
     }
     for (const n of ['logo', 'moon', 'sun', 'bell', 'globe', 'file']) used.add(`login.pick.${n}`);
-    for (const k of ['offline', 'blocked', 'no-stun', 'strict-nat', 'timeout']) used.add(`fail.${k}`);
+    for (const k of ['offline', 'blocked', 'no-stun', 'strict-nat', 'timeout', 'answered', 'expired', 'den', 'self', 'already', 'full', 'closed', 'damaged', 'version', 'kind']) used.add(`fail.${k}`);
+    for (const k of ['join', 'leave', 'peerJoin', 'peerLeave', 'mute', 'unmute', 'deafen', 'message', 'mention', 'ring', 'screen', 'connected', 'lost']) used.add(`sound.${k}`);
+    for (const k of ['off', 'standard', 'strong']) used.add(`voice.noise.${k}`).add(`voice.noise.${k}Hint`);
+    for (const k of ['empty', 'format', 'auth']) used.add(`settings.turnErr.${k}`);
+    for (const k of ['format', 'password', 'other']) used.add(`account.err.${k}`);
     for (const k of ['mic-denied', 'mic-missing', 'mic-failed', 'camera-denied', 'camera-failed', 'screen-unsupported', 'screen-failed', 'autoplay']) used.add(`notice.${k}`);
     expect(used.size).toBeGreaterThan(300);
     const missing = [...used].filter((k) => !(k in DICTS.en) || !(k in DICTS.pt));
@@ -44,7 +48,7 @@ describe('interface text', () => {
     expect(translator('en')('home.lead', { max: MAX_MEMBERS })).toContain('up to 5 people');
     expect(translator('pt')('notice.full', { count: 5, max: 5 })).toBe('Esta toca está cheia (5 de 5).');
     expect(translator('en')('fail.full', { count: 5, max: 5 })).toBe('This den is full (5 of 5).');
-    const old = /(up to|até) (8|eight|oito)|(8|eight) (people|peers|members)|8 pessoas/i;
+    const old = /\b(up to|até) (8|eight|oito)\b|\b(8|eight) (people|peers|members|wolves)\b|\b8 pessoas\b|\b\d\/8\b|\bof (8|eight)\b|caps at 8/i;
     expect(JSON.stringify(DICTS)).not.toMatch(old);
     const site = ['README.md', 'i18n/README.pt-BR.md', ...readdirSync(new URL('../docs/', import.meta.url)).filter((f) => f.endsWith('.html')).map((f) => `docs/${f}`)];
     for (const f of site) expect(readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'), f).not.toMatch(old);

@@ -43,11 +43,106 @@ export class MediaManager extends Emitter {
     return { channel: this.current.channel, muted: this.muted || !this.mic, deafened: this.deafened, camera: !!this.camera, screen: !!this.screen };
   }
 
+  /** Noise suppression mode: 'off', 'standard' (browser only) or 'strong' (browser plus our own DSP). */
+  get noiseMode() {
+    return this.settings.noiseMode || 'strong';
+  }
+
+  get sensitivity() {
+    return (this.settings.gateSensitivity ?? 50) / 100;
+  }
+
+  /** Echo cancellation and automatic gain are always on; noise suppression and voice isolation follow the mode. */
   _constraints() {
     const s = this.settings;
-    const audio = { noiseSuppression: s.noiseSuppression, echoCancellation: s.echoCancellation, autoGainControl: s.autoGainControl };
+    const clean = this.noiseMode !== 'off';
+    const audio = { echoCancellation: true, autoGainControl: true, noiseSuppression: clean };
+    const supported = navigator.mediaDevices?.getSupportedConstraints?.() || {};
+    if (supported.voiceIsolation) audio.voiceIsolation = clean;
     if (s.inputId) audio.deviceId = { exact: s.inputId };
     return audio;
+  }
+
+  /**
+   * Open the microphone and, in Strong mode, run it through the noise
+   * suppression worklet. Returns { raw, out, chain }: out is what peers get.
+   */
+  async _openPipe() {
+    const raw = await this._openMic();
+    if (this.noiseMode !== 'strong' || !this.ctx?.audioWorklet || typeof AudioWorkletNode === 'undefined') return { raw, out: raw, chain: null };
+    try {
+      this.workletReady ??= this.ctx.audioWorklet.addModule(new URL('./denoise-worklet.js', import.meta.url));
+      await this.workletReady;
+      const src = this.ctx.createMediaStreamSource(raw);
+      const node = new AudioWorkletNode(this.ctx, 'howlden-denoise', { processorOptions: { sensitivity: this.sensitivity } });
+      const dest = this.ctx.createMediaStreamDestination();
+      src.connect(node);
+      node.connect(dest);
+      const pipe = { raw, out: dest.stream, chain: { src, node, dest } };
+      node.port.onmessage = (e) => {
+        pipe.level = e.data;
+        this.emit('mic-level', e.data);
+      };
+      return pipe;
+    } catch (err) {
+      console.warn('howlden: noise suppression is not available here', err);
+      this.workletReady = null;
+      return { raw, out: raw, chain: null };
+    }
+  }
+
+  _closePipe(pipe) {
+    if (!pipe) return;
+    try {
+      pipe.chain?.src.disconnect();
+      pipe.chain?.node.disconnect();
+    } catch {
+      // already disconnected
+    }
+    this._stop(pipe.raw);
+    if (pipe.out !== pipe.raw) this._stop(pipe.out);
+  }
+
+  /** Whether the outgoing microphone runs through our own noise suppression right now. */
+  get processing() {
+    return this.pipe?.chain ? 'strong' : this.pipe ? this.noiseMode : null;
+  }
+
+  setSensitivity(value) {
+    this.settings.gateSensitivity = value;
+    this.app.saveSettings();
+    for (const pipe of [this.pipe, this.testPipe]) pipe?.chain?.node.port.postMessage({ sensitivity: this.sensitivity });
+  }
+
+  /** Hear yourself, processed, for the mic test in settings. Returns a stop function. */
+  async startMicTest() {
+    this._ensureContext();
+    this.stopMicTest();
+    const pipe = await this._openPipe();
+    this.testPipe = pipe;
+    const el = document.createElement('audio');
+    el.autoplay = true;
+    el.srcObject = pipe.out;
+    if (this.settings.outputId && el.setSinkId) el.setSinkId(this.settings.outputId).catch(() => {});
+    this.sink.append(el);
+    el.play().catch(() => {});
+    pipe.el = el;
+    this._meter('test', pipe.out);
+    return () => this.stopMicTest();
+  }
+
+  stopMicTest() {
+    const pipe = this.testPipe;
+    if (!pipe) return;
+    this.testPipe = null;
+    pipe.el?.remove();
+    this._unmeter('test');
+    this._closePipe(pipe);
+  }
+
+  /** The latest level report from the noise suppressor (dBFS, gate state), if it runs. */
+  get micLevel() {
+    return this.testPipe?.level || this.pipe?.level || null;
   }
 
   async _openMic() {
@@ -68,20 +163,24 @@ export class MediaManager extends Emitter {
     this._ensureContext();
     this.current = { session, channel: channelId };
     try {
-      this.mic = await this._openMic();
+      this.pipe = await this._openPipe();
+      this.mic = this.pipe.out;
       this._meter('self', this.mic);
     } catch (err) {
+      this.pipe = null;
       this.mic = null;
       this.emit('error', err.name === 'NotAllowedError' ? 'mic-denied' : err.name === 'NotFoundError' ? 'mic-missing' : 'mic-failed');
     }
     if (!this.current || this.current.session !== session) {
-      this._stop(this.mic);
+      this._closePipe(this.pipe);
+      this.pipe = null;
       this.mic = null;
       return;
     }
     this._gate();
     this._announce();
     for (const peerId of session.mesh?.links.keys() || []) this.sync(session, peerId);
+    this.emit('sound', 'join');
     this.emit('change');
   }
 
@@ -89,7 +188,9 @@ export class MediaManager extends Emitter {
     if (!this.current) return;
     const { session } = this.current;
     this.current = null;
-    for (const s of [this.mic, this.camera, this.screen]) this._stop(s);
+    this._closePipe(this.pipe);
+    for (const s of [this.camera, this.screen]) this._stop(s);
+    this.pipe = null;
     this.mic = this.camera = this.screen = null;
     this._unmeter('self');
     session.send({ type: 'voice', channel: null });
@@ -97,6 +198,7 @@ export class MediaManager extends Emitter {
       for (const slot of SLOTS) if (link.senders?.[slot]) link.setTrack(slot, null);
       this._dropAudio(`${session.id}:${peerId}`);
     }
+    this.emit('sound', 'leave');
     this.emit('change');
   }
 
@@ -206,10 +308,12 @@ export class MediaManager extends Emitter {
 
   /** Reopen the microphone after a device or processing change. */
   async restartMic() {
+    if (this.testPipe) await this.startMicTest();
     if (!this.current) return;
-    const old = this.mic;
+    const old = this.pipe;
     try {
-      this.mic = await this._openMic();
+      this.pipe = await this._openPipe();
+      this.mic = this.pipe.out;
     } catch {
       this.emit('error', 'mic-failed');
       return;
@@ -221,7 +325,7 @@ export class MediaManager extends Emitter {
       if (link.senders?.mic) link.setTrack('mic', this.mic.getAudioTracks()[0], this.mic);
       else this.sync(session, peerId);
     }
-    this._stop(old);
+    this._closePipe(old);
     this._gate();
   }
 
@@ -235,11 +339,13 @@ export class MediaManager extends Emitter {
     this._applyDeafen();
     this._gate();
     this._announce();
+    this.emit('sound', this.muted ? 'mute' : 'unmute');
     this.emit('change');
   }
 
   toggleDeafen() {
     this.deafened = !this.deafened;
+    this.emit('sound', this.deafened ? 'deafen' : 'undeafen');
     this._applyDeafen();
     this._gate();
     this._announce();
@@ -258,7 +364,7 @@ export class MediaManager extends Emitter {
 
   _gate() {
     const on = this.live;
-    for (const t of this.mic?.getAudioTracks() || []) t.enabled = on;
+    for (const t of [...(this.mic?.getAudioTracks() || []), ...(this.pipe?.raw.getAudioTracks() || [])]) t.enabled = on;
   }
 
   async toggleCamera() {
@@ -291,6 +397,7 @@ export class MediaManager extends Emitter {
       }
       try {
         this.screen = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: false });
+        this.emit('sound', 'screen');
         this.screen.getVideoTracks()[0].addEventListener('ended', () => {
           if (this.screen) this.toggleScreen();
         });

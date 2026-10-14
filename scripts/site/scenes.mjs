@@ -184,12 +184,12 @@ ${wolf(P, 196, 388, { s: 0.2, fur: 'luna', headset: true })}${wolf(P, 450, 388, 
     },
   },
   'pack-mesh': {
-    alt: 'Eight wolf faces shining like stars in the night sky, each one linked to all the others, like the mesh of a howlden den.',
+    alt: 'Five wolf faces shining like stars in the night sky, each one linked to all the others, like the mesh of a full howlden den.',
     draw(P, id) {
-      const pts = [[320, 70], [470, 112], [540, 228], [470, 330], [320, 360], [170, 330], [100, 228], [170, 112]];
+      const pts = [[320, 70], [470, 178], [413, 346], [227, 346], [170, 178]];
       let lines = '';
       for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) lines += `<path d="M${pts[i][0]} ${pts[i][1]}L${pts[j][0]} ${pts[j][1]}"/>`;
-      const furs = ['luna', 'grey', 'brown', 'snow', 'night', 'rust', 'grey', 'brown'];
+      const furs = ['luna', 'grey', 'brown', 'snow', 'rust'];
       const faces = pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="40" fill="${P.sky1}" stroke="${i === 0 ? P.ring : P.star}" stroke-width="${i === 0 ? 5 : 3}"/>${face(P, x, y + 6, 0.3, { fur: furs[i], headset: i === 0 })}`).join('');
       return frame(id, P, `${sky(P, id, { moon: [0, 0, 0], seed: 31, stars: 70 })}<g stroke="${P.star}" stroke-width="2" opacity=".55">${lines}</g>${faces}`);
     },

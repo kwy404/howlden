@@ -484,7 +484,8 @@ export function createChat(app) {
       if (files.length) await s.postFiles(state.channel, text, files, reply);
       else await s.post(state.channel, text, { reply });
     } catch (err) {
-      toast(err.message === 'too-large' ? t('chat.tooLarge') : String(err.message || err), 'error');
+      if (err.message !== 'too-large') console.warn('howlden send:', err);
+      toast(err.message === 'too-large' ? t('chat.tooLarge') : t('chat.sendFailed'), 'error');
     }
     for (const f of files) if (f.preview) URL.revokeObjectURL(f.preview);
     scrollBottom();

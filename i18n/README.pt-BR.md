@@ -52,7 +52,7 @@ Acesse **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)**
 | **Vídeo e tela** | Ligue a câmera ou compartilhe uma janela, uma aba ou a tela inteira em qualquer canal de voz. |
 | **Arquivos** | Solte um arquivo no chat e ele vai direto do seu navegador para os amigos. Nada é enviado para servidor nenhum. |
 | **Perfil local** | Nome, avatar e um par de chaves de assinatura (Ed25519 quando o navegador suporta) criado no seu aparelho. Sua tag, como `luna#7c1f`, vem dessa chave. Proteja com PIN ou leve para outro aparelho com um backup criptografado. |
-| **Convites** | Um link e um QR code de ida, um código de resposta de volta. Leitura pela câmera quando o navegador suporta, colar sempre funciona. |
+| **Convites** | Seis palavras (ou o QR delas) por relés públicos criptografados, confirmadas com mais seis palavras. Ou, com zero terceiros, um link de convite de ida e um link de resposta de volta. |
 | **Extras de privacidade** | Senha opcional do den para uma segunda camada de criptografia e uma impressão digital da conexão para comparar. |
 | **Ajuda com a rede** | Explicação clara quando uma rede restrita bloqueia a conexão direta, e uma opção para usar seu próprio servidor TURN. |
 
@@ -60,11 +60,11 @@ Acesse **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)**
 
 Não existe servidor para apresentar vocês, então os amigos se apresentam: um link de ida, um código de volta.
 
-1. **Mande um convite.** Clique em Convidar. O howlden coloca a oferta de conexão do WebRTC (comprimida com `deflate-raw` e escrita em base64url) num link e num QR code. Mande pelo mensageiro que você já usa, ou deixe o amigo escanear o QR.
-2. **Receba o código de resposta.** O amigo abre o link e o navegador dele gera um código curto de resposta, também em link ou QR. Ele devolve do mesmo jeito.
+1. **Mostre seis palavras.** Clique em Convidar. O howlden mostra seis palavras (e um QR code pequeno com elas). Leia em voz alta ou mande por qualquer mensageiro. Os dois aparelhos derivam das palavras um tópico aleatório e uma chave AES-GCM e se encontram em relés MQTT públicos (EMQX, HiveMQ, Mosquitto); o aperto de mão passa selado com essa chave, então os relés só veem texto cifrado. As palavras valem uma vez e expiram em 10 minutos. Prefere zero terceiros? Nas configurações dá para usar links: o howlden coloca a oferta de conexão do WebRTC (comprimida com `deflate-raw` e escrita em base64url) num link e num QR code. Mande pelo mensageiro que você já usa, ou deixe o amigo escanear o QR.
+2. **O amigo digita as palavras.** Com seis palavras ele não precisa devolver nada. No modo de links, o navegador dele gera um código curto de resposta, também em link ou QR, e ele devolve do mesmo jeito.
 3. **Uivem juntos.** Cole ou escaneie a resposta e pronto. Depois disso o howlden conecta o novato a todo o resto do den sozinho, pelas conexões criptografadas que já existem.
 
-Quem convidou precisa aceitar o código de resposta, então um link vazado sozinho não basta para entrar.
+Quem convidou confirma o novato digitando seis palavras de confirmação geradas a partir dos certificados da conexão (amigos com chave já conhecida entram pela assinatura), então palavras ou um link vazados sozinhos não bastam para entrar.
 
 ## Por que é privado
 

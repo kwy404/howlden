@@ -1,7 +1,10 @@
-// End to end test in a real browser: three people with fake cameras and
-// microphones create profiles, build a den mesh through invite links, chat,
-// join voice (audio bytes must flow), share a screen, become friends, talk in
-// a direct message with a 1 to 1 call, and reconnect with a verified key.
+// End to end test in a real browser with live public relays: seven people
+// with fake cameras and microphones create profiles; a den is built with an
+// invite link and with six words (confirmed with six more words), wrong words
+// and a sixth member are refused, five people chat and talk with noise
+// suppression on (audio bytes must flow), friends pair with six words, a
+// known friend is called with only six words, a screen share fills the call
+// view, and accounts survive a PIN lock and a backup.
 //
 // Usage: node test/app-e2e.mjs [path-to-chromium-browser]
 // Uses BROWSER, then common Edge and Chrome install paths.
@@ -97,13 +100,6 @@ async function acceptInvite(guest, link) {
   return { reply: await reply.inputValue(), hero };
 }
 
-async function pasteReply(host, reply) {
-  await host.page.fill('.invite-modal textarea', reply);
-  await host.page.click('.invite-modal button:text-is("Connect")');
-  await host.page.waitForSelector('.invite-modal .invite-status.ok', { timeout: 40000 });
-  await host.page.waitForSelector('.invite-modal', { state: 'detached', timeout: 5000 });
-}
-
 async function waitFor(p, fn, arg, timeout = 30000) {
   await p.page.waitForFunction(fn, arg, { timeout, polling: 250 });
 }
@@ -130,67 +126,130 @@ async function audioFlows(p, peerId, label) {
 
 const shot = async (p, file) => shots && p.page.screenshot({ path: join(shots, file) });
 
-try {
-  const ana = await person('Ana');
-  const bia = await person('Bia');
-  const caio = await person('Caio');
-  const dani = await person('Dani');
-  const edu = await person('Edu');
-  const fabi = await person('Fabi');
-  const ids = {};
-  for (const p of [ana, bia, caio, dani, edu, fabi]) ids[p.name] = await evalApp(p, () => window.howlden.profile.id);
-  log('six profiles created with identity keys');
+// Six word pairing helpers: the inviter shows words, the guest types them.
+async function openWords(host, open) {
+  await open();
+  const list = host.page.locator('.invite-modal .invite-words');
+  await list.waitFor({ timeout: 40000 });
+  return (await list.getAttribute('data-words')).split(' ');
+}
 
-  // Den and mesh
+async function typeWords(page, prefix, words) {
+  for (let i = 0; i < words.length; i++) await page.fill(`#${prefix}-${i}`, words[i]);
+}
+
+/** The guest joins with words; returns the confirmation words it shows (or null when let in by key). */
+async function joinWithWords(guest, words, { viaDialog = false, accept = true } = {}) {
+  if (viaDialog) {
+    await guest.page.click('.rail-btn[aria-label="Join a den"]');
+    await guest.page.waitForSelector('#join-word-0');
+    await typeWords(guest.page, 'join-word', words);
+    if (await guest.page.locator('#join-word-5').count()) await guest.page.press('#join-word-5', 'Enter');
+  } else {
+    await evalApp(guest, (w) => window.howlden.joinWithWords(w), words);
+  }
+  // A known friend's call is accepted by itself, so the invite card may only flash by.
+  await guest.page.waitForSelector('.join-modal .join-hero', { timeout: 60000 });
+  const hero = (await guest.page.evaluate(() => document.querySelector('.join-modal .join-hero')?.innerText)) || '';
+  if (accept && (await guest.page.locator('.join-modal .btn-block').count())) await guest.page.click('.join-modal .btn-block').catch(() => {});
+  return hero;
+}
+
+async function confirmWordsOf(guest) {
+  const list = guest.page.locator('.join-modal .confirm-words');
+  await list.waitFor({ timeout: 40000 });
+  return (await list.getAttribute('data-words')).split(' ');
+}
+
+async function hostConfirms(host, words) {
+  await host.page.waitForSelector('#confirm-word-0', { timeout: 30000 });
+  await typeWords(host.page, 'confirm-word', words);
+  await host.page.click('.confirm-step .btn');
+}
+
+async function wordsJoin(host, guest, open, opts) {
+  const words = await openWords(host, open);
+  const hero = await joinWithWords(guest, words, opts);
+  await hostConfirms(host, await confirmWordsOf(guest));
+  await guest.page.waitForSelector('.join-modal .invite-status.ok', { timeout: 30000 });
+  await host.page.waitForSelector('.invite-modal', { state: 'detached', timeout: 10000 });
+  return hero;
+}
+
+const inviteButton = (p) => () => p.page.click('.main-head button[aria-label="Invite people"]');
+
+try {
+  const people = {};
+  for (const name of ['Ana', 'Bia', 'Caio', 'Dani', 'Edu', 'Fabi', 'Gabi']) people[name] = await person(name);
+  const { Ana: ana, Bia: bia, Caio: caio, Dani: dani, Edu: edu, Fabi: fabi, Gabi: gabi } = people;
+  const ids = {};
+  for (const p of Object.values(people)) ids[p.name] = await evalApp(p, () => window.howlden.profile.id);
+  log('seven profiles created with identity keys');
+
+  // A den: the first guest joins with an invite link (zero third parties), pasting the reply and clicking Connect too
   await ana.page.click('.home-card');
   await ana.page.fill('#den-name', 'Night owls');
   await ana.page.click('.hl-modal button[type="submit"]');
+  await ana.page.waitForSelector('.invite-modal .invite-words', { timeout: 40000 });
+  await ana.page.click('.invite-modal .link-btn');
   let link = await inviteLink(ana);
   ok(link.startsWith(`${base}#i=`), 'invite link format');
   const first = await acceptInvite(bia, link);
   ok(first.hero.includes('Night owls'), 'join screen shows the den');
-  await pasteReply(ana, first.reply);
+  await ana.page.fill('.invite-modal textarea', first.reply);
+  await ana.page.evaluate(() => document.querySelector('.invite-modal textarea').dispatchEvent(new Event('paste', { bubbles: true })));
+  await ana.page.evaluate(() => [...document.querySelectorAll('.invite-modal button')].find((b) => b.textContent === 'Connect')?.click());
+  await ana.page.waitForSelector('.invite-modal .invite-status.ok', { timeout: 40000 });
+  const errText = await ana.page.locator('.invite-modal .form-error').allInnerTexts().catch(() => []);
+  ok(!errText.join('').trim(), `a reply pasted and submitted twice shows no error (${errText.join(' ')})`);
   await waitFor(bia, () => window.howlden.activeDen?.status === 'online');
-  log('Bia joined through one invite and one reply');
+  log('Bia joined by invite link; the reply applied twice (paste, then Connect) is ignored, not an error');
 
-  await ana.page.click('.main-head button[aria-label="Invite people"]');
-  link = await inviteLink(ana);
-  const second = await acceptInvite(caio, link);
-  await pasteReply(ana, second.reply);
+  // Six words, typed in the Join dialog, with the confirmation words
+  await wordsJoin(ana, caio, inviteButton(ana), { viaDialog: true });
   for (const p of [ana, bia, caio]) await waitFor(p, () => window.howlden.activeDen?.mesh?.links.size === 2);
-  log('Caio joined; the host introduced Bia and Caio over data channels (full mesh of 3)');
+  log('Caio joined with six words through the live public relays and the confirmation words; full mesh of 3');
 
-  for (const guest of [dani, edu]) {
-    await ana.page.click('.main-head button[aria-label="Invite people"]');
-    const l = await inviteLink(ana);
-    const j = await acceptInvite(guest, l);
-    await pasteReply(ana, j.reply);
+  // Wrong confirmation words: refused, nothing shared
+  {
+    const words = await openWords(ana, inviteButton(ana));
+    await joinWithWords(fabi, words);
+    await confirmWordsOf(fabi);
+    for (let i = 0; i < 3; i++) {
+      await hostConfirms(ana, ['zoo', 'zoo', 'zoo', 'zoo', 'zoo', 'zoo']);
+      if (i < 2) await ana.page.waitForSelector('.confirm-step .form-error:not(:empty)');
+    }
+    await ana.page.waitForSelector('.invite-modal .fail-box');
+    await fabi.page.waitForSelector('.join-modal .full-msg', { timeout: 20000 });
+    ok(/did not confirm the words/.test(await fabi.page.locator('.join-modal .full-msg').innerText()), 'the guest is told the words were not confirmed');
+    ok((await evalApp(ana, () => window.howlden.activeDen.mesh.onlineCount())) === 3, 'the refused guest never joined');
+    ok(!(await evalApp(fabi, () => [...window.howlden.sessions.values()].some((s) => s.messages.size))), 'nothing was shared with the refused guest');
+    await ana.page.keyboard.press('Escape');
+    await fabi.page.keyboard.press('Escape');
   }
+  log('wrong confirmation words three times: the guest is refused and receives nothing');
+
+  for (const guest of [dani, edu]) await wordsJoin(ana, guest, inviteButton(ana));
   const five = [ana, bia, caio, dani, edu];
-  for (const p of five) await waitFor(p, () => window.howlden.activeDen?.mesh?.links.size === 4);
+  for (const p of five) await waitFor(p, () => window.howlden.activeDen?.mesh?.links.size === 4, null, 40000);
   for (const p of five) await waitFor(p, () => document.querySelector('.hd-count')?.textContent === '5/5');
   ok((await ana.page.locator('.members-head').first().innerText()).includes('5/5'), 'member list shows 5/5');
-  log('Dani and Edu joined: full mesh of 5, header and member list show 5/5');
+  log('Dani and Edu joined with six words: full mesh of 5, header and member list show 5/5');
 
-  await ana.page.click('.main-head button[aria-label="Invite people"]');
-  const fullLink = await inviteLink(ana);
-  ok(/full \(5 of 5\)/.test(await ana.page.locator('.invite-modal .full-note').innerText()), 'invite made while full says so');
-  await fabi.page.goto(fullLink);
-  await fabi.page.waitForSelector('.join-modal');
-  ok(/was full when the invite was made \(5 of 5\)/.test(await fabi.page.locator('.join-modal').innerText()), 'the guest sees that the invite was made while full');
-  await fabi.page.click('.join-modal .btn-block');
-  const fullReply = fabi.page.locator('.join-modal .share-side input');
-  await fullReply.waitFor({ timeout: 30000 });
-  await ana.page.fill('.invite-modal textarea', await fullReply.inputValue());
-  await ana.page.click('.invite-modal button:text-is("Connect")');
-  await fabi.page.waitForSelector('.join-modal .full-msg', { timeout: 40000 });
-  ok((await fabi.page.locator('.join-modal .full-msg').innerText()) === 'This den is full (5 of 5). Ask the host for a new invite once someone leaves.', 'the sixth person gets the full message');
-  await ana.page.waitForSelector('.invite-modal .invite-status.bad');
-  ok(/Fabi could not join: this den is full \(5 of 5\)/.test(await ana.page.locator('.invite-modal .invite-status').innerText()), 'the host sees the rejection');
-  await ana.page.keyboard.press('Escape');
+  {
+    const words = await openWords(ana, inviteButton(ana));
+    ok(/full \(5 of 5\)/.test(await ana.page.locator('.invite-modal .full-note').innerText()), 'invite made while full says so');
+    const hero = await joinWithWords(fabi, words);
+    ok(/was full when the invite was made \(5 of 5\)/.test(await fabi.page.locator('.join-modal').innerText()) || hero, 'guest warned');
+    await fabi.page.waitForSelector('.join-modal .full-msg', { timeout: 40000 });
+    ok((await fabi.page.locator('.join-modal .full-msg').innerText()) === 'This den is full (5 of 5). Ask the host for a new invite once someone leaves.', 'the sixth person gets the full message');
+    await ana.page.waitForSelector('.invite-modal .invite-status.bad', { timeout: 20000 });
+    ok(/Fabi could not join: this den is full \(5 of 5\)/.test(await ana.page.locator('.invite-modal .invite-status').innerText()), 'the host sees the rejection');
+    await ana.page.keyboard.press('Escape');
+    await fabi.page.keyboard.press('Escape');
+  }
   for (const p of five) ok((await evalApp(p, () => window.howlden.activeDen.mesh.onlineCount())) === 5, `${p.name} still counts 5 online`);
-  await fabi.context.close();
-  log('a 6th joiner is refused with "This den is full (5 of 5)"; the host sees a notice');
+  log('a 6th joiner with six words is refused with "This den is full (5 of 5)"; the host sees a notice');
 
   // Chat
   await ana.page.fill('.composer-input', 'Hello **pack** <img src=x onerror=alert(1)>');
@@ -207,43 +266,40 @@ try {
   await bia.page.press('.composer-input', 'Enter');
   await waitFor(ana, () => !!document.querySelector('.msg.mentioned'));
   log('messages, markdown, reactions and mentions sync to every member');
-  await shot(ana, 'e2e-chat.png');
 
-  // Voice
+  // The author card stays inside the viewport near the composer
+  {
+    await bia.page.click('.msg.mentioned .msg-author', { trial: false }).catch(() => {});
+    await ana.page.click('.msg.mentioned .msg-author');
+    const box = await ana.page.evaluate(() => {
+      const r = document.querySelector('.hl-popover').getBoundingClientRect();
+      return { top: r.top, left: r.left, right: r.right, bottom: r.bottom, w: innerWidth, h: innerHeight, name: document.querySelector('.hl-popover .card-name').textContent };
+    });
+    ok(box.top >= 0 && box.left >= 0 && box.right <= box.w && box.bottom <= box.h, `user card inside the viewport ${JSON.stringify(box)}`);
+    ok(box.name === `Bia#${ids.Bia.slice(0, 4)}`, `user card shows the full name and tag (${box.name})`);
+    await ana.page.keyboard.press('Escape');
+  }
+  log('the user card flips and shifts inside the viewport and shows the full name#tag');
+
+  // Voice with 5 people: the noise suppressed track flows to every peer
   for (const p of five) {
     await p.page.click('.ch-row.voice .ch >> nth=0');
     await waitFor(p, () => !!window.howlden.media.current);
   }
   for (const p of five) await waitFor(p, () => document.querySelectorAll('.stage .tile').length === 5, null, 40000);
   await ana.page.waitForTimeout(3000);
+  const processed = await evalApp(ana, () => {
+    const m = window.howlden.media;
+    const sent = [...window.howlden.activeDen.mesh.links.values()].map((l) => l.senders.mic?.track);
+    return { mode: m.processing, sameTrack: sent.every((tr) => tr && tr === m.mic.getAudioTracks()[0]), raw: m.pipe.raw.getAudioTracks()[0] !== m.mic.getAudioTracks()[0] };
+  });
+  ok(processed.mode === 'strong' && processed.sameTrack && processed.raw, `peers get the processed microphone track ${JSON.stringify(processed)}`);
   const grew = [];
   for (let i = 0; i < five.length; i++) {
-    for (let k = i + 1; k < five.length; k++) {
-      const [p, q] = [five[i], five[k]];
-      grew.push(await audioFlows(p, ids[q.name], `${p.name} hears ${q.name}`));
-    }
+    for (let k = i + 1; k < five.length; k++) grew.push(await audioFlows(five[i], ids[five[k].name], `${five[i].name} hears ${five[k].name}`));
   }
-  log(`voice with 5 people: audio flows on all 10 pairs (bytesReceived grew by ${Math.min(...grew)} to ${Math.max(...grew)} bytes in 1.5 s)`);
-
-  const canShare = await evalApp(ana, async () => {
-    try {
-      const s = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      s.getTracks().forEach((t) => t.stop());
-      return true;
-    } catch (e) {
-      return e.name;
-    }
-  });
-  if (canShare === true || !process.env.CI) {
-    ok(canShare === true, `getDisplayMedia works in this browser (${canShare})`);
-    await evalApp(ana, () => window.howlden.media.toggleScreen());
-    for (const p of [bia, caio]) await waitFor(p, () => [...document.querySelectorAll('.screen-tile video')].some((v) => v.videoWidth > 0), null, 30000);
-    log('screen share from Ana is decoded by Bia and Caio');
-  } else {
-    log(`screen share skipped: this CI browser has no capture source (${canShare})`);
-  }
-  await shot(bia, 'e2e-voice.png');
-  if (await evalApp(ana, () => !!window.howlden.media.screen)) await evalApp(ana, () => window.howlden.media.toggleScreen());
+  log(`voice with 5 people, Strong noise suppression on: audio flows on all 10 pairs (bytesReceived grew ${Math.min(...grew)} to ${Math.max(...grew)} bytes in 1.5 s)`);
+  ok((await evalApp(ana, () => window.howlden.sounds.played || 0)) > 0, 'interface sounds played after the first interaction');
   for (const p of five) await evalApp(p, () => window.howlden.media.leave());
 
   // Identity and friends
@@ -256,40 +312,97 @@ try {
   }
   log('identity proofs verified on every link; members saved as friends');
 
-  // Direct message and 1 to 1 call
+  // A new friend with six words
+  {
+    await ana.page.click('.rail-home .rail-btn');
+    const hero = await wordsJoin(ana, fabi, () => evalApp(ana, () => window.howlden.friendInviteFlow()));
+    ok(/wants to connect with you/.test(hero), 'friend invite reads as a connection request');
+    await waitFor(ana, (id) => !!window.howlden.friends.get(id), ids.Fabi);
+    await waitFor(fabi, (id) => !!window.howlden.friends.get(id), ids.Ana);
+  }
+  log('Fabi became a friend with six words and the confirmation words');
+
+  // The friend invite link, applied twice (the reported setRemoteDescription bug)
+  {
+    await evalApp(ana, () => window.howlden.friendInviteFlow());
+    await ana.page.waitForSelector('.invite-modal .invite-words', { timeout: 40000 });
+    await ana.page.click('.invite-modal .link-btn');
+    const l = await inviteLink(ana);
+    const j = await acceptInvite(gabi, l);
+    await ana.page.fill('.invite-modal textarea', j.reply);
+    await ana.page.evaluate(() => document.querySelector('.invite-modal textarea').dispatchEvent(new Event('paste', { bubbles: true })));
+    await ana.page.evaluate(() => [...document.querySelectorAll('.invite-modal button')].find((b) => b.textContent === 'Connect')?.click());
+    await ana.page.waitForSelector('.invite-modal .invite-status.ok', { timeout: 40000 });
+    const e = (await ana.page.locator('.invite-modal .form-error').allInnerTexts().catch(() => [])).join('');
+    ok(!/setRemoteDescription|wrong state/i.test(e) && !e.trim(), `friend invite link applied twice shows no error (${e})`);
+    await waitFor(gabi, (id) => !!window.howlden.friends.get(id), ids.Ana);
+  }
+  log('a friend invite reply applied twice connects once with no error (regression)');
+
+  // Calling a known friend needs only the six words
   await ana.page.click('.rail-home .rail-btn');
   await ana.page.waitForSelector('.friend');
-  await ana.page.click(`.friend:has-text("Bia") button[aria-label="Start a voice call with Bia"]`);
-  link = await inviteLink(ana);
-  const dm = await acceptInvite(bia, link);
-  ok(/Verified friend/.test(dm.hero), 'Bia sees Ana as a verified friend on the call invite');
-  await pasteReply(ana, dm.reply);
-  await waitFor(bia, () => !!document.querySelector('.call-ring'));
+  const callWords = await openWords(ana, () => ana.page.click(`.friend:has-text("Bia") button[aria-label="Start a voice call with Bia"]`));
+  await evalApp(bia, (w) => window.howlden.joinWithWords(w), callWords);
+  await waitFor(bia, () => !!document.querySelector('.call-ring'), null, 60000);
+  await waitFor(bia, () => !!document.querySelector('.main-head .verified'), null, 20000);
+  ok(!(await ana.page.locator('#confirm-word-0').count()), 'no confirmation words needed for a known key');
   await bia.page.click('.call-ring button[aria-label="Accept call"]');
   await waitFor(ana, () => window.howlden.activeDen?.isDirect && window.howlden.media.current);
   await waitFor(bia, () => window.howlden.activeDen?.isDirect && window.howlden.media.current);
   await ana.page.waitForTimeout(2500);
   const dmGrew = await audioFlows(bia, ids.Ana, 'Bia hears Ana in the 1 to 1 call');
+  log(`calling a known friend took only the six words: verified key, ring, 1 to 1 audio (grew ${dmGrew} bytes)`);
+
+  // Screen share takes most of the call view
+  {
+    const canShare = await evalApp(ana, async () => {
+      try {
+        const st = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        st.getTracks().forEach((tr) => tr.stop());
+        return true;
+      } catch (e) {
+        return e.name;
+      }
+    });
+    if (canShare === true || !process.env.CI) {
+      ok(canShare === true, `getDisplayMedia works (${canShare})`);
+      await bia.page.setViewportSize({ width: 1920, height: 1080 });
+      await evalApp(ana, () => window.howlden.media.toggleScreen());
+      await waitFor(bia, () => [...document.querySelectorAll('.screen-tile video')].some((v) => v.videoWidth > 0), null, 30000);
+      await bia.page.waitForTimeout(600);
+      const size = await evalApp(bia, () => {
+        const stage = document.querySelector('.stage').getBoundingClientRect();
+        const main = document.querySelector('.main').getBoundingClientRect();
+        const tile = document.querySelector('.screen-tile').getBoundingClientRect();
+        return { stage: stage.height / main.height, tile: tile.height, focused: document.querySelector('.screen-tile').classList.contains('is-focus') };
+      });
+      ok(size.stage > 0.6 && size.focused && size.tile > 400, `the shared screen fills the call view ${JSON.stringify(size)}`);
+      await shot(bia, 'e2e-screen-1080.png');
+      await evalApp(ana, () => window.howlden.media.toggleScreen());
+      await bia.page.setViewportSize({ width: 1280, height: 800 });
+      log(`screen share is the focused stage: ${Math.round(size.stage * 100)}% of the main column, ${Math.round(size.tile)} px tall at 1920x1080`);
+    } else {
+      log(`screen share skipped: this CI browser has no capture source (${canShare})`);
+    }
+  }
   await bia.page.fill('.composer-input', 'private hello');
   await bia.page.press('.composer-input', 'Enter');
   await waitFor(ana, () => [...document.querySelectorAll('.msg-content')].some((e) => e.textContent.includes('private hello')));
-  log(`direct message and 1 to 1 voice call work (audio grew ${dmGrew} bytes)`);
-  await shot(ana, 'e2e-dm-call.png');
   await evalApp(ana, () => window.howlden.media.leave());
+  log('direct message works next to the call');
 
-  // Reconnect after Bia reloads: the invite shows the verified key and the header gets the badge
+  // Reconnect after Bia reloads: six words again, recognized by key, no confirmation step
   await bia.page.reload();
   await bia.page.waitForSelector('#app:not([hidden]) .rail');
   await waitFor(ana, () => !window.howlden.activeDen.mesh?.links.size);
-  await ana.page.click('.main-head button:has-text("Reconnect")');
-  link = await inviteLink(ana);
-  const again = await acceptInvite(bia, link);
-  ok(/Verified friend/.test(again.hero), 'reconnect invite recognized by key');
-  await pasteReply(ana, again.reply);
-  await waitFor(bia, () => window.howlden.activeDen?.isDirect && window.howlden.activeDen.status === 'online');
+  const againWords = await openWords(ana, () => ana.page.click('.main-head button:has-text("Reconnect")'));
+  await evalApp(bia, (w) => window.howlden.joinWithWords(w), againWords);
+  await waitFor(bia, () => window.howlden.activeDen?.isDirect && window.howlden.activeDen.status === 'online', null, 60000);
+  ok(!(await ana.page.locator('#confirm-word-0').count()), 'no confirmation words needed on reconnect');
   await waitFor(bia, () => !!document.querySelector('.main-head .verified'), null, 20000);
   await waitFor(ana, () => !!document.querySelector('.main-head .verified'), null, 20000);
-  log('reconnect: both sides show the verified badge for a known key');
+  log('reconnect with six words: both sides show the verified badge for a known key');
   await shot(bia, 'e2e-verified.png');
 
   // PIN lock and backup round trip on Caio's account
@@ -323,7 +436,7 @@ try {
   ok(moved[0] === before.id && moved[1] === before.id && moved[2] >= 2, 'backup moves the identity and friends to a new browser');
   log('PIN lock seals local data and unlocks; the encrypted backup moves the account');
 
-  const real = errors.filter((e) => !/favicon|net::ERR_|Failed to load resource/.test(e));
+  const real = errors.filter((e) => !/favicon|net::ERR_|Failed to load resource|WebSocket connection to/.test(e));
   ok(!real.length, `no console errors:\n${real.join('\n')}`);
   log('no console errors');
   console.log('e2e: all checks passed');

@@ -1,6 +1,6 @@
 {
   "name": "howlden",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Serverless peer to peer group chat, voice and video in the browser. Create a den, share an invite link or QR code and talk over encrypted WebRTC with no accounts, no sign up and no server.",
   "keywords": [
@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@scure/bip39": "^2.4.0",
     "eslint": "^9.39.5",
     "globals": "^17.13.0",
     "jsdom": "^26.1.0",

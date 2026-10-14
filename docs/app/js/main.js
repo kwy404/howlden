@@ -8,6 +8,7 @@ import * as account from './account.js';
 import { Friends } from './friends.js';
 import { DenSession, DM_CALL, DM_TEXT } from './session.js';
 import { MediaManager } from './media.js';
+import { Sounds } from './sounds.js';
 import { createChat } from './ui-chat.js';
 import { createVoice } from './ui-voice.js';
 import { closePopover, renderHeader, renderMembers, renderRail, renderSide } from './ui-shell.js';
@@ -20,15 +21,14 @@ import {
   createDenModal,
   deleteChannelFlow,
   denSettingsModal,
-  inviteModal,
-  joinModal,
   passphraseFlow,
-  pasteInviteModal,
   renameChannelFlow,
   scanModal,
   shareOrCopy,
 } from './ui-flows.js';
 import { openSettings, restoreModal } from './ui-settings.js';
+import { inviteModal, joinEntryModal, joinModal, joinWordsModal } from './ui-pair.js';
+import { wordsFromLink, resolvePhrase } from '../core/words.js';
 import { buildIceServers, RtcLink } from '../core/rtc.js';
 import { newDen, visibleChannels } from '../core/denstate.js';
 import { randomId } from '../core/crypto.js';
@@ -111,6 +111,12 @@ async function boot() {
     if (await handOffReply(hash.code)) return;
     app.pendingReply = hash;
   }
+  const hashWords = wordsFromLink(location.hash);
+  if (hashWords) {
+    history.replaceState(null, '', location.pathname + location.search);
+    const res = resolvePhrase(hashWords);
+    if (res.ok) app.pendingWords = res.words;
+  }
   if (hash?.kind === 'i') {
     history.replaceState(null, '', location.pathname + location.search);
     try {
@@ -129,7 +135,7 @@ async function boot() {
   $('#boot').hidden = true;
   if (acc.state === 'ready') return enter(acc);
   if (acc.state === 'locked') return pinScreen(app);
-  loginCard(app, { invite: app.pendingInvite });
+  loginCard(app, { invite: app.pendingInvite, words: app.pendingWords });
 }
 
 app.createProfile = async ({ name, avatar, accent }) => {
@@ -180,6 +186,8 @@ async function enter(acc) {
   replace($('#gate'));
   $('#app').hidden = false;
   app.media = new MediaManager(app);
+  app.sounds = new Sounds(app);
+  app.media.on('sound', (name) => app.sounds.play(name));
   app.friends = new Friends(app);
   await app.friends.load();
   app.friends.on('change', () => app.render());
@@ -192,6 +200,11 @@ async function enter(acc) {
     const invite = app.pendingInvite;
     app.pendingInvite = null;
     startJoin(invite);
+  }
+  if (app.pendingWords) {
+    const words = app.pendingWords;
+    app.pendingWords = null;
+    joinWordsModal(app, words);
   }
   if (app.pendingReply) {
     const r = app.pendingReply;
@@ -234,6 +247,7 @@ function wireSession(s) {
   s.on('file-progress', () => isActive() && chat.refresh());
   s.on('file-missing', () => isActive() && chat.refresh());
   s.on('voice', () => {
+    voiceSounds(s);
     if (isActive()) voice.refresh();
     if (s.isDirect) ringCheck(s);
     app.render();
@@ -250,6 +264,12 @@ function wireSession(s) {
     }
   });
   s.on('call-declined', () => toast(t('call.declined'), 'info'));
+  let connectedAt = 0;
+  s.on('link-open', () => {
+    if (performance.now() - connectedAt > 4000) app.sounds.play('connected');
+    connectedAt = performance.now();
+  });
+  s.on('link-lost', () => app.sounds.play('lost'));
   s.on('notice', (n) => {
     const key = { decrypt: 'notice.decrypt', 'bad-passphrase': 'notice.badPassphrase', full: 'notice.full', rejected: 'notice.rejected' }[n.kind];
     if (key) toast(t(key, { name: n.name || '', count: n.count || s.maxMembers, max: n.max || s.maxMembers }), n.kind === 'rejected' ? 'info' : 'error', 7000);
@@ -258,10 +278,29 @@ function wireSession(s) {
   s.on('incoming', (rec) => notify(s, rec));
 }
 
+/** Join, leave and screen share sounds for the voice channel I am in. */
+function voiceSounds(s) {
+  const mine = app.media.current?.session === s ? app.media.current.channel : null;
+  const now = new Map();
+  if (mine) for (const [peerId, v] of s.voice) if (v.channel === mine) now.set(peerId, v);
+  const before = s._voiceSeen || new Map();
+  if (mine && s._voiceSeenChannel === mine) {
+    for (const [id, v] of now) {
+      if (!before.has(id)) app.sounds.play('peerJoin');
+      else if (v.screen && !before.get(id).screen) app.sounds.play('screen');
+    }
+    for (const id of before.keys()) if (!now.has(id)) app.sounds.play('peerLeave');
+  }
+  s._voiceSeen = now;
+  s._voiceSeenChannel = mine;
+}
+
 function notify(s, rec) {
   const mention = s.isDirect || s.mentionsMe(rec);
-  const viewing = app.activeDen === s && app.channelId === rec.channel && document.visibilityState === 'visible';
-  if (!mention || viewing || !settings.notify || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const viewing = app.activeDen === s && app.channelId === rec.channel && document.visibilityState === 'visible' && document.hasFocus();
+  if (mention) app.sounds.play('mention');
+  else if (!viewing) app.sounds.play('message');
+  if (!mention || viewing || !settings.notify || settings.dnd || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const author = s.member(rec.author)?.name || app.t('chat.unknown');
   const channel = s.den.channels.find((c) => c.id === rec.channel)?.name || '';
   const title = s.isDirect ? author : app.t('notice.mention', { name: author, channel });
@@ -316,21 +355,28 @@ app.newFriendInvite = async () => {
   const sdp = await link.offer();
   const inviteId = randomId(6);
   const me = { id: app.profile.id, name: app.profile.name, avatar: app.profile.avatar, publicKey: app.identity.publicKey, alg: app.identity.alg, tag: app.identity.tag };
-  const code = await packCode(invitePayload({ inviteId, den: { id: '00000000', name: app.profile.name, locked: false }, host: me, sdp, kind: 'dm' }));
+  const payload = invitePayload({ inviteId, den: { id: '00000000', name: app.profile.name, locked: false }, host: me, sdp, kind: 'dm' });
+  const code = await packCode(payload);
+  let used = false;
   return {
     inviteId,
     code,
+    payload,
     link: codeLink(app.baseUrl, 'i', code),
     cancel: () => link.close(),
-    accept: async (reply) => {
+    accept: async (reply, { hold = false } = {}) => {
+      // A reply applied twice (paste then click, another tab, two relays) is not an error.
+      if (used) throw new MeshError('answered', 'already used');
+      if (reply.inviteId !== inviteId) throw new MeshError('expired', 'other invite');
       if (reply.peer.id === app.profile.id) throw new MeshError('self', app.t('fail.self'));
       const id = await directId(app.profile.id, reply.peer.id);
       if (reply.denId !== id) throw new MeshError('den', app.t('fail.den'));
       const friend = app.friends.get(reply.peer.id) || { id: reply.peer.id, name: reply.peer.name, avatar: reply.peer.avatar };
       const s = await app.dmSession(friend);
       if (s.mesh?.links.has(reply.peer.id)) throw new MeshError('already', app.t('fail.already', { name: reply.peer.name }));
+      used = true;
       const mesh = s.ensureMesh(true);
-      link.onopen = () => mesh.adopt(link, { id: reply.peer.id, name: reply.peer.name, avatar: reply.peer.avatar });
+      link.onopen = () => mesh.adopt(link, { id: reply.peer.id, name: reply.peer.name, avatar: reply.peer.avatar }, { hold });
       link.onfail = (reason) => s.emit('link-failed', { peerId: reply.peer.id, reason, diagnosis: link.diagnose(navigator.onLine) });
       await link.complete(reply.sdp);
       return s;
@@ -434,6 +480,13 @@ function manualReply(code) {
 }
 
 window.addEventListener('hashchange', () => {
+  const words = wordsFromLink(location.hash);
+  if (words && app.profile) {
+    history.replaceState(null, '', location.pathname + location.search);
+    const res = resolvePhrase(words);
+    if (res.ok) joinWordsModal(app, res.words);
+    return;
+  }
   const found = findCode(location.hash);
   if (!found || !app.profile) return;
   history.replaceState(null, '', location.pathname + location.search);
@@ -530,7 +583,8 @@ app.mention = (m) => {
 // Flows
 
 app.createDenFlow = () => createDenModal(app);
-app.joinFlow = () => pasteInviteModal(app);
+app.joinFlow = () => joinEntryModal(app);
+app.joinWithWords = (words) => joinWordsModal(app, words);
 app.scanFlow = (cb) => scanModal(app, cb);
 app.openSettings = (section) => openSettings(app, section);
 app.createChannelFlow = (s, kind) => createChannelModal(app, s, kind);
@@ -612,10 +666,12 @@ function ringCheck(s) {
     card.querySelector('img').src = avatarSrc(f.avatar || peer);
     document.body.append(card);
     ringing = { card, s };
+    app.sounds.startRing();
   } else if (!calling && ringing?.s === s) stopRing();
 }
 
 function stopRing() {
+  app.sounds?.stopRing();
   ringing?.card.remove();
   ringing = null;
 }
@@ -625,11 +681,15 @@ function stopRing() {
 function wireMedia() {
   const m = app.media;
   m.on('change', () => {
+    if (m.current) voiceSounds(m.current.session);
     if (ringing && app.media.inVoice(ringing.s, DM_CALL)) stopRing();
     voice.refresh();
     app.render();
   });
-  m.on('video', () => voice.refresh());
+  m.on('video', () => {
+    voice.refresh();
+    if (app.activeDen?.isDirect) setSplit();
+  });
   const side = frameThrottle(() => app.render());
   m.on('speaking', () => {
     voice.speaking();
@@ -705,9 +765,12 @@ app.render = frameThrottle(() => {
     if (main.firstChild !== homeEl) replace(main, homeEl);
     renderHome(app, homeEl);
   } else if (s.isDirect) {
-    const want = hasCall ? [voice.el, chat.el] : [chat.el];
+    const want = hasCall ? [voice.el, splitter, chat.el] : [chat.el];
     if (main.childNodes.length !== want.length || want.some((n, i) => main.childNodes[i] !== n)) replace(main, want);
-    if (hasCall) voice.show(s, DM_CALL);
+    if (hasCall) {
+      voice.show(s, DM_CALL);
+      setSplit();
+    }
     chat.refresh();
   } else if (app.view === 'voice') {
     if (main.firstChild !== voice.el || main.childNodes.length !== 1) replace(main, voice.el);
@@ -720,6 +783,41 @@ app.render = frameThrottle(() => {
 });
 
 const homeEl = h('section', { class: 'home' });
+
+// The divider between a 1 to 1 call and its chat. A screen share gets most of
+// the height by default; dragging or the arrow keys set it by hand.
+const splitter = h('div', { class: 'split-handle', role: 'separator', tabindex: '0', 'aria-orientation': 'horizontal', 'aria-valuemin': '20', 'aria-valuemax': '90' }, h('span', { class: 'split-grip', 'aria-hidden': 'true' }));
+let splitManual = null;
+function setSplit(pct) {
+  if (pct != null) splitManual = Math.max(20, Math.min(90, pct));
+  const sharing = voice.el.classList.contains('sharing');
+  const value = splitManual ?? (sharing ? 76 : 44);
+  $('#content').style.setProperty('--call-h', `${value}%`);
+  splitter.setAttribute('aria-valuenow', String(Math.round(value)));
+  splitter.setAttribute('aria-label', app.t('voice.split'));
+}
+splitter.addEventListener('pointerdown', (e) => {
+  const box = $('#content').getBoundingClientRect();
+  splitter.setPointerCapture(e.pointerId);
+  const move = (ev) => setSplit(((ev.clientY - box.top) / box.height) * 100);
+  const up = () => {
+    splitter.removeEventListener('pointermove', move);
+    splitter.removeEventListener('pointerup', up);
+  };
+  splitter.addEventListener('pointermove', move);
+  splitter.addEventListener('pointerup', up);
+});
+splitter.addEventListener('keydown', (e) => {
+  const now = Number(splitter.getAttribute('aria-valuenow')) || 44;
+  if (e.key === 'ArrowUp') setSplit(now - 5);
+  else if (e.key === 'ArrowDown') setSplit(now + 5);
+  else return;
+  e.preventDefault();
+});
+splitter.addEventListener('dblclick', () => {
+  splitManual = null;
+  setSplit();
+});
 
 function registerWorker() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
@@ -736,7 +834,7 @@ window.addEventListener('beforeunload', () => {
 boot().catch((err) => {
   console.error(err);
   $('#boot').hidden = true;
-  toast(String(err.message || err), 'error', 10000);
+  toast(app.t('fail.generic'), 'error', 10000);
 });
 
 export { app, closePopover, shareOrCopy };

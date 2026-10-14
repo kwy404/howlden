@@ -30,7 +30,7 @@ function preview() {
       <button type="button" class="den-btn add" aria-label="Open a new den" title="Open a new den" @click="toast('In the real app this opens a new den in one click. No account needed.')">${icon('plus')}</button>
     </nav>
     <aside class="app-side" aria-label="Channels">
-      <header class="app-den"><b>Moonlight Pack</b><span class="cap" title="Members in this den">4/8</span></header>
+      <header class="app-den"><b>Moonlight Pack</b><span class="cap" title="Members in this den">4/5</span></header>
       <p class="app-cat">Text channels</p>
       ${ch('campfire', 'campfire')}${ch('memes', 'memes')}${ch('homework', 'homework')}
       <p class="app-cat">Voice channels</p>
@@ -97,19 +97,19 @@ const TRUTHS = [
   ['key', 'Your account lives on your device', 'A username, an avatar and a signing key made in your browser.'],
   ['lock', 'End to end encrypted', 'Every connection is sealed by WebRTC.'],
   ['invite', 'Invite only', 'No public directory. Nobody gets in without you.'],
-  ['pack', 'Group calls or just one friend', 'A den for two or a pack of eight.'],
+  ['pack', 'Group calls or just one friend', 'A den for two or a pack of five.'],
 ];
 
 const STEPS = [
-  ['owl-invite', 'Send an invite', 'Click <b>Invite</b> in your den. howlden packs the connection offer into a link and a QR code. Send the link through any messenger you already use, or let your friend scan the QR.', 'invite', 'An owl carries the invite link'],
-  ['reply-code', 'Get a reply code', 'Your friend opens the link and their browser makes a short reply code, also a link or a QR. They send it back the same way. One round trip, nothing technical to copy.', 'reply', 'The reply code travels back'],
-  ['pack-mesh', 'Howl together', 'Paste or scan the reply and your friend is in. howlden then connects them to everyone else in the den by itself, over the encrypted links that already exist.', 'mesh', 'The pack is connected'],
+  ['owl-invite', 'Show six words', 'Click <b>Invite</b> in your den and howlden shows six words, plus a small QR code. Read them out on a call or send them in any messenger.', 'invite', 'An owl carries the invite link'],
+  ['reply-code', 'Your friend types them', 'The six words find your den through public relays that only ever see an encrypted handshake. Nothing to send back, and the words expire in ten minutes.', 'reply', 'The reply code travels back'],
+  ['pack-mesh', 'Confirm and howl', 'Type the six confirmation words your friend sees and they are in. Known friends are let in on their verified key. Then chat, voice and files go device to device.', 'mesh', 'The pack is connected'],
 ];
 
 const PRIVATE = [
   ['no-server', 'No server of ours', 'There is no howlden backend, database or account system. No server of ours ever sees your messages, voice, video or files. This website is static files.'],
   ['lock', 'Encrypted by WebRTC', 'Every connection is encrypted end to end with DTLS, and audio and video with SRTP. It is built into the browser and cannot be switched off.'],
-  ['relay', 'Relays cannot read', 'When a strict network blocks a direct path, a TURN relay can forward the traffic. It only ever sees encrypted packets and cannot read them.'],
+  ['relay', 'Relays cannot read', 'The six word handshake travels encrypted through public relays (EMQX, HiveMQ, Mosquitto) that cannot read it, and a TURN relay, when a strict network needs one, only forwards encrypted packets. Prefer zero third parties? Use invite links instead.'],
   ['no-account', 'Nothing stored online', 'No email, no phone number, no profile in the cloud. Your profile, settings and dens live in your own browser.'],
   ['key', 'Optional passphrase', 'Give a den a passphrase for a second layer: PBKDF2 derives an AES-GCM key, so only members who know it can read messages and files.'],
   ['fingerprint', 'Compare a fingerprint', 'howlden shows a short connection fingerprint. Read it aloud on a call: if both sides see the same code, nobody is in the middle.'],
@@ -186,7 +186,7 @@ function voiceMock() {
 function membersMock() {
   const row = (id, name, status, label, color) => `<p class="mk-mem">${`<span class="mk-avw">${mav(id, 'av av-sm')}<i class="st st-${status}"></i></span>`}<span><b style="color:${color}">${name}</b><small>${label}</small></span></p>`;
   return `<div class="mock mock-members" aria-hidden="true">
-  <p class="mk-cat">In the den, 4 of 8</p>
+  <p class="mk-cat">In the den, 4 of 5</p>
   <div class="mk-cap"><i style="width:50%"></i></div>
   ${row('luna', 'Luna', 'voice', 'In Howl lounge', '#b79dff')}
   ${row('nova', 'Nova', 'live', 'Sharing a screen', '#ffb27a')}
@@ -336,9 +336,9 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
 
 <section id="mesh" class="band" aria-labelledby="mesh-title">
   <div class="wrap mesh-grid">
-    ${pic('', 'pack-mesh', 'Eight wolves linked to each other like stars in a constellation')}
+    ${pic('', 'pack-mesh', 'Five wolves linked to each other like stars in a constellation')}
     <div>
-      <header class="sec-head left"><p class="kicker">${art('pack')}Up to 5</p><h2 id="mesh-title" class="mega mega-md">Why a den holds 8 wolves</h2></header>
+      <header class="sec-head left"><p class="kicker">${art('pack')}Up to 5</p><h2 id="mesh-title" class="mega mega-md">Why a den holds 5 wolves</h2></header>
       <p>In a den, everyone is linked to everyone. With 4 members that is 6 links, with 5 members it is 10. Each member sends their voice and video to each of the others, so upload bandwidth grows with the size of the pack. Audio is light; video with 5 cameras on asks a lot of a home connection.</p>
       <p>Eight is where a mesh still feels good on ordinary connections. For bigger groups, a server based tool is the honest answer, and that is fine.</p>
       <ul class="ticks"><li>${icon('check')}<span>Text, reactions and files are tiny and stay quick in a full den.</span></li><li>${icon('check')}<span>If two members cannot link directly, another member forwards their messages.</span></li><li>${icon('check')}<span>When both sides sit behind a strict NAT, a TURN relay can carry the encrypted traffic. <a href="webrtc-connection-failed-strict-nat.html">Fixing a failed connection</a>.</span></li></ul>

@@ -57,6 +57,8 @@ export class FakeLink {
 
   async complete(sdp) {
     await tick();
+    if (this.completed) return false;
+    this.completed = true;
     const [kind, token] = sdp.split(' ');
     if (kind !== 'fake-answer' || token !== this.token || !this.answerer) throw new Error('unknown answer');
     const other = this.answerer;

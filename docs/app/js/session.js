@@ -1,7 +1,7 @@
 // One den on this device: its settings, messages, mesh connection, typing and
 // voice state, file transfers and the optional passphrase layer.
 
-import { DIRECT_MEMBERS, Emitter, MAX_MEMBERS, Mesh } from '../core/mesh.js';
+import { DIRECT_MEMBERS, Emitter, MAX_MEMBERS, Mesh, MeshError } from '../core/mesh.js';
 import { RtcLink } from '../core/rtc.js';
 import {
   HistorySync,
@@ -17,11 +17,12 @@ import {
   toggleReaction,
 } from '../core/history.js';
 import { channelName, denConfig, mergeDen, visibleChannels } from '../core/denstate.js';
-import { decryptBytes, decryptJSON, deriveKey, encryptBytes, encryptJSON, keyCheck, randomId, verifyKeyCheck } from '../core/crypto.js';
+import { decryptBytes, decryptJSON, deriveKey, encryptBytes, encryptJSON, keyCheck, randomId, sdpFingerprints, verifyKeyCheck } from '../core/crypto.js';
 import { codeLink, invitePayload, packCode, replyPayload } from '../core/invite.js';
 import { Assembler, CHUNK_SIZE, MAX_FILE, decodeChunk, encodeChunk, slices } from '../core/chunks.js';
 import { mentions } from '../core/markdown.js';
-import { checkProof, nonce, proveIdentity } from '../core/identity.js';
+import { checkProof, friendStatus, nonce, proveIdentity } from '../core/identity.js';
+import { confirmWords } from '../core/words.js';
 import * as store from './store.js';
 
 const PLAIN_TYPES = new Set(['key', 'key-ok', 'key-bad', 'id-hello', 'id-proof']);
@@ -45,6 +46,8 @@ export class DenSession extends Emitter {
     this.requested = new Set();
     this.verified = new Set();
     this.ids = new Map();
+    this.pairing = new Map();
+    this.byes = new Set();
     this.decryptWarned = false;
     this.queue = Promise.resolve();
     this.lastTyping = 0;
@@ -173,7 +176,9 @@ export class DenSession extends Emitter {
     });
     mesh.on('relay', () => this.emit('members'));
     mesh.on('link-open', ({ peerId, link }) => this._onLinkOpen(peerId, link));
+    mesh.on('bye', ({ peerId }) => this.byes.add(peerId));
     mesh.on('link-close', ({ peerId }) => {
+      if (!this.byes.delete(peerId)) this.emit('link-lost', peerId);
       this.typing.delete(peerId);
       this.voice.delete(peerId);
       this.verified.delete(peerId);
@@ -188,10 +193,22 @@ export class DenSession extends Emitter {
       this.emit('link-failed', { ...info, diagnosis: info.link?.diagnose?.(navigator.onLine) || 'strict-nat' });
     });
     mesh.on('welcome', () => {
+      mesh.welcomed = true;
+      this._saveFriend(mesh.introducer);
       this.sync.start(mesh.introducer);
       this.emit('welcome');
     });
     mesh.on('full', (f) => this.emit('notice', { kind: 'full', ...f }));
+    mesh.on('refused', (r) => this.emit('notice', { kind: 'refused', ...r }));
+    mesh.on('held', ({ peerId }) => {
+      this._startIdentity(peerId);
+      this.emit('held', peerId);
+    });
+    mesh.on('held-close', ({ peerId }) => {
+      this.ids.delete(peerId);
+      this.pairing.delete(peerId);
+      this.emit('held-close', peerId);
+    });
     mesh.on('rejected', (r) => this.emit('notice', { kind: 'rejected', name: r.peer.name, peerId: r.peer.id, count: r.count, max: r.max }));
     mesh.on('message', ({ from, body }) => this._receive(from, body));
     mesh.on('error', (err) => console.warn('howlden mesh:', err));
@@ -203,13 +220,7 @@ export class DenSession extends Emitter {
     link.polite = this.self.id > peerId;
     link.onbinary = (buf) => this._onBinary(peerId, buf);
     this.app.media.attach(this, peerId, link);
-    const st = this.ids.get(peerId) || {};
-    st.myNonce = nonce();
-    st.status = 'pending';
-    this.ids.set(peerId, st);
-    const i = this.app.identity;
-    this.sendTo(peerId, { type: 'id-hello', nonce: st.myNonce, alg: i.alg, publicKey: i.publicKey, tag: i.tag });
-    if (st.theirNonce) this._prove(peerId);
+    this._startIdentity(peerId);
     if (this.den.locked && this.key) keyCheck(this.key).then((token) => this.sendTo(peerId, { type: 'key', token }));
     this.sendTo(peerId, { type: 'den', den: denConfig(this.den) });
     const mine = this.app.media.stateFor(this);
@@ -218,22 +229,93 @@ export class DenSession extends Emitter {
     this.emit('link-open', peerId);
   }
 
+  /** Start the identity proof with a peer once per connection (also for held peers). */
+  _startIdentity(peerId) {
+    const st = this.ids.get(peerId) || {};
+    if (st.myNonce) return;
+    st.myNonce = nonce();
+    st.status = 'pending';
+    this.ids.set(peerId, st);
+    const i = this.app.identity;
+    this.sendTo(peerId, { type: 'id-hello', nonce: st.myNonce, alg: i.alg, publicKey: i.publicKey, tag: i.tag });
+    if (st.theirNonce) this._prove(peerId);
+  }
+
+  _linkOf(peerId) {
+    return this.mesh?.links.get(peerId) || this.mesh?.held.get(peerId) || null;
+  }
+
+  /** Remember the pairing nonce for a guest who joins with six words. */
+  expectPairing(peerId, pairNonce) {
+    this.pairing.set(peerId, { nonce: pairNonce, attempts: 0 });
+  }
+
+  /** The six confirmation words for the connection with a peer: the same on both ends. */
+  async confirmationWords(peerId, pairNonce) {
+    const link = this._linkOf(peerId);
+    const local = sdpFingerprints(link?.pc?.localDescription?.sdp).join(',');
+    const remote = sdpFingerprints(link?.pc?.remoteDescription?.sdp).join(',');
+    if (!local || !remote || !pairNonce) return null;
+    return confirmWords(local, remote, pairNonce);
+  }
+
+  /**
+   * The inviter typed the words the guest sees. Returns 'ok' (let in),
+   * 'refused' (third wrong try) or { left } tries.
+   */
+  async confirmHeld(peerId, typed, pairNonce) {
+    const p = this.pairing.get(peerId) || { nonce: pairNonce, attempts: 0 };
+    this.pairing.set(peerId, p);
+    const expected = await this.confirmationWords(peerId, p.nonce || pairNonce);
+    if (expected && expected.join(' ') === typed.join(' ')) {
+      this._letIn(peerId, false);
+      return 'ok';
+    }
+    p.attempts++;
+    if (p.attempts >= 3) {
+      await this.sendTo(peerId, { type: 'pair', ok: false });
+      this.mesh?.refuse(peerId, 'words');
+      return 'refused';
+    }
+    return { left: 3 - p.attempts };
+  }
+
+  /** Save a verified peer as a friend once they are really in. */
+  _saveFriend(peerId) {
+    const st = this.ids.get(peerId);
+    if (!st?.pendingFriend) return;
+    const card = st.pendingFriend;
+    st.pendingFriend = null;
+    this.app.friends.verified(card);
+  }
+
+  _letIn(peerId, auto) {
+    if (!this.mesh?.held.has(peerId)) return;
+    this._saveFriend(peerId);
+    this.sendTo(peerId, { type: 'pair', ok: true });
+    this.queue.then(() => {
+      this.mesh?.release(peerId);
+      this.emit('paired', { peerId, auto });
+    });
+  }
+
   async createInvite() {
     const mesh = this.ensureMesh(true);
     const { inviteId, sdp, full } = await mesh.createInvite();
     const count = mesh.onlineCount();
     const max = this.maxMembers;
-    const code = await packCode(invitePayload({ inviteId, den: { id: this.id, name: this.isDirect ? this.self.name : this.den.name, locked: !!this.den.locked, full, count, max }, host: this.selfCard, sdp, kind: this.isDirect ? 'dm' : 'den' }));
-    return { inviteId, code, link: codeLink(this.app.baseUrl, 'i', code), full, count, max };
+    const payload = invitePayload({ inviteId, den: { id: this.id, name: this.isDirect ? this.self.name : this.den.name, locked: !!this.den.locked, full, count, max }, host: this.selfCard, sdp, kind: this.isDirect ? 'dm' : 'den' });
+    const code = await packCode(payload);
+    return { inviteId, code, payload, link: codeLink(this.app.baseUrl, 'i', code), full, count, max };
   }
 
   cancelInvite(inviteId) {
     this.mesh?.cancelInvite(inviteId);
   }
 
-  async acceptReply(reply) {
-    if (!this.mesh) throw new Error('no open invite');
-    return this.mesh.acceptReply(reply);
+  async acceptReply(reply, opts) {
+    if (!this.mesh) throw new MeshError('expired', 'no open invite');
+    return this.mesh.acceptReply(reply, opts);
   }
 
   /** Guest side: answer an invite and return the reply link. */
@@ -242,8 +324,9 @@ export class DenSession extends Emitter {
     const mesh = this.ensureMesh(false);
     const reply = await mesh.acceptInvite(invite);
     reply.peer = this.selfCard;
-    const code = await packCode(replyPayload(reply));
-    return { code, link: codeLink(this.app.baseUrl, 'r', code) };
+    const payload = replyPayload(reply);
+    const code = await packCode(payload);
+    return { code, payload, link: codeLink(this.app.baseUrl, 'r', code) };
   }
 
   leave() {
@@ -355,6 +438,10 @@ export class DenSession extends Emitter {
         this._check(from);
         return;
       }
+      case 'pair':
+        if (msg.ok === false) this.emit('notice', { kind: 'refused', reason: 'words' });
+        else this.emit('pair', { from, ok: true });
+        return;
       case 'call-decline':
         this.emit('call-declined', from);
         return;
@@ -371,7 +458,7 @@ export class DenSession extends Emitter {
 
   async _prove(peerId) {
     const st = this.ids.get(peerId);
-    const link = this.mesh?.links.get(peerId);
+    const link = this._linkOf(peerId);
     if (!st?.theirNonce || !link || st.proved) return;
     st.proved = true;
     const connection = await link.fingerprint();
@@ -381,18 +468,29 @@ export class DenSession extends Emitter {
 
   async _check(peerId) {
     const st = this.ids.get(peerId);
-    const link = this.mesh?.links.get(peerId);
+    const link = this._linkOf(peerId);
     if (!st?.claim || !st.proof || !st.myNonce || !link || st.checked) return;
     st.checked = true;
     const connection = await link.fingerprint();
     const result = await checkProof({ claimedId: peerId, alg: st.claim.alg, publicKey: st.claim.publicKey, signature: st.proof, connection, myNonce: st.myNonce, myId: this.self.id });
     st.status = result;
     if (result === 'verified') {
-      const m = this.member(peerId) || {};
-      st.friend = await this.app.friends.verified({ id: peerId, name: m.name, avatar: m.avatar, status: m.status, accent: m.accent, publicKey: st.claim.publicKey, alg: st.claim.alg, tag: st.claim.tag || peerId.slice(0, 4) });
+      const m = this.member(peerId) || this.mesh?.held.get(peerId)?.peer || {};
+      const card = { id: peerId, name: m.name, avatar: m.avatar, status: m.status, accent: m.accent, publicKey: st.claim.publicKey, alg: st.claim.alg, tag: st.claim.tag || peerId.slice(0, 4) };
+      // Someone waiting to be let in (or the inviter before it lets us in) is
+      // not a friend yet: remember the card and save it only once both agree.
+      const waiting = this.mesh?.held.has(peerId) || (this.mesh?.introducer === peerId && !this.mesh?.welcomed);
+      if (waiting) {
+        st.friend = friendStatus(this.app.friends.list(), card);
+        st.pendingFriend = card;
+      } else {
+        st.friend = await this.app.friends.verified(card);
+      }
     }
     this.emit('identity', peerId);
     this.emit('members');
+    // A known friend whose key just proved itself skips the confirmation words.
+    if (result === 'verified' && st.friend === 'known' && this.mesh?.held.has(peerId)) this._letIn(peerId, true);
   }
 
   /** Identity state of a peer: { status, friend } where status is 'verified', 'pending' or a failure. */

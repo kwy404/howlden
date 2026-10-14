@@ -61,20 +61,20 @@ Go to **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)**,
 | **Video and screen share** | Turn on a camera or share a window, a tab or the whole screen inside any voice channel. |
 | **Files** | Drop a file in the chat and it goes straight from your browser to your friends. Nothing is uploaded anywhere. |
 | **Local profile** | A username, an avatar and a signing key pair (Ed25519 where the browser supports it) made on your device. Your tag, like `luna#7c1f`, comes from that key. Lock it with a PIN, or move it with an encrypted backup file. |
-| **Invites** | A link and a QR code out, a reply code back. Camera scanning where the browser supports it, paste everywhere. |
+| **Invites** | Six words (or their QR code) through encrypted public relays, confirmed with six more words. Or, with zero third parties, an invite link out and a reply link back. |
 | **Privacy extras** | An optional den passphrase for a second layer of encryption and a connection fingerprint you can compare. |
 | **Network help** | Clear words when a strict network blocks a direct connection, and a setting for your own TURN server. |
 | **Installable** | A PWA with a service worker: install it, and it opens offline once loaded. |
 
 ## How inviting works
 
-There is no server to introduce you, so friends introduce themselves. One round trip:
+There is no server to introduce you, so friends introduce themselves. By default it takes six words:
 
-1. **Send an invite.** Click Invite in your den. howlden packs the WebRTC connection offer (compressed with `deflate-raw`, written as base64url) into a link and a QR code. Send the link through any messenger you already use, or let your friend scan the QR.
-2. **Get a reply code.** Your friend opens the link and their browser makes a short reply code, also a link or a QR. They send it back the same way.
-3. **Howl together.** Paste or scan the reply and your friend is in. howlden then connects them to everyone else in the den by itself, passing the setup messages over the encrypted links that already exist, so every member ends up linked to every other member.
+1. **Show six words.** Click Invite in your den. howlden shows six words (and a small QR code with them). Read them out, or send them in any messenger.
+2. **Your friend types them.** Both devices derive a random topic and an AES-GCM key from the words and meet on public MQTT relays (EMQX, HiveMQ, Mosquitto). The short WebRTC handshake travels sealed with that key, so the relays only see ciphertext. Nothing has to be sent back. The words work once and expire after 10 minutes.
+3. **Confirm and howl together.** Your friend sees six confirmation words made from both connection certificates; you type them, and they are in. A friend whose identity key you already know is let in on the signature alone, so calling a known friend needs only the six words. howlden then connects them to everyone else in the den by itself, passing the setup messages over the encrypted links that already exist, so every member ends up linked to every other member.
 
-The member who invited has to accept the reply code, so a leaked invite link alone is not enough to get in. Nobody ever sees JSON or anything technical. More in [peer to peer chat, explained](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html).
+Prefer zero third parties? In Settings, switch to links: you send an invite link (or QR) and get a reply link back, and nothing but the STUN servers is contacted. Either way, the member who invited has to confirm the newcomer, so leaked words or a leaked link alone are not enough to get in. Nobody ever sees JSON or anything technical. More in [peer to peer chat, explained](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html).
 
 ## Why it is private
 

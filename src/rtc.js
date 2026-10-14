@@ -22,13 +22,15 @@ export const STUN_SERVERS = [
 // public TURN server is built in; people who need a relay add their own.
 
 /** Check one TURN server entered in settings. Returns a normalized entry or throws. */
+const turnError = (reason, message) => Object.assign(new TypeError(message), { reason });
+
 export function parseTurn({ urls, username = '', credential = '' }) {
   const list = (Array.isArray(urls) ? urls : String(urls || '').split(/[\s,]+/)).map((u) => u.trim()).filter(Boolean);
-  if (!list.length) throw new TypeError('Add at least one TURN address, like turn:turn.example.com:3478');
+  if (!list.length) throw turnError('empty', 'Add at least one TURN address, like turn:turn.example.com:3478');
   for (const u of list) {
-    if (!/^(turns?|stun):[^\s/?#]+(:\d{1,5})?(\?transport=(udp|tcp))?$/i.test(u)) throw new TypeError(`"${u}" is not a TURN address. It should look like turn:host:3478`);
+    if (!/^(turns?|stun):[^\s/?#]+(:\d{1,5})?(\?transport=(udp|tcp))?$/i.test(u)) throw turnError('format', `"${u}" is not a TURN address. It should look like turn:host:3478`);
   }
-  if (list.some((u) => /^turns?:/i.test(u)) && (!username || !credential)) throw new TypeError('TURN servers need a username and a password.');
+  if (list.some((u) => /^turns?:/i.test(u)) && (!username || !credential)) throw turnError('auth', 'TURN servers need a username and a password.');
   return { urls: list, username: String(username), credential: String(credential) };
 }
 
@@ -146,14 +148,24 @@ export class RtcLink {
   }
 
   /** Create the first offer and wait for every ICE candidate. */
-  async offer() {
-    await this.pc.setLocalDescription(await this.pc.createOffer());
-    await this._gather();
-    return this.pc.localDescription.sdp;
+  offer() {
+    this._offering ??= (async () => {
+      await this.pc.setLocalDescription(await this.pc.createOffer());
+      await this._gather();
+      return this.pc.localDescription.sdp;
+    })();
+    return this._offering;
   }
 
   /** Answer a first offer and wait for every ICE candidate. */
-  async answer(sdp) {
+  answer(sdp) {
+    // Answering is idempotent: a repeated offer (a double click, a relay that
+    // delivers twice) gets the same answer instead of a state error.
+    this._answering ??= this._answer(sdp);
+    return this._answering;
+  }
+
+  async _answer(sdp) {
     await this.pc.setRemoteDescription({ type: 'offer', sdp });
     await this.pc.setLocalDescription(await this.pc.createAnswer());
     await this._gather();
@@ -162,9 +174,22 @@ export class RtcLink {
   }
 
   /** Apply the answer to the first offer. */
+  /**
+   * Apply the answer to the first offer. Idempotent: a second answer (the
+   * same reply pasted twice, or delivered by two tabs or two relays) is
+   * ignored and resolves false instead of throwing a state error.
+   */
   async complete(sdp) {
-    await this.pc.setRemoteDescription({ type: 'answer', sdp });
+    if (this.answered || this.closed || this.pc.signalingState !== 'have-local-offer') return false;
+    this.answered = true;
+    try {
+      await this.pc.setRemoteDescription({ type: 'answer', sdp });
+    } catch (err) {
+      this.answered = false;
+      throw err;
+    }
     this._watchOpen();
+    return true;
   }
 
   _watchOpen(ms = 25000) {
@@ -232,6 +257,8 @@ export class RtcLink {
       }
       if (msg.description) {
         const d = msg.description;
+        // A stale or repeated answer (renegotiation for camera or screen) is ignored.
+        if (d.type === 'answer' && this.pc.signalingState !== 'have-local-offer') return;
         const collision = d.type === 'offer' && (this.makingOffer || this.pc.signalingState !== 'stable');
         this.ignoreOffer = !this.polite && collision;
         if (this.ignoreOffer) return;

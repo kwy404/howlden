@@ -9,11 +9,14 @@ import { avatarTraits } from '../core/avatar.js';
 export function createVoice(app) {
   const t = (k, v) => app.t(k, v);
   const grid = h('div', { class: 'stage-grid' });
+  const strip = h('div', { class: 'stage-strip', role: 'list' });
   const empty = h('div', { class: 'stage-empty' });
   const controls = h('div', { class: 'stage-controls' });
   const el = h('section', { class: 'stage', 'aria-label': 'Voice' }, grid, empty, controls);
   const tiles = new Map();
-  const state = { session: null, channel: null, focus: null };
+  // focus: the tile in the big view. manual: what the user picked ('grid' or a key),
+  // which wins over the automatic focus on a new screen share.
+  const state = { session: null, channel: null, focus: null, manual: null };
 
   function tileFor(key, build) {
     let tile = tiles.get(key);
@@ -42,23 +45,43 @@ export function createVoice(app) {
   }
 
   function makeTile(key) {
+    const video = h('video', { autoplay: true, playsinline: true, muted: true, hidden: true });
+    const focusBtn = h('button', { class: 'icon-btn tile-btn tile-focus', type: 'button' }, icon('focus', { size: 18 }));
+    const fullBtn = h('button', { class: 'icon-btn tile-btn tile-full', type: 'button', 'aria-label': t('voice.fullscreen'), 'data-tip': t('voice.fullscreen') }, icon('expand', { size: 18 }));
+    const pipBtn = h('button', { class: 'icon-btn tile-btn tile-pip', type: 'button', 'aria-label': t('voice.pip'), 'data-tip': t('voice.pip') }, icon('screen', { size: 18 }));
     const tile = h(
       'div',
-      { class: 'tile', tabindex: '0', role: 'button', dataset: { key } },
-      h('video', { autoplay: true, playsinline: true, muted: true, hidden: true }),
+      { class: 'tile', tabindex: '0', role: 'group', dataset: { key } },
+      video,
       h('div', { class: 'tile-avatar' }),
       h('div', { class: 'tile-label' }),
-      h('button', { class: 'icon-btn tile-focus', type: 'button', tabindex: '-1' }, icon('expand', { size: 18 })),
+      h('div', { class: 'tile-tools' }, pipBtn, fullBtn, focusBtn),
     );
     const toggle = () => {
-      state.focus = state.focus === key ? null : key;
+      const focused = state.focus === key;
+      state.manual = focused ? 'grid' : key;
       refresh();
     };
-    tile.addEventListener('click', toggle);
+    focusBtn.addEventListener('click', toggle);
+    tile.addEventListener('dblclick', (e) => {
+      if (!e.target.closest('.tile-tools')) toggle();
+    });
     tile.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
+      if (e.target === tile && (e.key === 'Enter' || e.key === ' ')) {
         e.preventDefault();
         toggle();
+      }
+    });
+    fullBtn.addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else (tile.requestFullscreen || tile.webkitRequestFullscreen)?.call(tile)?.catch?.(() => {});
+    });
+    pipBtn.addEventListener('click', async () => {
+      try {
+        if (document.pictureInPictureElement === video) await document.exitPictureInPicture();
+        else await video.requestPictureInPicture();
+      } catch {
+        // not allowed right now (no video yet, or the browser refuses)
       }
     });
     return tile;
@@ -105,15 +128,39 @@ export function createVoice(app) {
         tiles.delete(key);
       }
     }
-    if (state.focus && !want.includes(state.focus)) state.focus = null;
-    grid.classList.toggle('focused', !!state.focus);
+    // A screen share takes the big view by itself, unless the user chose otherwise.
+    const screens = want.filter((k) => k.endsWith(':screen'));
+    if (state.manual && state.manual !== 'grid' && !want.includes(state.manual)) state.manual = null;
+    if (state.manual === 'grid' && !screens.length) state.manual = null;
+    state.focus = state.manual === 'grid' ? null : state.manual || screens[0] || null;
+    const focused = !!state.focus && want.length > 1;
+    el.classList.toggle('sharing', screens.length > 0);
+    grid.classList.toggle('focused', focused);
     grid.dataset.count = String(want.length);
-    const order = state.focus ? [state.focus, ...want.filter((k) => k !== state.focus)] : want;
-    order.forEach((key, i) => {
-      const tile = tiles.get(key);
-      tile.classList.toggle('is-focus', key === state.focus);
-      if (grid.children[i] !== tile) grid.insertBefore(tile, grid.children[i] || null);
-    });
+    for (const [key, tile] of tiles) {
+      tile.classList.toggle('is-focus', focused && key === state.focus);
+      const btn = tile.querySelector('.tile-focus');
+      btn.setAttribute('aria-label', key === state.focus ? t('voice.grid') : t('voice.focus'));
+      btn.dataset.tip = btn.getAttribute('aria-label');
+      replace(btn, icon(key === state.focus && focused ? 'grid' : 'focus', { size: 18 }));
+      tile.querySelector('.tile-pip').hidden = !tile.classList.contains('has-video') || !document.pictureInPictureEnabled;
+    }
+    if (focused) {
+      const main = tiles.get(state.focus);
+      if (grid.firstChild !== main) grid.prepend(main);
+      if (main.nextSibling !== strip) main.after(strip);
+      while (strip.nextSibling) strip.nextSibling.remove();
+      const others = want.filter((k) => k !== state.focus).map((k) => tiles.get(k));
+      others.forEach((tile, i) => {
+        if (strip.children[i] !== tile) strip.insertBefore(tile, strip.children[i] || null);
+      });
+    } else {
+      strip.remove();
+      want.forEach((key, i) => {
+        const tile = tiles.get(key);
+        if (grid.children[i] !== tile) grid.insertBefore(tile, grid.children[i] || null);
+      });
+    }
 
     empty.hidden = people.length > 0;
     const c = s.den.channels.find((x) => x.id === state.channel);
@@ -139,7 +186,7 @@ export function createVoice(app) {
   return {
     el,
     show(session, channelId) {
-      if (state.session !== session || state.channel !== channelId) state.focus = null;
+      if (state.session !== session || state.channel !== channelId) state.focus = state.manual = null;
       state.session = session;
       state.channel = channelId;
       refresh();

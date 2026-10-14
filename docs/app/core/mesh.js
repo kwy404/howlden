@@ -22,6 +22,8 @@ import { randomId } from './crypto.js';
 export const MAX_MEMBERS = 5;
 /** Direct conversations and 1 to 1 calls always have exactly two people. */
 export const DIRECT_MEMBERS = 2;
+/** App message types a held link may exchange before it is let in (identity proof and pairing confirmation). */
+export const HELD_TYPES = new Set(['id-hello', 'id-proof', 'pair']);
 export const INTRO_TIMEOUT = 30000;
 
 /** The online member who joined first, by joinedAt then id. */
@@ -111,6 +113,9 @@ export class Mesh extends Emitter {
     this.links = new Map();
     this.peerLinks = new Map();
     this.pending = new Map();
+    this.answeredInvites = new Map();
+    this.answeredSids = new Set();
+    this.held = new Map();
     this.outgoing = new Map();
     this.timers = new Set();
     this.relay = host ? this.self.id : null;
@@ -180,8 +185,10 @@ export class Mesh extends Emitter {
   }
 
   /** Host side: apply a reply code. */
-  async acceptReply(reply) {
+  async acceptReply(reply, { hold = false } = {}) {
     const p = this.pending.get(reply.inviteId);
+    // The same reply twice (pasted again, or delivered by another tab or relay) is not an error.
+    if (!p && this.answeredInvites.has(reply.inviteId)) throw new MeshError('answered', 'This reply was already used.');
     if (!p) throw new MeshError('expired', 'This reply belongs to an invite that is no longer open. Make a new invite.');
     if (reply.denId && reply.denId !== this.den.id) throw new MeshError('den', 'This reply is for a different den.');
     if (reply.peer.id === this.self.id) throw new MeshError('self', 'This is your own reply code.');
@@ -189,8 +196,10 @@ export class Mesh extends Emitter {
     // When the den is full the link still opens, only to tell the guest why
     // they cannot join (see _onOpen); then it closes.
     this.pending.delete(reply.inviteId);
+    this.answeredInvites.set(reply.inviteId, reply.peer.id);
     p.link.peerId = reply.peer.id;
     p.link.peer = reply.peer;
+    p.link.hold = hold;
     await p.link.complete(reply.sdp);
     return p.link;
   }
@@ -220,7 +229,7 @@ export class Mesh extends Emitter {
   sendTo(peerId, body) {
     const env = { t: 'm', id: randomId(8), from: this.self.id, to: peerId, body };
     this._remember(env.id);
-    const direct = this.links.get(peerId);
+    const direct = this.links.get(peerId) || this.held.get(peerId);
     if (direct) return this._send(direct, env);
     const relay = this.links.get(this.relay);
     if (relay) return this._send(relay, env);
@@ -243,15 +252,42 @@ export class Mesh extends Emitter {
    * invite answered before its conversation id was known). This peer acts as
    * the introducer of the other side.
    */
-  adopt(link, peer) {
+  adopt(link, peer, { hold = false } = {}) {
     link.peerId = peer.id;
     link.peer = peer;
     link.introduce = true;
+    link.hold = hold;
     link.onopen = () => this._onOpen(link);
     link.onmessage = (data) => this._onRaw(link, data);
     link.onclose = () => this._onClose(link);
     link.onfail = (reason) => this.emit('link-failed', { peerId: link.peerId, reason, link });
     if (link.open) this._onOpen(link);
+  }
+
+  /**
+   * Let a held link in: a guest who joined with six words waits here until the
+   * inviter confirms the words (or recognizes a known friend's key).
+   */
+  release(peerId) {
+    const link = this.held.get(peerId);
+    if (!link) return false;
+    this.held.delete(peerId);
+    link.hold = false;
+    const queue = link.queue || [];
+    link.queue = [];
+    this._onOpen(link);
+    for (const data of queue) this._onRaw(link, data);
+    return true;
+  }
+
+  /** Turn a held link away with a reason the guest's app can show. */
+  refuse(peerId, reason = 'refused') {
+    const link = this.held.get(peerId);
+    if (!link) return false;
+    this.held.delete(peerId);
+    this._send(link, { t: 'refused', reason });
+    setTimeout(() => link.close(), 200);
+    return true;
   }
 
   /** Leave the den: say goodbye and close every link. */
@@ -262,6 +298,8 @@ export class Mesh extends Emitter {
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
     for (const { link } of this.pending.values()) link.close();
+    for (const link of this.held.values()) link.close();
+    this.held.clear();
     for (const link of this.outgoing.values()) link.close();
     for (const link of [...this.links.values()]) link.close();
     this.pending.clear();
@@ -315,6 +353,13 @@ export class Mesh extends Emitter {
         setTimeout(() => link.close(), 200);
         return;
       }
+      if (link.hold) {
+        this.links.delete(id);
+        link.queue = [];
+        this.held.set(id, link);
+        this.emit('held', { peerId: id, link, peer: link.peer });
+        return;
+      }
       const have = this.members.get(id);
       const member = { id, name: link.peer?.name || have?.name || 'member', avatar: link.peer?.avatar || have?.avatar || '', joinedAt: this.now(), online: true };
       this.members.set(id, member);
@@ -333,6 +378,11 @@ export class Mesh extends Emitter {
 
   _onClose(link) {
     const id = link.peerId;
+    if (id && this.held.get(id) === link) {
+      this.held.delete(id);
+      this.emit('held-close', { peerId: id });
+      return;
+    }
     for (const [sid, l] of this.outgoing) if (l === link) this.outgoing.delete(sid);
     if (!id || this.links.get(id) !== link) return;
     this.links.delete(id);
@@ -363,6 +413,14 @@ export class Mesh extends Emitter {
     }
     if (!msg || typeof msg.t !== 'string') return;
     const from = link.peerId;
+    if (from && link.hold && this.held.get(from) === link) {
+      if (msg.t === 'm' && msg.to === this.self.id && msg.from === from && HELD_TYPES.has(msg.body?.type)) {
+        this.emit('message', { from, body: msg.body, id: msg.id, via: from, direct: true, held: true });
+      } else if (link.queue.length < 200) {
+        link.queue.push(data);
+      }
+      return;
+    }
     // Only links that made it into the mesh may talk (a refused guest may not).
     if (!from || this.links.get(from) !== link) return;
     try {
@@ -436,11 +494,16 @@ export class Mesh extends Emitter {
         return;
       }
       case 'bye': {
+        this.emit('bye', { peerId: from });
         const m = this.members.get(from);
         if (m) m.online = false;
         link.close();
         return;
       }
+      case 'refused':
+        if (from !== this.introducer) return;
+        this.emit('refused', { reason: String(msg.reason || 'refused').slice(0, 40) });
+        return;
       case 'full':
         if (from !== this.introducer) return;
         this.emit('full', { max: Number(msg.max) || this.max, count: Number(msg.count) || Number(msg.max) || this.max });
@@ -487,7 +550,8 @@ export class Mesh extends Emitter {
       return;
     }
     if (msg.kind === 'offer') {
-      if (this.links.has(msg.from)) return;
+      if (this.links.has(msg.from) || this.answeredSids.has(msg.sid)) return;
+      this.answeredSids.add(msg.sid);
       if (!this.members.has(msg.from)) this.members.set(msg.from, { id: msg.from, name: 'member', avatar: '', joinedAt: null, online: false });
       const link = this._newLink();
       link.peerId = msg.from;

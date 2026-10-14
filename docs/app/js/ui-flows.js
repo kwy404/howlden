@@ -1,11 +1,11 @@
 // Invite, join, scan and den management flows.
 
-import { h, replace, copyText } from './dom.js';
+import { h, copyText } from './dom.js';
 import { icon } from './icons.js';
-import { confirmDialog, modal, promptDialog, toast } from './ui-modal.js';
-import { avatarSrc } from './ui-account.js';
+import { confirmDialog, modal, promptDialog } from './ui-modal.js';
 import { encodeQR, qrPath } from '../core/qr.js';
-import { CodeError, findCode, readReply, unpackCode } from '../core/invite.js';
+import { CodeError, findCode, unpackCode } from '../core/invite.js';
+import { wordsFromLink } from '../core/words.js';
 import { MeshError } from '../core/mesh.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -31,17 +31,21 @@ export function qrElement(text, label) {
   return svg;
 }
 
-/** Translate a code or mesh error into words. */
+/**
+ * Translate any error into plain words. Raw exception text (often a browser
+ * message in English about SDP states) is never shown; it goes to the console.
+ */
 export function codeErrorText(t, err) {
   if (err instanceof CodeError || err instanceof MeshError) {
     const key = `fail.${err.reason}`;
-    const text = t(key, { name: '' });
-    return text === key ? err.message : text;
+    const text = t(key, { name: '', count: '', max: '' });
+    if (text !== key) return text;
   }
-  return String(err?.message || err);
+  console.warn('howlden:', err);
+  return t('fail.generic');
 }
 
-function failureBox(app, diagnosis, retry) {
+export function failureBox(app, diagnosis, retry) {
   const t = app.t;
   return h(
     'div',
@@ -57,7 +61,7 @@ function failureBox(app, diagnosis, retry) {
   );
 }
 
-function shareRow(app, link, title) {
+export function shareRow(app, link, title) {
   const t = app.t;
   const copyBtn = h(
     'button',
@@ -97,219 +101,6 @@ export async function shareOrCopy(link, title) {
     }
   }
   return (await copyText(link)) ? 'copied' : 'none';
-}
-
-/**
- * Invite modal for a den, a 1 to 1 conversation, or a new friend.
- * options.friend makes a friend invite (the conversation is known only after the reply).
- * options.autoShare opens the share sheet as soon as the link is ready.
- */
-export async function inviteModal(app, { session, friend = false, autoShare = false, title }) {
-  const t = app.t;
-  const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('invite.making'));
-  const body = h('div', { class: 'hl-stack' }, status);
-  let invite = null;
-  let done = false;
-  let peerName = '';
-  const offs = [];
-  const m = modal({
-    title: title || t('invite.title', { den: session?.den.name || '' }),
-    className: 'invite-modal',
-    closeLabel: t('common.close'),
-    body: [body],
-    onClose: () => {
-      offs.forEach((off) => off());
-      if (invite) app.invites.delete(invite.inviteId);
-      if (invite && !done) invite.cancel?.();
-    },
-  });
-
-  const watch = (s, peerId) => {
-    offs.push(
-      s.on('link-open', (id) => {
-        if (id !== peerId || done) return;
-        done = true;
-        replace(status, icon('check', { size: 18 }), t('invite.connected', { name: peerName }));
-        status.className = 'invite-status ok';
-        setTimeout(() => m.close(), 1300);
-      }),
-      s.on('notice', (n) => {
-        if (n.kind !== 'rejected' || n.peerId !== peerId || done) return;
-        done = true;
-        replace(status, icon('warning', { size: 18 }), t('invite.rejected', { name: n.name, count: n.count, max: n.max }));
-        status.className = 'invite-status bad';
-      }),
-      s.on('link-failed', (f) => {
-        if (f.peerId !== peerId || done) return;
-        replace(body, failureBox(app, f.diagnosis, () => (m.close(), inviteModal(app, { session, friend, title }))));
-      }),
-    );
-  };
-
-  async function submit(text) {
-    const found = findCode(text);
-    if (!found) return setError(t('fail.empty'));
-    if (found.kind === 'i') return setError(t('fail.notReply'));
-    try {
-      const reply = readReply(await unpackCode(found.code));
-      if (reply.inviteId !== invite.inviteId) {
-        const other = app.invites.get(reply.inviteId);
-        if (other) return other.submit(text);
-        throw new MeshError('expired', t('fail.expired'));
-      }
-      peerName = reply.peer.name;
-      replace(status, h('span', { class: 'spinner spinner-xs' }), t('invite.connecting', { name: reply.peer.name }));
-      status.className = 'invite-status';
-      const target = await invite.accept(reply);
-      watch(target, reply.peer.id);
-      setError('');
-    } catch (err) {
-      setError(codeErrorText(t, err));
-    }
-  }
-
-  const replyInput = h('textarea', { class: 'input field-input mono', rows: 2, placeholder: t('invite.replyPlaceholder'), 'aria-label': t('invite.step2') });
-  const err = h('p', { class: 'form-error', role: 'alert' });
-  const setError = (text) => (err.textContent = text);
-
-  try {
-    if (friend) {
-      invite = await app.newFriendInvite();
-    } else {
-      const made = await session.createInvite();
-      invite = { ...made, accept: async (reply) => (await session.acceptReply(reply), session), cancel: () => session.cancelInvite(made.inviteId) };
-    }
-  } catch (e) {
-    replace(body, h('p', { class: 'form-error' }, codeErrorText(t, e)));
-    return;
-  }
-  if (!m.open) return invite.cancel?.();
-  app.invites.set(invite.inviteId, { submit });
-  replace(status, h('span', { class: 'dot alone' }), t('invite.waiting'));
-  replace(
-    body,
-    h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '1'), t('invite.step1')), h('p', { class: 'muted' }, t('invite.step1Hint')), shareRow(app, invite.link, t('invite.step1')), session?.den.locked ? h('p', { class: 'callout-warn' }, icon('lock', { size: 16 }), t('invite.locked')) : null, invite.full ? h('p', { class: 'callout-warn full-note', role: 'status' }, icon('members', { size: 16 }), t('invite.full', { count: invite.count, max: invite.max })) : null),
-    h(
-      'section',
-      { class: 'hl-step' },
-      h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '2'), t('invite.step2')),
-      h('p', { class: 'muted' }, t('invite.step2Hint')),
-      replyInput,
-      err,
-      h(
-        'div',
-        { class: 'row-btns' },
-        h('button', { class: 'btn btn-brand', type: 'button', onclick: () => submit(replyInput.value) }, t('invite.connect')),
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.scanFlow((text) => ((replyInput.value = text), submit(text))) }, icon('scan', { size: 16 }), t('invite.scan')),
-      ),
-    ),
-    status,
-  );
-  replyInput.addEventListener('paste', () => setTimeout(() => findCode(replyInput.value)?.kind === 'r' && submit(replyInput.value), 0));
-  if (autoShare) {
-    const how = await shareOrCopy(invite.link, 'howlden');
-    if (how === 'copied') toast(t('notice.copied'), 'ok');
-  }
-}
-
-/** Guest side: show an invite, accept it, and hand back the reply. */
-export async function joinModal(app, invite) {
-  const t = app.t;
-  const known = app.friends.get(invite.host.id);
-  const clash = !known && app.friends.list().some((f) => f.name.toLowerCase() === invite.host.name.toLowerCase());
-  const keyOk = known && known.publicKey === invite.host.publicKey;
-  const badge = keyOk
-    ? h('span', { class: 'verified' }, icon('shield', { size: 14 }), t('id.knownFriend'))
-    : known
-      ? h('span', { class: 'warn-tag' }, icon('warning', { size: 14 }), t('id.keyChanged'))
-      : clash
-        ? h('span', { class: 'warn-tag' }, icon('warning', { size: 14 }), t('id.nameClash'))
-        : h('span', { class: 'new-tag' }, t('id.newPerson'));
-  const pass = invite.den.locked ? h('input', { class: 'input field-input', type: 'password', autocomplete: 'off', required: true, id: 'join-pass' }) : null;
-  const err = h('p', { class: 'form-error', role: 'alert' });
-  const body = h('div', { class: 'hl-stack' });
-  const hostName = invite.host.tag ? `${invite.host.name}#${invite.host.tag}` : invite.host.name;
-  const accept = h('button', { class: 'btn btn-brand btn-lg btn-block', type: 'button' }, t(invite.kind === 'dm' ? 'join.acceptDm' : 'join.accept'));
-  replace(
-    body,
-    h(
-      'div',
-      { class: 'join-hero' },
-      h('img', { class: 'av', src: avatarSrc(invite.host.avatar || invite.host.id), alt: '', width: 72, height: 72 }),
-      h('p', { class: 'muted' }, invite.kind === 'dm' ? t('join.dmFrom', { host: hostName }) : t('join.invited', { host: hostName })),
-      invite.kind === 'dm' ? null : h('h3', { class: 'join-den' }, invite.den.name),
-      badge,
-    ),
-    invite.den.full ? h('p', { class: 'callout-warn', role: 'status' }, icon('members', { size: 16 }), t('join.fullInvite', invite.den.full)) : null,
-    (known && !keyOk) || clash ? h('p', { class: 'callout-warn' }, icon('warning', { size: 16 }), t(known ? 'id.keyChangedHint' : 'id.nameClashHint', { name: invite.host.name })) : null,
-    pass ? h('label', { class: 'hl-field', for: 'join-pass' }, h('span', { class: 'field-label' }, t('join.passphrase')), pass, h('span', { class: 'field-hint' }, t('join.passphraseHint'))) : null,
-    h('div', { class: 'join-as' }, h('span', { class: 'muted' }, t('join.as')), h('img', { class: 'av', src: avatarSrc(app.profile.avatar), alt: '', width: 24, height: 24 }), h('strong', null, `${app.profile.name}#${app.profile.tag}`)),
-    err,
-    accept,
-  );
-  const m = modal({ title: t('join.title'), className: 'join-modal', closeLabel: t('common.close'), body: [body] });
-  accept.addEventListener('click', async () => {
-    if (pass && !pass.value) return pass.focus();
-    accept.disabled = true;
-    accept.textContent = t('join.making');
-    let session;
-    let reply;
-    try {
-      ({ session, reply } = await app.answerInvite(invite, pass?.value));
-    } catch (e) {
-      err.textContent = codeErrorText(t, e);
-      accept.disabled = false;
-      accept.textContent = t('join.accept');
-      return;
-    }
-    if (!m.open) return;
-    const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('join.waiting', { host: invite.host.name }));
-    replace(body, h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, t('join.replyTitle', { host: invite.host.name })), h('p', { class: 'muted' }, t('join.replyHint', { host: invite.host.name })), shareRow(app, reply.link, t('join.replyTitle', { host: invite.host.name }))), status);
-    const offs = [
-      session.on('welcome', () => {
-        offs.forEach((off) => off());
-        replace(status, icon('check', { size: 18 }), t('join.connected', { den: session.isDirect ? invite.host.name : session.den.name }));
-        status.className = 'invite-status ok';
-        setTimeout(() => {
-          m.close();
-          app.openSession(session);
-        }, 900);
-      }),
-      session.on('notice', (n) => {
-        if (n.kind !== 'full') return;
-        offs.forEach((off) => off());
-        app.discardEmptyDen(session);
-        replace(body, h('div', { class: 'fail-box', role: 'alert' }, h('div', { class: 'fail-head' }, icon('members', { size: 20 }), h('strong', { class: 'full-msg' }, t('join.full', { count: n.count, max: n.max })))));
-      }),
-      session.on('link-failed', (f) => {
-        if (f.peerId !== invite.host.id) return;
-        replace(body, failureBox(app, f.diagnosis));
-      }),
-    ];
-    if (invite.kind === 'dm') shareOrCopy(reply.link, 'howlden').then((how) => how === 'copied' && toast(t('notice.copied'), 'ok'));
-  });
-}
-
-/** Paste an invite link by hand. */
-export function pasteInviteModal(app) {
-  const t = app.t;
-  const input = h('input', { class: 'input field-input', id: 'paste-invite', placeholder: t('join.pastePlaceholder'), autocomplete: 'off' });
-  const err = h('p', { class: 'form-error', role: 'alert' });
-  const go = async (text) => {
-    const found = findCode(text);
-    if (!found) return (err.textContent = t('fail.empty'));
-    m.close();
-    await app.handleCode(found, { onError: (msg) => toast(msg, 'error') });
-  };
-  const m = modal({
-    title: t('join.title'),
-    lead: t('home.joinHint'),
-    closeLabel: t('common.close'),
-    body: [h('label', { class: 'hl-field', for: 'paste-invite' }, h('span', { class: 'field-label' }, t('join.paste')), input), err],
-    footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.scanFlow((text) => go(text)) }, icon('scan', { size: 16 }), t('invite.scan')), h('button', { class: 'btn btn-brand', type: 'button', onclick: () => go(input.value) }, t('join.continue'))],
-  });
-  input.addEventListener('keydown', (e) => e.key === 'Enter' && go(input.value));
-  setTimeout(() => input.focus(), 30);
 }
 
 /** Scan a QR code with the camera through BarcodeDetector. */
@@ -354,7 +145,7 @@ export async function scanModal(app, onText) {
     if (video.readyState < 2) return;
     try {
       const codes = await detector.detect(video);
-      const text = codes.find((c) => findCode(c.rawValue))?.rawValue;
+      const text = codes.find((c) => findCode(c.rawValue) || wordsFromLink(c.rawValue))?.rawValue;
       if (text) {
         m.close();
         onText(text);

@@ -45,6 +45,7 @@ export function closePopover() {
   if (!openPopover) return;
   const p = openPopover;
   openPopover = null;
+  p.cleanup?.();
   p.el.remove();
   p.anchor?.setAttribute('aria-expanded', 'false');
   document.removeEventListener('mousedown', p.outside, true);
@@ -55,29 +56,42 @@ export function closePopover() {
 export function popover(anchor, content, { placement = 'below', className = '' } = {}) {
   closePopover();
   const el = h('div', { class: `hl-popover ${className}`, role: 'dialog' }, content);
+  el.style.visibility = 'hidden';
   document.body.append(el);
-  const r = anchor.getBoundingClientRect();
-  const pw = el.offsetWidth;
-  const ph = el.offsetHeight;
-  let left;
-  let top;
-  if (placement === 'right') {
-    left = r.right + 10;
-    top = r.top;
-    if (left + pw > innerWidth - 8) left = Math.max(8, r.left - pw - 10);
-  } else if (placement === 'left') {
-    left = r.left - pw - 10;
-    top = r.top;
-    if (left < 8) left = Math.min(innerWidth - pw - 8, r.right + 10);
-  } else if (placement === 'above') {
-    left = r.right - pw;
-    top = r.top - ph - 6;
-  } else {
-    left = r.left;
-    top = r.bottom + 6;
-  }
-  el.style.left = `${Math.max(8, Math.min(left, innerWidth - pw - 8))}px`;
-  el.style.top = `${Math.max(8, Math.min(top, innerHeight - ph - 8))}px`;
+  const gap = 10;
+  const edge = 8;
+  // Place next to the anchor, flip to the other side when there is no room,
+  // then shift inside the viewport. Runs again whenever the card changes size.
+  const place = () => {
+    const r = anchor.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    el.style.maxHeight = `${vh - edge * 2}px`;
+    const pw = el.offsetWidth;
+    const ph = el.offsetHeight;
+    let left;
+    let top;
+    if (placement === 'right' || placement === 'left') {
+      const right = r.right + gap;
+      const leftSide = r.left - pw - gap;
+      const fitsRight = right + pw <= vw - edge;
+      const fitsLeft = leftSide >= edge;
+      left = placement === 'right' ? (fitsRight || !fitsLeft ? right : leftSide) : fitsLeft || !fitsRight ? leftSide : right;
+      if (!fitsRight && !fitsLeft) left = (vw - pw) / 2;
+      top = r.top;
+    } else {
+      left = placement === 'above' ? r.right - pw : r.left;
+      const below = r.bottom + 6;
+      const above = r.top - ph - 6;
+      top = placement === 'above' ? (above >= edge ? above : below) : below + ph <= vh - edge ? below : above;
+    }
+    el.style.left = `${Math.round(Math.max(edge, Math.min(left, vw - pw - edge)))}px`;
+    el.style.top = `${Math.round(Math.max(edge, Math.min(top, vh - ph - edge)))}px`;
+  };
+  place();
+  el.style.visibility = '';
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null;
+  ro?.observe(el);
   const outside = (e) => {
     if (!el.contains(e.target) && !anchor.contains(e.target)) closePopover();
   };
@@ -88,10 +102,12 @@ export function popover(anchor, content, { placement = 'below', className = '' }
       closePopover();
     }
   };
+  const onResize = () => place();
+  window.addEventListener('resize', onResize);
   document.addEventListener('mousedown', outside, true);
   document.addEventListener('keydown', key, true);
   anchor.setAttribute('aria-expanded', 'true');
-  openPopover = { el, anchor, outside, key, restore: false };
+  openPopover = { el, anchor, outside, key, restore: false, cleanup: () => (ro?.disconnect(), window.removeEventListener('resize', onResize)) };
   const first = el.querySelector('button, [href], input, select, [tabindex]');
   first?.focus({ preventScroll: true });
   return el;
@@ -329,8 +345,8 @@ function userPanel(app) {
     h(
       'button',
       { class: 'up-me', type: 'button', onclick: () => app.openSettings('profile') },
-      h('span', { class: 'avatar-wrap s32' }, avatarImg(app.profile.avatar, { size: 32, speaking: m.isSpeaking(app.profile.id) && !!m.current }), h('span', { class: 'status-dot on' })),
-      h('span', { class: 'up-text' }, h('span', { class: 'up-name' }, app.profile.name), h('span', { class: 'up-sub' }, ptt ? t('voice.pttHint', { key: keyName(app.settings.pttKey) }) : t('user.online'))),
+      h('span', { class: 'avatar-wrap s32' }, avatarImg(app.profile.avatar, { size: 32, speaking: m.isSpeaking(app.profile.id) && !!m.current }), h('span', { class: `status-dot ${app.settings.dnd ? 'dnd' : 'on'}` })),
+      h('span', { class: 'up-text' }, h('span', { class: 'up-name' }, app.profile.name), h('span', { class: 'up-sub' }, app.settings.dnd ? t('sound.dnd') : ptt ? t('voice.pttHint', { key: keyName(app.settings.pttKey) }) : t('user.online'))),
     ),
     h(
       'div',

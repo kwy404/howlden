@@ -8,6 +8,9 @@ import { avatarPicker } from './ui-account.js';
 import { keyName } from './ui-shell.js';
 import { LANGS } from './i18n.js';
 import { STUN_SERVERS, parseTurn } from '../core/rtc.js';
+import { BackupError } from '../core/identity.js';
+import { SOUND_NAMES } from './sounds.js';
+import { VERSION } from '../core/version.js';
 
 const SECTIONS = [
   ['user', [['profile', 'edit'], ['account', 'lock'], ['privacy', 'shield']]],
@@ -73,7 +76,7 @@ export function openSettings(app, section = 'profile') {
         items.map(([key, ico]) => h('button', { class: `settings-tab${key === current ? ' active' : ''}`, type: 'button', 'aria-current': key === current ? 'page' : null, onclick: () => show(key) }, icon(ico, { size: 18 }), t(`settings.${key}`))),
       ]),
       h('div', { class: 'settings-sep' }),
-      h('p', { class: 'settings-ver' }, 'howlden 0.1.0'),
+      h('p', { class: 'settings-ver' }, `howlden ${VERSION}`),
     );
   }
 
@@ -215,34 +218,47 @@ export function openSettings(app, section = 'profile') {
         });
         return field(label, el, null, `set-${key}`);
       };
-      const meter = h('div', { class: 'meter-bar' }, h('span'));
-      let test = null;
-      const testBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('settings.micTestStart'));
+      // Live meter: input level, where the gate opens, and whether it is open
+      const fill = h('span', { class: 'meter-fill' });
+      const mark = h('span', { class: 'meter-mark', title: t('voice.gateMark') });
+      const meter = h('div', { class: 'meter-bar gate-meter', role: 'img', 'aria-label': t('voice.meterLabel') }, fill, mark);
+      const gateState = h('span', { class: 'gate-state' }, t('voice.gateClosed'));
+      const toPct = (db) => Math.max(0, Math.min(100, ((db + 80) / 80) * 100));
+      const tick = setInterval(() => {
+        const lv = app.media.micLevel;
+        if (lv) {
+          fill.style.width = `${toPct(lv.input)}%`;
+          mark.style.left = `${toPct(lv.input - lv.snr + lv.threshold)}%`;
+          mark.hidden = false;
+          meter.classList.toggle('open', !!lv.open);
+          gateState.textContent = t(lv.open ? 'voice.gateOpen' : 'voice.gateClosed');
+          gateState.classList.toggle('open', !!lv.open);
+        } else {
+          const level = Math.max(app.media.level('test'), app.media.level('self'));
+          fill.style.width = `${Math.min(100, level * 400)}%`;
+          mark.hidden = true;
+          gateState.textContent = '';
+        }
+      }, 80);
+      const testBtn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'aria-pressed': 'false' }, icon('headphones', { size: 16 }), t('voice.testMic'));
       testBtn.addEventListener('click', async () => {
-        if (test) {
-          test.getTracks().forEach((tr) => tr.stop());
-          app.media._unmeter('test');
-          test = null;
-          testBtn.textContent = t('settings.micTestStart');
+        if (app.media.testPipe) {
+          app.media.stopMicTest();
+          testBtn.lastChild.textContent = t('voice.testMic');
+          testBtn.setAttribute('aria-pressed', 'false');
           return;
         }
         try {
-          app.media._ensureContext();
-          test = await navigator.mediaDevices.getUserMedia({ audio: app.media._constraints() });
-          app.media._meter('test', test);
-          testBtn.textContent = t('settings.micTestStop');
+          await app.media.startMicTest();
+          testBtn.lastChild.textContent = t('voice.testMicStop');
+          testBtn.setAttribute('aria-pressed', 'true');
         } catch {
           toast(t('notice.mic-failed'), 'error');
         }
       });
-      const tick = setInterval(() => {
-        const level = Math.max(app.media.level('test'), app.media.level('self'));
-        meter.firstChild.style.width = `${Math.min(100, level * 400)}%`;
-      }, 80);
       cleanup.push(() => {
         clearInterval(tick);
-        test?.getTracks().forEach((tr) => tr.stop());
-        app.media._unmeter('test');
+        app.media.stopMicTest();
       });
       const pttKey = h('button', { class: 'kbd-btn', type: 'button' }, keyName(s.pttKey));
       pttKey.addEventListener('click', () => {
@@ -264,15 +280,25 @@ export function openSettings(app, section = 'profile') {
       const pttRow = h('div');
       const renderMode = () => replace(pttRow, s.inputMode === 'ptt' ? h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.pttKey')), pttKey) : null);
       renderMode();
-      const proc = (key, label) => toggleRow(label, s[key], (v) => ((s[key] = v), app.saveSettings(), app.media.restartMic()));
+      const noise = (value) =>
+        h(
+          'label',
+          { class: 'radio-row' },
+          h('input', { class: 'radio', type: 'radio', name: 'noise', value, checked: (s.noiseMode || 'strong') === value, onchange: () => ((s.noiseMode = value), app.saveSettings(), app.media.restartMic(), renderSens()) }),
+          h('span', null, h('strong', null, t(`voice.noise.${value}`)), h('br'), h('small', { class: 'muted' }, t(`voice.noise.${value}Hint`))),
+        );
+      const sens = h('input', { class: 'range', type: 'range', id: 'set-sens', min: 0, max: 100, value: s.gateSensitivity ?? 50, oninput: (e) => app.media.setSensitivity(Number(e.target.value)) });
+      const sensRow = h('div');
+      const renderSens = () => replace(sensRow, (s.noiseMode || 'strong') === 'strong' ? field(t('voice.sensitivity'), sens, t('voice.sensitivityHint'), 'set-sens') : null);
+      renderSens();
       replace(
         box,
         h('div', { class: 'grid-2' }, select(t('settings.input'), 'audioinput', 'inputId', (v) => ((s.inputId = v), app.saveSettings(), app.media.restartMic())), select(t('settings.output'), 'audiooutput', 'outputId', (v) => app.media.setOutput(v))),
         select(t('settings.cameraDevice'), 'videoinput', 'cameraId', (v) => ((s.cameraId = v), app.saveSettings())),
-        h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.micTest')), h('p', { class: 'field-hint' }, t('settings.micTestHint')), h('div', { class: 'meter-row' }, testBtn, meter)),
+        h('fieldset', { class: 'set-sec' }, h('legend', { class: 'sr-only' }, t('voice.noiseTitle')), h('h2', null, t('voice.noiseTitle')), h('p', { class: 'field-hint' }, t('voice.noiseHint')), noise('off'), noise('standard'), noise('strong'), sensRow),
+        h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.micTest')), h('p', { class: 'field-hint' }, t('voice.testMicHint')), h('div', { class: 'meter-row' }, testBtn, meter, gateState)),
         h('fieldset', { class: 'hl-field' }, h('legend', { class: 'field-label' }, t('settings.inputMode')), mode('voice', t('settings.voiceActivity')), mode('ptt', t('settings.ptt'))),
         pttRow,
-        h('section', { class: 'set-sec' }, h('h2', null, t('settings.processing')), h('p', { class: 'field-hint' }, t('settings.processingHint')), proc('noiseSuppression', t('settings.noise')), proc('echoCancellation', t('settings.echo')), proc('autoGainControl', t('settings.gain'))),
       );
       return box;
     },
@@ -337,6 +363,14 @@ export function openSettings(app, section = 'profile') {
       return h(
         'div',
         { class: 'hl-stack' },
+        h(
+          'fieldset',
+          { class: 'set-sec' },
+          h('legend', { class: 'sr-only' }, t('settings.pairMode')),
+          h('h2', null, t('settings.pairMode')),
+          h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'pair-mode', checked: s.pairMode !== 'link', onchange: () => ((s.pairMode = 'words'), app.saveSettings()) }), h('span', null, h('strong', null, t('settings.pairWords')), h('br'), h('small', { class: 'muted' }, t('settings.pairWordsHint')))),
+          h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'pair-mode', checked: s.pairMode === 'link', onchange: () => ((s.pairMode = 'link'), app.saveSettings()) }), h('span', null, h('strong', null, t('settings.pairLink')), h('br'), h('small', { class: 'muted' }, t('settings.pairLinkHint')))),
+        ),
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.stun')), h('p', { class: 'muted' }, t('settings.stunHint')), h('ul', { class: 'mono-list' }, STUN_SERVERS.map((u) => h('li', null, h('code', null, u))))),
         h(
           'section',
@@ -359,7 +393,7 @@ export function openSettings(app, section = 'profile') {
                   err.textContent = '';
                   renderList();
                 } catch (x) {
-                  err.textContent = x.message;
+                  err.textContent = t(`settings.turnErr.${x.reason || 'format'}`);
                 }
               },
             },
@@ -418,6 +452,25 @@ export function openSettings(app, section = 'profile') {
           t('settings.notifyHint'),
         ),
         note,
+        toggleRow(t('sound.dnd'), !!s.dnd, (v) => ((s.dnd = v), app.saveSettings(), app.render()), t('sound.dndHint')),
+        h(
+          'section',
+          { class: 'set-sec' },
+          h('h2', null, t('sound.title')),
+          field(t('sound.volume'), h('input', { class: 'range', type: 'range', id: 'set-volume', min: 0, max: 100, value: app.sounds.volume, oninput: (e) => ((s.soundVolume = Number(e.target.value)), app.saveSettings()), onchange: () => app.sounds.play('message', { force: true }) }), t('sound.volumeHint'), 'set-volume'),
+          h(
+            'ul',
+            { class: 'sound-list' },
+            SOUND_NAMES.map((name) =>
+              h(
+                'li',
+                { class: 'sound-row' },
+                h('label', { class: 'switch-row' }, h('input', { class: 'toggle', type: 'checkbox', checked: s.sounds?.[name] !== false, onchange: (e) => ((s.sounds = { ...s.sounds, [name]: e.target.checked }), app.saveSettings()) }), h('span', null, t(`sound.${name}`))),
+                h('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'aria-label': `${t('sound.preview')}: ${t(`sound.${name}`)}`, onclick: () => app.sounds.play(name, { force: true }) }, icon('volume', { size: 16 }), t('sound.preview')),
+              ),
+            ),
+          ),
+        ),
       );
     },
 
@@ -485,7 +538,8 @@ export function restoreModal(app) {
               await app.restoreAccount(await f.text(), pw.value);
               m.close();
             } catch (x) {
-              err.textContent = x.message;
+              console.warn('howlden restore:', x);
+              err.textContent = t(x instanceof BackupError ? `account.err.${x.reason}` : 'account.err.other');
               e.currentTarget.disabled = false;
             }
           },
