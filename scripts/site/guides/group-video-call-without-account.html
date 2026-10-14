@@ -2,7 +2,7 @@
 {
   "slug": "group-video-call-without-account",
   "title": "Group video call without an account, in the browser | howlden",
-  "description": "Start a group video call without an account, right in your browser. No sign up, no app, up to 8 people, end to end encrypted, with honest tips on bandwidth.",
+  "description": "Start a group video call without an account, right in your browser. No sign up, no app, up to 5 people, end to end encrypted, with honest tips on bandwidth.",
   "h1": "Group video call without an account",
   "lede": "See a few faces without anyone creating a login: how to start a video call in a den, what your connection needs, and when a different kind of tool fits better.",
   "short": "Group video call, no account",
@@ -11,7 +11,7 @@
   "keywords": ["group video call without account", "video call no sign up", "free group video call in browser", "video chat without registration", "private group video call", "video call no app"],
   "faq": [
     { "q": "Can I make a group video call without an account?", "a": "Yes. In howlden you pick a display name and an avatar that stay in your browser, create a den and invite people with a link. Nobody signs up, gives an email or a phone number." },
-    { "q": "How many people can join a video call?", "a": "A den holds up to 8 people. Every member sends their video directly to every other member, so bigger groups are better served by a server based tool." },
+    { "q": "How many people can join a video call?", "a": "A den holds up to 5 people. Every member sends their video directly to every other member, so bigger groups are better served by a server based tool." },
     { "q": "Does the video call work on a phone?", "a": "Yes, it runs in the phone's browser with nothing to install. The browser asks for camera and microphone permission the first time you turn them on." },
     { "q": "Is the group video call encrypted?", "a": "Yes. Each connection is encrypted end to end by WebRTC with DTLS, and audio and video use SRTP. No server of ours ever sees your video." }
   ]
@@ -36,7 +36,7 @@
 <p>If you want extra assurance, howlden shows a short connection fingerprint. Compare it out loud at the start of the call: if it matches on both screens, nobody is sitting in the middle. You can read more about this in the guide to <a href="private-group-voice-call.html">private group voice calls</a>.</p>
 </section>
 <section id="bandwidth"><h2>The honest part: upload bandwidth</h2>
-<p>A mesh has one real cost. Your browser sends its own copy of your video to each other person in the den, so the more cameras are on, the more you upload. With a few people, a typical home connection usually copes well. As you approach the den limit of 8 people, everyone sends up to seven video streams at once, and a slow upload line or an older phone will start to struggle: video gets blurry, freezes, or the device gets warm.</p>
+<p>A mesh has one real cost. Your browser sends its own copy of your video to each other person in the den, so the more cameras are on, the more you upload. With a few people, a typical home connection usually copes well. As you approach the den limit of 5 people, everyone sends up to four video streams at once, and a slow upload line or an older phone will start to struggle: video gets blurry, freezes, or the device gets warm.</p>
 <p>Audio is far lighter than video, so a few habits keep things smooth:</p>
 <ul>
 <li>Let people on weak connections join with voice only. They still receive everyone else's video, which costs download rather than upload.</li>
@@ -49,7 +49,7 @@
 <section id="mesh-vs-server"><h2>Mesh or server: picking the right approach</h2>
 <p>Tools like Zoom, Google Meet and Jitsi use a server based approach: each person sends one video stream to a media server, which forwards it to everyone else. That is excellent for big meetings, webinars and classes, and it lets people join through a single meeting link with no codes to swap. howlden takes the direct approach, which suits small private groups. Neither is better in general. They are built for different jobs.</p>
 <table><thead><tr><th>Question</th><th>Direct mesh (howlden)</th><th>Server based</th></tr></thead><tbody>
-<tr><td>Group size</td><td>Up to 8 people</td><td>Large meetings</td></tr>
+<tr><td>Group size</td><td>Up to 5 people</td><td>Large meetings</td></tr>
 <tr><td>Account needed</td><td>Never</td><td>Depends on the service</td></tr>
 <tr><td>Where video travels</td><td>Only between the people in the call</td><td>Through the service's media servers</td></tr>
 <tr><td>Upload per person</td><td>Grows with group size</td><td>About one stream</td></tr>

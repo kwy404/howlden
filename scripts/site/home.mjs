@@ -25,7 +25,7 @@ function preview() {
     <nav class="app-rail" aria-label="Dens">
       <button type="button" class="den-btn on" aria-label="Moonlight Pack" title="Moonlight Pack">${art('moon')}</button>
       <button type="button" class="den-btn" aria-label="Study burrow" title="Study burrow" @click="toast('Study burrow is a separate den with its own members and invites.')">${art('study')}</button>
-      <button type="button" class="den-btn" aria-label="Family den" title="Family den" @click="toast('Family den: each den is its own private mesh of up to 8 people.')">${art('home')}</button>
+      <button type="button" class="den-btn" aria-label="Family den" title="Family den" @click="toast('Family den: each den is its own private mesh of up to 5 people.')">${art('home')}</button>
       <span class="rail-sep"></span>
       <button type="button" class="den-btn add" aria-label="Open a new den" title="Open a new den" @click="toast('In the real app this opens a new den in one click. No account needed.')">${icon('plus')}</button>
     </nav>
@@ -83,7 +83,7 @@ function preview() {
         <button type="submit" class="cbtn send" aria-label="Send">${icon('send')}</button>
       </form>
     </section>
-    <aside class="app-members" aria-label="Members"><p class="app-cat">Online, 4 of 8</p><ul>${mlist}</ul><p class="mem-note">${art('mesh', 'hi')}Everyone is connected to everyone, directly.</p></aside>
+    <aside class="app-members" aria-label="Members"><p class="app-cat">Online, 4 of 5</p><ul>${mlist}</ul><p class="mem-note">${art('mesh', 'hi')}Everyone is connected to everyone, directly.</p></aside>
   </div>
   <p class="pv-toast" role="status" v-show="PV.toast" v-text="PV.toast"></p>
 </div>`;
@@ -125,7 +125,7 @@ const USES = [
 const COMPARE = [
   ['Where messages go', 'Through the provider\'s servers, which store and forward them', 'Straight between the members\' browsers'],
   ['Account', 'Usually an email or a phone number and a password', 'A local profile on your device: username, avatar and identity key'],
-  ['Group size', 'Large communities, thousands of people', 'Up to 8 people per den, or just you and one friend'],
+  ['Group size', 'Large communities, thousands of people', 'Up to 5 people per den, or just you and one friend'],
   ['Friends who are away', 'Messages wait on the server until they come back', 'Everyone chats while online. History syncs from members who are online'],
   ['How people join', 'Public servers, search and invite links', 'Invite only. Nothing to discover'],
   ['Encryption', 'Depends on the app: to the server, or end to end', 'End to end by WebRTC, plus an optional passphrase'],
@@ -137,7 +137,7 @@ const COMPARE = [
 export const FAQ = [
   ['Is howlden really serverless?', 'Yes. The site and the app are static files on GitHub Pages, and once the page is loaded your messages, voice, video and files go directly between browsers. To find a route, each browser asks a public STUN server one question, "what is my public address?". When no direct route exists, an optional TURN relay forwards encrypted packets it cannot read. No server of ours ever sees your conversations.'],
   ['Do I need an account or to sign up?', 'No email, no password and no phone number. You create a local profile: a username, an avatar and a cryptographic identity key (Ed25519 where the browser supports it), all made in your browser and kept on your device. The dens you join see your name, your avatar and your public key, nothing else.'],
-  ['How many people can be in a den?', 'Up to 8, or just two of you. A den is a full mesh: every member sends their audio, video and messages to every other member directly. That keeps everything private, but upload bandwidth grows with each person, so for big communities a server based tool is the better fit.'],
+  ['How many people can be in a den?', 'Up to 5, or just two of you. A den is a full mesh: every member sends their audio, video and messages to every other member directly. That keeps everything private, but upload bandwidth grows with each person, so for big communities a server based tool is the better fit.'],
   ['Do my friends need to be online?', 'Yes, to talk everyone has to be online at the same time, because there is no server holding messages. When you come back, members who are online share the messages you missed, but if nobody is online the den is quiet.'],
   ['Why can\'t I connect to a friend?', 'Most often both of you are behind a strict NAT (some office, school, hotel and mobile carrier networks). Then a direct connection is not possible and you need a TURN relay. howlden tells you in plain words when this happens, and you can add your own TURN server in Settings.'],
   ['Is howlden end to end encrypted?', 'Yes. WebRTC encrypts every connection end to end with DTLS (and SRTP for audio and video). You can add a den passphrase for a second layer, and compare the connection fingerprint to make sure nobody is in the middle. Your security still depends on your device: encryption cannot protect a device that is already compromised.'],
@@ -243,7 +243,7 @@ export function homeBody({ guides, qr }) {
         <a href="app/" class="btn-big btn-white">${art('den')}Open howlden in your browser</a>
         <a href="#invite" class="btn-big btn-night">How it works</a>
       </div>
-      <p class="hx-note">${icon('check')}Free and open source. Desktop and phone. A den for two, or a pack of up to 8.</p>
+      <p class="hx-note">${icon('check')}Free and open source. Desktop and phone. A den for two, or a pack of up to 5.</p>
     </div>
     <div class="hx-scene">
       <div class="monitor">${preview()}</div>
@@ -269,7 +269,7 @@ export function homeBody({ guides, qr }) {
 ${panel({ id: 'chat', tone: 'pink', media: chatMock(), kicker: `${art('text-channel')}Text channels`, title: 'Chat, react, howl', text: 'Text channels with bold, italic, spoilers, code and quotes. Reply to a friend, mention the whole pack, react with a howl or a campfire, drop a file that goes straight from your browser to theirs. It all feels like the chat app you know, minus the company in the middle.', extra: `<a href="chat-without-signing-up.html" class="more">Chat without signing up${icon('arrow')}</a>` })}
 ${panel({ id: 'share', flip: true, tone: 'mint', media: shareMock(), kicker: `${art('screen-share')}Voice, video, screen share`, title: 'Show the pack your screen, no server watching', text: 'Share a game, a tab or your whole screen while the den talks it over. Turn on cameras, watch the ring light up around whoever speaks. Every stream travels directly between you, sealed with DTLS and SRTP.', extra: `<a href="screen-share-without-app.html" class="more">Screen share without an app${icon('arrow')}</a>` })}
 ${panel({ id: 'voice', tone: 'fire', media: voiceMock(), kicker: `${art('voice-channel')}Voice channels`, title: 'Take a seat by the fire', text: 'Voice channels are campfires that never go out. See which wolves are already howling, click to sit down, click to leave. No ringing, no meeting links, no scheduling. Mute and deafen are one click away, and a call works just as well with one friend as with the whole pack.', extra: `<a href="voice-chat-in-browser-no-download.html" class="more">Voice chat with no download${icon('arrow')}</a>` })}
-${panel({ id: 'around', flip: true, tone: 'night', media: membersMock(), kicker: `${art('pack')}Members`, title: 'Know your whole pack at a glance', text: 'The member list shows which wolves are in the den, who is howling in voice, who is sharing a screen and who wandered off. A den holds up to 8, invite only, so every name on the list is someone you let in.', extra: `<a href="#mesh" class="more">Why a den holds 8${icon('arrow')}</a>` })}
+${panel({ id: 'around', flip: true, tone: 'night', media: membersMock(), kicker: `${art('pack')}Members`, title: 'Know your whole pack at a glance', text: 'The member list shows which wolves are in the den, who is howling in voice, who is sharing a screen and who wandered off. A den holds up to 5, invite only, so every name on the list is someone you let in.', extra: `<a href="#mesh" class="more">Why a den holds 8${icon('arrow')}</a>` })}
 </div>
 
 <div class="marquee" aria-hidden="true"><div class="mq-track"><div class="mq-row">${band}</div><div class="mq-row">${band}</div></div></div>
@@ -338,8 +338,8 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
   <div class="wrap mesh-grid">
     ${pic('', 'pack-mesh', 'Eight wolves linked to each other like stars in a constellation')}
     <div>
-      <header class="sec-head left"><p class="kicker">${art('pack')}Up to 8</p><h2 id="mesh-title" class="mega mega-md">Why a den holds 8 wolves</h2></header>
-      <p>In a den, everyone is linked to everyone. With 4 members that is 6 links, with 8 members it is 28. Each member sends their voice and video to each of the others, so upload bandwidth grows with the size of the pack. Audio is light; video with 8 cameras on asks a lot of a home connection.</p>
+      <header class="sec-head left"><p class="kicker">${art('pack')}Up to 5</p><h2 id="mesh-title" class="mega mega-md">Why a den holds 8 wolves</h2></header>
+      <p>In a den, everyone is linked to everyone. With 4 members that is 6 links, with 5 members it is 10. Each member sends their voice and video to each of the others, so upload bandwidth grows with the size of the pack. Audio is light; video with 5 cameras on asks a lot of a home connection.</p>
       <p>Eight is where a mesh still feels good on ordinary connections. For bigger groups, a server based tool is the honest answer, and that is fine.</p>
       <ul class="ticks"><li>${icon('check')}<span>Text, reactions and files are tiny and stay quick in a full den.</span></li><li>${icon('check')}<span>If two members cannot link directly, another member forwards their messages.</span></li><li>${icon('check')}<span>When both sides sit behind a strict NAT, a TURN relay can carry the encrypted traffic. <a href="webrtc-connection-failed-strict-nat.html">Fixing a failed connection</a>.</span></li></ul>
     </div>
@@ -394,7 +394,7 @@ export function homeJsonLd(guides) {
       isAccessibleForFree: true,
       license: 'https://opensource.org/licenses/MIT',
       softwareVersion: '0.1.0',
-      featureList: ['Local profile with a cryptographic identity key, no email or password', 'Text channels', 'Voice channels', 'Video calls', 'Screen share', 'File sharing', 'Reactions', 'QR code invites', 'End to end encryption with WebRTC', 'Optional passphrase', 'Connection fingerprint', 'Installable PWA', 'Up to 8 people per den'],
+      featureList: ['Local profile with a cryptographic identity key, no email or password', 'Text channels', 'Voice channels', 'Video calls', 'Screen share', 'File sharing', 'Reactions', 'QR code invites', 'End to end encryption with WebRTC', 'Optional passphrase', 'Connection fingerprint', 'Installable PWA', 'Up to 5 people per den'],
       screenshot: `${SITE}og.png`,
       image: `${SITE}assets/mascot.svg`,
       author: { '@type': 'Person', name: 'Alexandre Kohler', url: 'https://github.com/kwy404', sameAs: ['https://www.linkedin.com/in/alexandre-silva-173687256/'] },

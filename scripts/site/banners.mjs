@@ -15,7 +15,7 @@ function stars(P, w, h, count, seed) {
   return out;
 }
 
-const PILLS = ['No account', 'End to end encrypted', 'Invite only', 'Up to 8 people'];
+const PILLS = ['No account', 'End to end encrypted', 'Invite only', 'Up to 5 people'];
 
 /** README banner, 1280 by 400. */
 export function banner(theme = 'light') {

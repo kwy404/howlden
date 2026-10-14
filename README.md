@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/banner-dark.svg">
-    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/banner.svg" width="880" alt="howlden banner: Luna the wolf howls into her headset mic. Serverless group chat, voice and video in your browser, with no account, end to end encryption, invites only and up to 8 people">
+    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/banner.svg" width="880" alt="howlden banner: Luna the wolf howls into her headset mic. Serverless group chat, voice and video in your browser, with no account, end to end encryption, invites only and up to 5 people">
   </picture>
 </p>
 
@@ -24,7 +24,7 @@
   <a href="https://github.com/kwy404/howlden/blob/main/i18n/README.pt-BR.md">Leia em Português (pt-BR)</a>
 </p>
 
-**howlden is a free, open source group chat that runs entirely in your browser, with the layout you know from gaming chat apps: dens (servers), text channels, voice channels, video and screen share.** There is no account and no sign up: you create a local profile (a username, an avatar and an identity key made on your device). You invite friends with a link or a QR code, and everything flows directly between your browsers over WebRTC, end to end encrypted. No server of ours ever sees your messages, voice, video or files. A den holds up to 8 people, or just you and one friend.
+**howlden is a free, open source group chat that runs entirely in your browser, with the layout you know from gaming chat apps: dens (servers), text channels, voice channels, video and screen share.** There is no account and no sign up: you create a local profile (a username, an avatar and an identity key made on your device). You invite friends with a link or a QR code, and everything flows directly between your browsers over WebRTC, end to end encrypted. No server of ours ever sees your messages, voice, video or files. A den holds up to 5 people, or just you and one friend.
 
 <p align="center">
   <a href="https://kwy404.github.io/howlden/"><img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@main/assets/social-preview.png" width="820" alt="The howlden website: a den for your pack, no server in sight, with a pack of wolves around a campfire"></a>
@@ -55,7 +55,7 @@ Go to **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)**,
 
 | | |
 | --- | --- |
-| **Dens** | A group space with text channels, voice channels and a member list. Each den is its own private circle of up to 8 people. |
+| **Dens** | A group space with text channels, voice channels and a member list. Each den is its own private circle of up to 5 people. |
 | **Text channels** | Messages with bold, italic, strike, spoilers, code, quotes, lists and links. Mentions, replies, edits, deletes and reactions. |
 | **Voice channels** | Take a seat and howl. A ring lights up around whoever is speaking. Mute and deafen are one click away. |
 | **Video and screen share** | Turn on a camera or share a window, a tab or the whole screen inside any voice channel. |
@@ -90,10 +90,10 @@ Private is not the same as anonymous: members of a den connect directly, so they
 
 ## Honest limits
 
-- **Up to 8 people per den.** A den is a full mesh: everyone sends their audio and video to everyone else. Upload bandwidth grows with each person, so for large communities a server based tool is the better fit.
+- **Up to 5 people per den.** A den is a full mesh: everyone sends their audio and video to everyone else. Upload bandwidth grows with each person, so for large communities a server based tool is the better fit.
 - **Everyone has to be online.** There is no server holding messages. When you come back, members who are online share what you missed; if nobody is online, the den is quiet.
 - **Strict NAT on both sides** (some office, school, hotel and mobile carrier networks) can block a direct connection. Then you need a TURN relay; howlden tells you when this happens. See [fixing a failed connection](https://kwy404.github.io/howlden/webrtc-connection-failed-strict-nat.html).
-- **Video is heavy.** Audio stays light even in a full den; eight cameras ask a lot of a home connection.
+- **Video is heavy.** Audio stays light even in a full den; five cameras ask a lot of a home connection.
 - **Clearing your browser data removes your profile**, unless you saved an encrypted backup.
 
 ## Server based or direct
@@ -104,7 +104,7 @@ Both approaches are good at different things. This compares approaches, not bran
 | --- | --- | --- |
 | Where messages go | Through the provider's servers, which store and forward them | Straight between the members' browsers |
 | Account | Usually an email or a phone number and a password | A local profile on your device |
-| Group size | Large communities | Up to 8 per den, or just two of you |
+| Group size | Large communities | Up to 5 per den, or just two of you |
 | Friends who are away | Messages wait on the server | Everyone chats while online; history syncs from members who are online |
 | How people join | Public servers, search and invite links | Invite only |
 | Encryption | Depends on the app | End to end by WebRTC, plus an optional passphrase |
@@ -155,7 +155,7 @@ Yes. WebRTC encrypts every connection with DTLS and SRTP, a passphrase can add a
 Usually because both sides are behind a strict NAT. Add a TURN server in Settings. See [WebRTC connection failed](https://kwy404.github.io/howlden/webrtc-connection-failed-strict-nat.html).
 
 ### How many people can join?
-Up to 8 per den. It works just as well for two.
+Up to 5 per den. It works just as well for two.
 
 ## Guides
 

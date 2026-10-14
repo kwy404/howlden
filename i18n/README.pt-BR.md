@@ -21,7 +21,7 @@
   <a href="https://github.com/kwy404/howlden/blob/main/README.md">Read in English</a>
 </p>
 
-**O howlden é um chat em grupo gratuito e de código aberto que roda inteiro no navegador, com o layout que você já conhece dos apps de chat para jogos: dens (servidores), canais de texto, canais de voz, vídeo e compartilhamento de tela.** Não tem conta nem cadastro: você cria um perfil local (nome de usuário, avatar e uma chave de identidade gerada no seu aparelho). Você convida a turma com um link ou QR code, e tudo vai direto entre os navegadores por WebRTC, com criptografia de ponta a ponta. Nenhum servidor nosso vê suas mensagens, voz, vídeo ou arquivos. Um den comporta até 8 pessoas, ou só você e um amigo.
+**O howlden é um chat em grupo gratuito e de código aberto que roda inteiro no navegador, com o layout que você já conhece dos apps de chat para jogos: dens (servidores), canais de texto, canais de voz, vídeo e compartilhamento de tela.** Não tem conta nem cadastro: você cria um perfil local (nome de usuário, avatar e uma chave de identidade gerada no seu aparelho). Você convida a turma com um link ou QR code, e tudo vai direto entre os navegadores por WebRTC, com criptografia de ponta a ponta. Nenhum servidor nosso vê suas mensagens, voz, vídeo ou arquivos. Um den comporta até 5 pessoas, ou só você e um amigo.
 
 ## Sumário
 
@@ -46,7 +46,7 @@ Acesse **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)**
 
 | | |
 | --- | --- |
-| **Dens** | Um espaço do grupo com canais de texto, canais de voz e lista de membros. Cada den é um círculo privado de até 8 pessoas. |
+| **Dens** | Um espaço do grupo com canais de texto, canais de voz e lista de membros. Cada den é um círculo privado de até 5 pessoas. |
 | **Canais de texto** | Negrito, itálico, tachado, spoiler, código, citações, listas e links. Menções, respostas, edição, exclusão e reações. |
 | **Canais de voz** | Entre e fale. Um anel acende em volta de quem está falando. Mutar e ensurdecer a um clique. |
 | **Vídeo e tela** | Ligue a câmera ou compartilhe uma janela, uma aba ou a tela inteira em qualquer canal de voz. |
@@ -80,7 +80,7 @@ Privado não é o mesmo que anônimo: os membros se conectam direto, então veem
 
 ## Limites, sem rodeios
 
-- **Até 8 pessoas por den.** Num mesh completo cada um envia áudio e vídeo para cada um dos outros; para comunidades grandes, uma ferramenta com servidor é a escolha certa.
+- **Até 5 pessoas por den.** Num mesh completo cada um envia áudio e vídeo para cada um dos outros; para comunidades grandes, uma ferramenta com servidor é a escolha certa.
 - **Todos precisam estar online.** Não há servidor guardando mensagens. Quando você volta, quem está online compartilha o que você perdeu.
 - **NAT restrito dos dois lados** (algumas redes de empresa, escola, hotel e operadora móvel) pode bloquear a conexão direta. Aí é preciso um relay TURN, e o howlden avisa quando isso acontece.
 - **Limpar os dados do navegador apaga o perfil**, a não ser que você tenha salvo um backup criptografado.

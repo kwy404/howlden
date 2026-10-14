@@ -233,7 +233,7 @@
 </section>
 <section id="from-two-to-a-den"><h2>From two people to a whole den</h2>
 <p>Everything above describes one connection. A howlden den is a full mesh: every member has its own peer connection, ICE path and DTLS keys with every other member. After the first invite round trip, howlden introduces the new member to the rest of the den over the encrypted connections that already exist.</p>
-<p>The trade off is upload: your browser sends a copy of your voice to each person, so with eight people you upload seven streams. Opus voice is light, so audio holds up well, but video is much heavier, which is the main reason a den is capped at 8 people. Server based tools instead use a media server that receives one stream from you and forwards it to everyone, which scales to large meetings. The mesh keeps traffic between the people in the room, and the server approach handles crowds.</p>
+<p>The trade off is upload: your browser sends a copy of your voice to each person, so with five people you upload four streams. Opus voice is light, so audio holds up well, but video is much heavier, which is the main reason a den is capped at 5 people. Server based tools instead use a media server that receives one stream from you and forwards it to everyone, which scales to large meetings. The mesh keeps traffic between the people in the room, and the server approach handles crowds.</p>
 <p>One more honest limit: with nothing in the middle, everyone has to be online at the same time.</p>
 </section>
 <section id="try-it"><h2>See it for yourself</h2>
