@@ -1,6 +1,6 @@
 // Invite, join, scan and den management flows.
 
-import { h, copyText } from './dom.js';
+import { h } from './dom.js';
 import { icon } from './icons.js';
 import { confirmDialog, modal, promptDialog } from './ui-modal.js';
 import { encodeQR, qrPath } from '../core/qr.js';
@@ -59,48 +59,6 @@ export function failureBox(app, diagnosis, retry) {
       retry ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: retry }, icon('shuffle', { size: 16 }), t('fail.retry')) : null,
     ),
   );
-}
-
-export function shareRow(app, link, title) {
-  const t = app.t;
-  const copyBtn = h(
-    'button',
-    {
-      class: 'btn btn-brand btn-sm',
-      type: 'button',
-      onclick: async () => {
-        await copyText(link);
-        copyBtn.lastChild.textContent = t('invite.copied');
-        setTimeout(() => (copyBtn.lastChild.textContent = t('invite.copy')), 1600);
-      },
-    },
-    icon('copy', { size: 16 }),
-    h('span', null, t('invite.copy')),
-  );
-  return h(
-    'div',
-    { class: 'share' },
-    h('div', { class: 'share-qr' }, qrElement(link, title)),
-    h(
-      'div',
-      { class: 'share-side' },
-      h('input', { class: 'input field-input mono', readonly: true, value: link, 'aria-label': title, onfocus: (e) => e.target.select() }),
-      h('div', { class: 'row-btns' }, copyBtn, navigator.share ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => navigator.share({ title: 'howlden', url: link }).catch(() => {}) }, icon('share', { size: 16 }), t('invite.share')) : null),
-    ),
-  );
-}
-
-/** Try the share sheet, then fall back to copying. Returns 'shared', 'copied' or 'none'. */
-export async function shareOrCopy(link, title) {
-  if (navigator.share) {
-    try {
-      await navigator.share({ title, url: link });
-      return 'shared';
-    } catch (err) {
-      if (err?.name === 'AbortError') return 'none';
-    }
-  }
-  return (await copyText(link)) ? 'copied' : 'none';
 }
 
 /** Scan a QR code with the camera through BarcodeDetector. */

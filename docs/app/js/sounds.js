@@ -3,8 +3,9 @@
 // and "Do not disturb" silences everything except feedback for your own
 // actions (mute, deafen, joining and leaving a call).
 
-export const SOUND_NAMES = ['join', 'leave', 'peerJoin', 'peerLeave', 'mute', 'unmute', 'deafen', 'message', 'mention', 'ring', 'screen', 'connected', 'lost'];
-const OWN_ACTIONS = new Set(['join', 'leave', 'mute', 'unmute', 'deafen', 'undeafen']);
+export const SOUND_NAMES = ['join', 'leave', 'peerJoin', 'peerLeave', 'mute', 'unmute', 'deafen', 'message', 'mention', 'ring', 'screen', 'connected', 'lost', 'record'];
+// Feedback for your own actions, and the recording notice, play even in Do not disturb.
+const OWN_ACTIONS = new Set(['join', 'leave', 'mute', 'unmute', 'deafen', 'undeafen', 'record']);
 
 /** One enveloped oscillator note. */
 function note(ctx, out, at, { freq, to, type = 'sine', dur = 0.12, gain = 0.6, attack = 0.006 }) {
@@ -42,6 +43,7 @@ export const RECIPES = {
   screen: (ctx, out, t) => note(ctx, out, t, { freq: 392, to: 987.77, dur: 0.28, gain: 0.35 }),
   connected: (ctx, out, t) => seq(ctx, out, t, [[523.25], [659.25], [783.99]], { dur: 0.14, gain: 0.35 }),
   lost: (ctx, out, t) => seq(ctx, out, t, [[523.25], [415.3], [329.63]], { dur: 0.16, gain: 0.3 }),
+  record: (ctx, out, t) => seq(ctx, out, t, [[880], [880, 0.16], [1318.51, 0.32]], { type: 'sine', dur: 0.1, gain: 0.4, attack: 0.004 }),
 };
 
 export class Sounds {

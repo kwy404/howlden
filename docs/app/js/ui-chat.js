@@ -1,12 +1,13 @@
-// The text channel view: message list, reactions, replies, edits, files and
-// the composer with mentions and attachments.
+// The text channel view: message list, reactions, stickers, replies, edits,
+// files and the composer with mentions and attachments.
 
 import { h, replace, formatDay } from './dom.js';
 import { icon, reactionIcon } from './icons.js';
+import { stickerEl } from './stickers.js';
 import { avatarImg, closePopover, colorOf, idBadge, memberCard, popover } from './ui-shell.js';
 import { confirmDialog, modal, toast } from './ui-modal.js';
 import { plainText, render as renderMarkdown } from '../core/markdown.js';
-import { REACTIONS, reactors } from '../core/history.js';
+import { REACTIONS, STICKERS, reactors } from '../core/history.js';
 import { formatSize, MAX_FILE } from '../core/chunks.js';
 
 const GROUP_MS = 7 * 60 * 1000;
@@ -26,7 +27,8 @@ export function createChat(app) {
   const fileInput = h('input', { type: 'file', multiple: true, hidden: true, tabindex: '-1' });
   const attachBtn = h('button', { class: 'icon-btn composer-attach', type: 'button', onclick: () => fileInput.click() }, icon('attach', { size: 22 }));
   const sendBtn = h('button', { class: 'icon-btn composer-send', type: 'submit' }, icon('send', { size: 20 }));
-  const form = h('form', { class: 'composer' }, replyBar, attachBar, suggest, h('div', { class: 'composer-box' }, attachBtn, input, sendBtn), fileInput, typingLine);
+  const stickerBtn = h('button', { class: 'icon-btn composer-sticker', type: 'button', 'aria-haspopup': 'menu', onclick: () => stickerPicker() }, icon('sticker', { size: 22 }));
+  const form = h('form', { class: 'composer' }, replyBar, attachBar, suggest, h('div', { class: 'composer-box' }, attachBtn, input, stickerBtn, sendBtn), fileInput, typingLine);
   const dropHint = h('div', { class: 'drop-hint', hidden: true }, h('div', null, icon('file', { size: 40 }), h('p', null, '')));
   const el = h('section', { class: 'hl-chat' }, scroller, form, dropHint);
 
@@ -42,6 +44,9 @@ export function createChat(app) {
     drafts: new Map(),
     suggestIndex: 0,
     suggestItems: [],
+    // Reaction counts already on screen, so only new ones pop; primed once the first render is done.
+    counts: new Map(),
+    primed: false,
   };
 
   const memberName = (id) => state.session?.member(id)?.name || t('chat.unknown');
@@ -66,6 +71,8 @@ export function createChat(app) {
     attachBtn.setAttribute('aria-label', t('chat.attach'));
     attachBtn.dataset.tip = t('chat.attach');
     sendBtn.setAttribute('aria-label', t('chat.send'));
+    stickerBtn.setAttribute('aria-label', t('chat.stickers'));
+    stickerBtn.dataset.tip = t('chat.stickers');
     dropHint.querySelector('p').textContent = t('chat.dropHere');
   }
 
@@ -90,15 +97,19 @@ export function createChat(app) {
 
   function reactionRow(rec) {
     const row = h('div', { class: 'reactions' });
+    const before = state.counts.get(rec.id);
+    const now = {};
     for (const key of REACTIONS) {
       const who = reactors(rec, key);
+      now[key] = who.length;
       if (!who.length) continue;
       const mine = who.includes(app.profile.id);
+      const grew = state.primed && who.length > (before?.[key] || 0);
       row.append(
         h(
           'button',
           {
-            class: `reaction${mine ? ' mine' : ''}`,
+            class: `reaction${mine ? ' mine' : ''}${grew ? ' pop' : ''}`,
             type: 'button',
             'aria-pressed': String(mine),
             'aria-label': `${key}, ${who.length}`,
@@ -110,6 +121,7 @@ export function createChat(app) {
         ),
       );
     }
+    state.counts.set(rec.id, now);
     return row.childElementCount ? row : null;
   }
 
@@ -155,17 +167,18 @@ export function createChat(app) {
       { class: 'msg-reply', type: 'button', 'aria-label': t('chat.jump'), onclick: () => jumpTo(rec.reply) },
       target ? avatarImg(author?.avatar || target.author, { size: 16 }) : null,
       h('span', { class: 'msg-reply-name', style: { color: colorOf(author, target?.author) } }, target ? `@${author?.name || t('chat.unknown')}` : ''),
-      h('span', { class: 'msg-reply-text' }, target ? (target.deleted ? t('chat.deleted') : plainText(target.text, resolveMention).slice(0, 120) || (target.files?.[0]?.name ?? '')) : t('chat.deleted')),
+      h('span', { class: 'msg-reply-text' }, target ? (target.deleted ? t('chat.deleted') : target.sticker ? t('chat.stickerSent') : plainText(target.text, resolveMention).slice(0, 120) || (target.files?.[0]?.name ?? '')) : t('chat.deleted')),
     );
   }
 
-  function buildMessage(rec, grouped) {
+  function buildMessage(rec, grouped, fresh = false) {
     const s = state.session;
     const author = s.member(rec.author);
     const mine = rec.author === app.profile.id;
     const mentioned = !mine && !rec.deleted && s.mentionsMe(rec);
     const content = h('div', { class: 'msg-content' });
     if (rec.deleted) content.append(h('em', { class: 'msg-deleted' }, t('chat.deleted')));
+    else if (rec.sticker) content.append(stickerEl(rec.sticker, { size: 120, label: t(`chat.sticker.${rec.sticker}`), play: fresh && Date.now() - rec.ts < 60000 }));
     else {
       content.append(renderMarkdown(rec.text, { document, resolveMention }));
       if (rec.editedAt) content.append(h('span', { class: 'msg-edited', title: timeLabel(rec.editedAt) }, ` ${t('chat.edited')}`));
@@ -177,7 +190,7 @@ export function createChat(app) {
           { class: 'msg-actions', role: 'toolbar', 'aria-label': 'Message actions' },
           h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.react'), 'data-tip': t('chat.react'), onclick: (e) => reactionPicker(rec, e.currentTarget) }, icon('react', { size: 18 })),
           h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.reply'), 'data-tip': t('chat.reply'), onclick: () => startReply(rec) }, icon('reply', { size: 18 })),
-          mine ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.edit'), 'data-tip': t('chat.edit'), onclick: () => startEdit(rec.id) }, icon('edit', { size: 18 })) : null,
+          mine && !rec.sticker ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.edit'), 'data-tip': t('chat.edit'), onclick: () => startEdit(rec.id) }, icon('edit', { size: 18 })) : null,
           mine ? h('button', { class: 'icon-btn danger', type: 'button', 'aria-label': t('chat.delete'), 'data-tip': t('chat.delete'), onclick: () => deleteMessage(rec) }, icon('trash', { size: 18 })) : null,
         );
     const nameBtn = h('button', { class: 'msg-author', type: 'button', style: { color: colorOf(author, rec.author) }, onclick: (e) => memberCard(app, s, { ...(author || { id: rec.author, name: t('chat.unknown') }), id: rec.author, online: !!author?.online || mine }, e.currentTarget) }, author?.name || t('chat.unknown'));
@@ -231,7 +244,7 @@ export function createChat(app) {
       if (rec && typeof rec === 'object' && rec.id) {
         const sig = signature(rec, extra, state.editing === rec.id);
         if (!node || node.sig !== sig) {
-          const el2 = state.editing === rec.id ? editBox(rec) : buildMessage(rec, extra);
+          const el2 = state.editing === rec.id ? editBox(rec) : buildMessage(rec, extra, !node && state.primed);
           node?.el.replaceWith(el2);
           node = { el: el2, sig };
           state.nodes.set(key, node);
@@ -256,6 +269,7 @@ export function createChat(app) {
     }
     if (keepScroll) scroller.scrollTop = scroller.scrollHeight - before;
     else if (stick) scrollBottom();
+    state.primed = true;
     maybeRead();
   }
 
@@ -306,6 +320,44 @@ export function createChat(app) {
               },
             },
             reactionIcon(key, { size: 26 }),
+          ),
+        ),
+      ),
+      { placement: 'above' },
+    );
+  }
+
+  function stickerPicker() {
+    const s = state.session;
+    if (!s) return;
+    popover(
+      stickerBtn,
+      h(
+        'div',
+        { class: 'sticker-picker', role: 'menu', 'aria-label': t('chat.stickers') },
+        STICKERS.map((key) =>
+          h(
+            'button',
+            {
+              class: 'sticker-pick',
+              type: 'button',
+              role: 'menuitem',
+              'aria-label': t(`chat.sticker.${key}`),
+              title: t(`chat.sticker.${key}`),
+              onclick: async () => {
+                closePopover();
+                const channel = state.channel;
+                try {
+                  await s.postSticker(channel, key);
+                } catch (err) {
+                  console.warn('howlden sticker:', err);
+                  toast(t('chat.sendFailed'), 'error');
+                }
+                scrollBottom();
+                input.focus({ preventScroll: true });
+              },
+            },
+            stickerEl(key, { size: 64 }),
           ),
         ),
       ),
@@ -663,6 +715,8 @@ export function createChat(app) {
         state.limit = PAGE;
         state.reply = null;
         state.editing = null;
+        state.counts.clear();
+        state.primed = false;
         state.newSince = session.den.lastRead?.[channelId] || 0;
         input.value = state.drafts.get(channelId) || '';
         autosize(input);
@@ -684,6 +738,7 @@ export function createChat(app) {
     rebuild() {
       for (const node of state.nodes.values()) node.el.remove();
       state.nodes.clear();
+      state.primed = false;
       labels();
       sync();
     },

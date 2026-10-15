@@ -16,7 +16,6 @@ import { renderDmHeader, renderHome } from './ui-home.js';
 import { avatarSrc, loginCard, pinScreen } from './ui-account.js';
 import { confirmDialog, modal, toast } from './ui-modal.js';
 import {
-  codeErrorText,
   createChannelModal,
   createDenModal,
   deleteChannelFlow,
@@ -24,18 +23,19 @@ import {
   passphraseFlow,
   renameChannelFlow,
   scanModal,
-  shareOrCopy,
 } from './ui-flows.js';
 import { openSettings, restoreModal } from './ui-settings.js';
-import { inviteModal, joinEntryModal, joinModal, joinWordsModal } from './ui-pair.js';
+import { inviteModal, joinEntryModal, joinWordsModal } from './ui-pair.js';
 import { wordsFromLink, resolvePhrase } from '../core/words.js';
 import { buildIceServers, RtcLink } from '../core/rtc.js';
 import { newDen, visibleChannels } from '../core/denstate.js';
 import { randomId } from '../core/crypto.js';
 import { directId } from '../core/identity.js';
-import { codeLink, findCode, invitePayload, packCode, readInvite, readReply, unpackCode } from '../core/invite.js';
+import { codeLink, findCode, invitePayload, packCode } from '../core/invite.js';
 import { MeshError } from '../core/mesh.js';
 import { plainText } from '../core/markdown.js';
+import { formatDuration, recordingFileName } from '../core/call.js';
+import { formatSize } from '../core/chunks.js';
 
 const settings = store.loadSettings();
 
@@ -50,7 +50,6 @@ const app = {
   media: null,
   sessions: new Map(),
   invites: new Map(),
-  pendingInvite: null,
   activeDen: null,
   channelId: null,
   view: 'home',
@@ -82,7 +81,7 @@ app.setLang = (lang, gate = false) => {
   app.t = translator(lang);
   document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
   staticText();
-  if (gate && !app.profile) loginCard(app, { invite: app.pendingInvite });
+  if (gate && !app.profile) loginCard(app, { words: app.pendingWords });
   else if (app.profile) {
     chat?.rebuild();
     app.render();
@@ -105,25 +104,16 @@ async function boot() {
   document.documentElement.lang = app.lang === 'pt' ? 'pt-BR' : 'en';
   staticText();
   registerWorker();
-  const hash = findCode(location.hash);
-  if (hash?.kind === 'r') {
-    history.replaceState(null, '', location.pathname + location.search);
-    if (await handOffReply(hash.code)) return;
-    app.pendingReply = hash;
-  }
+  // A QR code opens the app with the six words in the address.
   const hashWords = wordsFromLink(location.hash);
   if (hashWords) {
     history.replaceState(null, '', location.pathname + location.search);
     const res = resolvePhrase(hashWords);
     if (res.ok) app.pendingWords = res.words;
   }
-  if (hash?.kind === 'i') {
+  if (findCode(location.hash)) {
     history.replaceState(null, '', location.pathname + location.search);
-    try {
-      app.pendingInvite = readInvite(await unpackCode(hash.code));
-    } catch (err) {
-      toast(codeErrorText(app.t, err), 'error');
-    }
+    toast(app.t('fail.oldLink'), 'info', 9000);
   }
   let acc;
   try {
@@ -135,7 +125,7 @@ async function boot() {
   $('#boot').hidden = true;
   if (acc.state === 'ready') return enter(acc);
   if (acc.state === 'locked') return pinScreen(app);
-  loginCard(app, { invite: app.pendingInvite, words: app.pendingWords });
+  loginCard(app, { words: app.pendingWords });
 }
 
 app.createProfile = async ({ name, avatar, accent }) => {
@@ -196,20 +186,10 @@ async function enter(acc) {
   for (const den of await store.listDens()) await addSession(den);
   setupShell();
   app.openHome();
-  if (app.pendingInvite) {
-    const invite = app.pendingInvite;
-    app.pendingInvite = null;
-    startJoin(invite);
-  }
   if (app.pendingWords) {
     const words = app.pendingWords;
     app.pendingWords = null;
     joinWordsModal(app, words);
-  }
-  if (app.pendingReply) {
-    const r = app.pendingReply;
-    app.pendingReply = null;
-    manualReply(r.code);
   }
 }
 
@@ -276,6 +256,7 @@ function wireSession(s) {
     if (n.kind === 'bad-passphrase') s.leave();
   });
   s.on('incoming', (rec) => notify(s, rec));
+  s.on('burst', (b) => isActive() && voice.burst(s, b));
 }
 
 /** Join, leave and screen share sounds for the voice channel I am in. */
@@ -284,12 +265,21 @@ function voiceSounds(s) {
   const now = new Map();
   if (mine) for (const [peerId, v] of s.voice) if (v.channel === mine) now.set(peerId, v);
   const before = s._voiceSeen || new Map();
+  const name = (id) => s.member(id)?.name || app.t('chat.unknown');
   if (mine && s._voiceSeenChannel === mine) {
     for (const [id, v] of now) {
       if (!before.has(id)) app.sounds.play('peerJoin');
       else if (v.screen && !before.get(id).screen) app.sounds.play('screen');
+      if (v.rec && !before.get(id)?.rec) {
+        app.sounds.play('record');
+        toast(app.t('voice.rec.started', { name: name(id) }), 'info', 7000);
+      }
     }
     for (const id of before.keys()) if (!now.has(id)) app.sounds.play('peerLeave');
+  } else if (mine) {
+    // Just joined: say so if someone here is already recording.
+    const recorders = [...now].filter(([, v]) => v.rec).map(([id]) => name(id));
+    if (recorders.length) toast(app.t('voice.rec.already', { names: recorders.join(', ') }), 'info', 7000);
   }
   s._voiceSeen = now;
   s._voiceSeenChannel = mine;
@@ -304,7 +294,7 @@ function notify(s, rec) {
   const author = s.member(rec.author)?.name || app.t('chat.unknown');
   const channel = s.den.channels.find((c) => c.id === rec.channel)?.name || '';
   const title = s.isDirect ? author : app.t('notice.mention', { name: author, channel });
-  const body = plainText(rec.text, (id) => s.member(id)).slice(0, 140) || rec.files?.[0]?.name || '';
+  const body = rec.sticker ? app.t('chat.stickerSent') : plainText(rec.text, (id) => s.member(id)).slice(0, 140) || rec.files?.[0]?.name || '';
   const opts = { body, tag: rec.id, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { den: s.id, channel: rec.channel } };
   navigator.serviceWorker?.ready.then((reg) => reg.showNotification(title, opts)).catch(() => new Notification(title, opts));
 }
@@ -406,78 +396,8 @@ app.answerInvite = async (invite, passphrase) => {
   return { session: s, reply };
 };
 
-function startJoin(invite) {
-  if (invite.host.id === app.profile.id) return toast(app.t('fail.self'), 'error');
-  joinModal(app, invite);
-}
-
-/** A code from the URL, a paste or a scan. */
-app.handleCode = async (found, { fromGate = false, onError = (m) => toast(m, 'error') } = {}) => {
-  try {
-    const data = await unpackCode(found.code);
-    if (data.k === 'i') {
-      const invite = readInvite(data);
-      if (!app.profile) {
-        app.pendingInvite = invite;
-        if (fromGate) loginCard(app, { invite });
-        return;
-      }
-      startJoin(invite);
-    } else if (data.k === 'r') {
-      const reply = readReply(data);
-      const target = app.invites.get(reply.inviteId);
-      if (target) target.submit(found.code.startsWith('#') ? found.code : `#r=${found.code}`);
-      else onError(app.t('fail.expired'));
-    } else onError(app.t('fail.kind'));
-  } catch (err) {
-    onError(codeErrorText(app.t, err));
-  }
-};
-
-// Reply links opened in a new tab are handed to the tab that made the invite.
-const channel = 'BroadcastChannel' in window ? new BroadcastChannel('howlden') : null;
-channel?.addEventListener('message', async (e) => {
-  const msg = e.data;
-  if (msg?.type !== 'reply' || !app.profile) return;
-  try {
-    const reply = readReply(await unpackCode(msg.code));
-    const target = app.invites.get(reply.inviteId);
-    if (!target) return;
-    channel.postMessage({ type: 'ack', nonce: msg.nonce });
-    toast(app.t('invite.tabReply'), 'ok');
-    target.submit(`#r=${msg.code}`);
-  } catch {
-    // not ours
-  }
-});
-
-function handOffReply(code) {
-  if (!channel) return Promise.resolve(false);
-  return new Promise((resolve) => {
-    const nonce = randomId(4);
-    const onAck = (e) => {
-      if (e.data?.type !== 'ack' || e.data.nonce !== nonce) return;
-      channel.removeEventListener('message', onAck);
-      clearTimeout(timer);
-      $('#boot').hidden = true;
-      const gate = $('#gate');
-      replace(gate, h('main', { class: 'login' }, h('div', { class: 'login-card narrow' }, h('div', { class: 'login-form is-center' }, h('div', { class: 'pin-ico ok' }, icon('check', { size: 36 })), h('h1', { class: 'login-title' }, app.t('reply.handedTitle')), h('p', { class: 'login-lead' }, app.t('join.replyOpened'))))));
-      gate.hidden = false;
-      resolve(true);
-    };
-    const timer = setTimeout(() => {
-      channel.removeEventListener('message', onAck);
-      resolve(false);
-    }, 1500);
-    channel.addEventListener('message', onAck);
-    channel.postMessage({ type: 'reply', code, nonce });
-  });
-}
-
-function manualReply(code) {
-  const t = app.t;
-  modal({ title: t('reply.manualTitle'), closeLabel: t('common.close'), body: [h('p', null, t('join.replyManual')), h('textarea', { class: 'input field-input mono', rows: 3, readonly: true }, `${app.baseUrl}#r=${code}`)] });
-}
+/** Invite and reply links came from older versions; invites are six words now. */
+app.handleCode = (found, { onError = (m) => toast(m, 'error') } = {}) => onError(app.t('fail.oldLink'));
 
 window.addEventListener('hashchange', () => {
   const words = wordsFromLink(location.hash);
@@ -487,10 +407,9 @@ window.addEventListener('hashchange', () => {
     if (res.ok) joinWordsModal(app, res.words);
     return;
   }
-  const found = findCode(location.hash);
-  if (!found || !app.profile) return;
+  if (!findCode(location.hash) || !app.profile) return;
   history.replaceState(null, '', location.pathname + location.search);
-  app.handleCode(found);
+  toast(app.t('fail.oldLink'), 'info', 9000);
 });
 
 // Navigation
@@ -600,6 +519,9 @@ app.inviteFlow = async (s, opts = {}) => {
 
 app.friendInviteFlow = () => inviteModal(app, { friend: true, title: app.t('home.friendInvite') });
 
+/** The big button on the home screen: six words, the share sheet, then a voice call. */
+app.callNewFriendFlow = () => inviteModal(app, { friend: true, call: true, autoShare: true, title: app.t('home.callTitle') });
+
 app.removeDenFlow = async (s) => {
   const t = app.t;
   if (!(await confirmDialog(t, { title: t('den.remove'), text: t('den.removeConfirm', { name: s.den.name }), ok: t('common.remove'), danger: true }))) return;
@@ -695,11 +617,31 @@ function wireMedia() {
     voice.speaking();
     side();
   });
+  m.on('recorded', showRecording);
   m.on('error', (key) => {
     if (key === 'autoplay') {
       toast(app.t('notice.autoplay'), 'info', 6000);
       document.addEventListener('click', () => document.querySelectorAll('audio').forEach((a) => a.play().catch(() => {})), { once: true });
     } else toast(app.t(`notice.${key}`), 'error', 6000);
+  });
+}
+
+/** A finished local recording: listen, download, or let it go. It is kept nowhere else. */
+function showRecording({ blob, ms, since, session }) {
+  const t = app.t;
+  if (!blob.size) return toast(t('notice.record-failed'), 'error', 6000);
+  const url = URL.createObjectURL(blob);
+  const file = recordingFileName(session.den.name, new Date(since), blob.type);
+  const m = modal({
+    title: t('voice.rec.doneTitle'),
+    className: 'rec-modal',
+    closeLabel: t('common.close'),
+    body: [h('p', { class: 'modal-text' }, t('voice.rec.doneText', { time: formatDuration(ms), size: formatSize(blob.size) })), h('audio', { class: 'rec-audio', controls: true, src: url, preload: 'metadata' })],
+    footer: [
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, t('voice.rec.discard')),
+      h('a', { class: 'btn btn-brand', href: url, download: file }, icon('download', { size: 18 }), t('voice.rec.download')),
+    ],
+    onClose: () => setTimeout(() => URL.revokeObjectURL(url), 1000),
   });
 }
 
@@ -837,4 +779,4 @@ boot().catch((err) => {
   toast(app.t('fail.generic'), 'error', 10000);
 });
 
-export { app, closePopover, shareOrCopy };
+export { app, closePopover };

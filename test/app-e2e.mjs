@@ -1,10 +1,12 @@
 // End to end test in a real browser with live public relays: seven people
-// with fake cameras and microphones create profiles; a den is built with an
-// invite link and with six words (confirmed with six more words), wrong words
-// and a sixth member are refused, five people chat and talk with noise
-// suppression on (audio bytes must flow), friends pair with six words, a
-// known friend is called with only six words, a screen share fills the call
-// view, and accounts survive a PIN lock and a backup.
+// with fake cameras and microphones create profiles; a den is built with six
+// words (confirmed with six more words) and no link is ever shown, wrong
+// words and a sixth member are refused, five people chat and talk with noise
+// suppression on (audio bytes must flow), friends pair with six words, "Call
+// a friend" rings a new friend, stickers, live reactions, music mode, push
+// to talk and a local recording with its notice work in that call, a known
+// friend is called with only six words, a screen share fills the call view,
+// and accounts survive a PIN lock and a backup.
 //
 // Usage: node test/app-e2e.mjs [path-to-chromium-browser]
 // Uses BROWSER, then common Edge and Chrome install paths.
@@ -84,22 +86,6 @@ async function person(name) {
 
 const evalApp = (p, fn, arg) => p.page.evaluate(fn, arg);
 
-async function inviteLink(p) {
-  const input = p.page.locator('.invite-modal .share-side input');
-  await input.waitFor({ timeout: 30000 });
-  return input.inputValue();
-}
-
-async function acceptInvite(guest, link) {
-  await guest.page.goto(link);
-  await guest.page.waitForSelector('.join-modal');
-  const hero = await guest.page.locator('.join-hero').innerText();
-  await guest.page.click('.join-modal .btn-block');
-  const reply = guest.page.locator('.join-modal .share-side input');
-  await reply.waitFor({ timeout: 30000 });
-  return { reply: await reply.inputValue(), hero };
-}
-
 async function waitFor(p, fn, arg, timeout = 30000) {
   await p.page.waitForFunction(fn, arg, { timeout, polling: 250 });
 }
@@ -171,7 +157,8 @@ async function wordsJoin(host, guest, open, opts) {
   const words = await openWords(host, open);
   const hero = await joinWithWords(guest, words, opts);
   await hostConfirms(host, await confirmWordsOf(guest));
-  await guest.page.waitForSelector('.join-modal .invite-status.ok', { timeout: 30000 });
+  // The guest's dialog says "connected" and closes itself shortly after.
+  await guest.page.waitForFunction(() => !!document.querySelector('.join-modal .invite-status.ok') || !document.querySelector('.join-modal'), null, { timeout: 30000 });
   await host.page.waitForSelector('.invite-modal', { state: 'detached', timeout: 10000 });
   return hero;
 }
@@ -186,24 +173,22 @@ try {
   for (const p of Object.values(people)) ids[p.name] = await evalApp(p, () => window.howlden.profile.id);
   log('seven profiles created with identity keys');
 
-  // A den: the first guest joins with an invite link (zero third parties), pasting the reply and clicking Connect too
+  // A den: creating it opens the invite, which is six words and a QR code, never a link
   await ana.page.click('.home-card');
   await ana.page.fill('#den-name', 'Night owls');
   await ana.page.click('.hl-modal button[type="submit"]');
   await ana.page.waitForSelector('.invite-modal .invite-words', { timeout: 40000 });
-  await ana.page.click('.invite-modal .link-btn');
-  let link = await inviteLink(ana);
-  ok(link.startsWith(`${base}#i=`), 'invite link format');
-  const first = await acceptInvite(bia, link);
-  ok(first.hero.includes('Night owls'), 'join screen shows the den');
-  await ana.page.fill('.invite-modal textarea', first.reply);
-  await ana.page.evaluate(() => document.querySelector('.invite-modal textarea').dispatchEvent(new Event('paste', { bubbles: true })));
-  await ana.page.evaluate(() => [...document.querySelectorAll('.invite-modal button')].find((b) => b.textContent === 'Connect')?.click());
-  await ana.page.waitForSelector('.invite-modal .invite-status.ok', { timeout: 40000 });
-  const errText = await ana.page.locator('.invite-modal .form-error').allInnerTexts().catch(() => []);
-  ok(!errText.join('').trim(), `a reply pasted and submitted twice shows no error (${errText.join(' ')})`);
+  {
+    const shown = await ana.page.evaluate(() => {
+      const m = document.querySelector('.invite-modal');
+      return { text: m.innerText, fields: m.querySelectorAll('input, textarea').length, qr: !!m.querySelector('svg.qr') };
+    });
+    ok(!/https?:|#i=|#w=/.test(shown.text) && !shown.fields && shown.qr, `the invite shows only words and a QR code ${JSON.stringify(shown)}`);
+    const hero = await wordsJoin(ana, bia, async () => {});
+    ok(hero.includes('Night owls'), 'join screen shows the den');
+  }
   await waitFor(bia, () => window.howlden.activeDen?.status === 'online');
-  log('Bia joined by invite link; the reply applied twice (paste, then Connect) is ignored, not an error');
+  log('Bia joined the new den with six words; the invite shows no link, only the words and a QR code');
 
   // Six words, typed in the Join dialog, with the confirmation words
   await wordsJoin(ana, caio, inviteButton(ana), { viaDialog: true });
@@ -260,12 +245,12 @@ try {
   await caio.page.hover('.msg');
   await caio.page.click('.msg .msg-actions button[aria-label="Add reaction"]');
   await caio.page.click('.reaction-picker button[aria-label="howl"]');
-  await waitFor(ana, () => !!document.querySelector('.reaction'));
+  await waitFor(ana, () => !!document.querySelector('.reaction.pop'));
   await bia.page.fill('.composer-input', '@Ana sounds good');
   await bia.page.keyboard.press('Escape');
   await bia.page.press('.composer-input', 'Enter');
   await waitFor(ana, () => !!document.querySelector('.msg.mentioned'));
-  log('messages, markdown, reactions and mentions sync to every member');
+  log('messages, markdown, reactions (which pop when they arrive) and mentions sync to every member');
 
   // The author card stays inside the viewport near the composer
   {
@@ -322,22 +307,86 @@ try {
   }
   log('Fabi became a friend with six words and the confirmation words');
 
-  // The friend invite link, applied twice (the reported setRemoteDescription bug)
+  // Call a friend: one button, six words copied as text, and the call rings when the friend types them
   {
-    await evalApp(ana, () => window.howlden.friendInviteFlow());
-    await ana.page.waitForSelector('.invite-modal .invite-words', { timeout: 40000 });
-    await ana.page.click('.invite-modal .link-btn');
-    const l = await inviteLink(ana);
-    const j = await acceptInvite(gabi, l);
-    await ana.page.fill('.invite-modal textarea', j.reply);
-    await ana.page.evaluate(() => document.querySelector('.invite-modal textarea').dispatchEvent(new Event('paste', { bubbles: true })));
-    await ana.page.evaluate(() => [...document.querySelectorAll('.invite-modal button')].find((b) => b.textContent === 'Connect')?.click());
-    await ana.page.waitForSelector('.invite-modal .invite-status.ok', { timeout: 40000 });
-    const e = (await ana.page.locator('.invite-modal .form-error').allInnerTexts().catch(() => [])).join('');
-    ok(!/setRemoteDescription|wrong state/i.test(e) && !e.trim(), `friend invite link applied twice shows no error (${e})`);
-    await waitFor(gabi, (id) => !!window.howlden.friends.get(id), ids.Ana);
+    await ana.page.click('.rail-home .rail-btn');
+    await ana.page.click('.home-tabs .call-new');
+    const words = await openWords(ana, async () => {});
+    ok(!/https?:/.test(await ana.page.locator('.invite-modal').innerText()), 'the call invite shows no link');
+    await ana.page.waitForFunction(() => document.querySelector('.toasts')?.textContent.includes('Copied the six words'), null, { timeout: 10000 });
+    const clip = await ana.page.evaluate(() => navigator.clipboard.readText());
+    ok(clip.includes(words.join(' ')) && !/https?:|#w=/.test(clip), `the six words are copied as text only (${clip})`);
+    await joinWithWords(gabi, words);
+    await hostConfirms(ana, await confirmWordsOf(gabi));
+    await waitFor(ana, () => window.howlden.activeDen?.isDirect && !!window.howlden.media.current, null, 40000);
+    await waitFor(gabi, () => !!document.querySelector('.call-ring'), null, 40000);
+    await gabi.page.click('.call-ring button[aria-label="Accept call"]');
+    await waitFor(gabi, () => window.howlden.activeDen?.isDirect && !!window.howlden.media.current);
+    await ana.page.waitForTimeout(2000);
+    const grewCall = await audioFlows(gabi, ids.Ana, 'Gabi hears Ana after Call a friend');
+    log(`"Call a friend": six words copied as text, Gabi typed them, the call rang and audio flows (grew ${grewCall} bytes)`);
   }
-  log('a friend invite reply applied twice connects once with no error (regression)');
+
+  // Stickers, live reactions, music mode, recording and push to talk in that call
+  {
+    await gabi.page.click('.composer-sticker');
+    await gabi.page.click('.sticker-picker .sticker-pick >> nth=1');
+    await waitFor(ana, () => !!document.querySelector('.msg-content .sticker-howl[role="img"]'));
+    ok((await ana.page.locator('.msg-content .sticker-howl').getAttribute('aria-label')) === 'Luna howls at the moon', 'the sticker has a label');
+    log('a sticker drawn for howlden arrives and plays on the other side');
+
+    await ana.page.click('.stage-controls .react-btn');
+    await ana.page.click('.burst-bar button[aria-label="Fire"]');
+    await waitFor(gabi, () => !!document.querySelector('.stage-bursts .burst'), null, 10000);
+    ok((await gabi.page.locator('.stage-bursts .burst-name').first().innerText()) === 'Ana', 'the live reaction shows who sent it');
+    log('a live reaction floats over the call for the other person');
+
+    await ana.page.click('.stage-controls .more-btn');
+    await ana.page.click('.call-menu button:has-text("Music mode")');
+    await waitFor(ana, (id) => window.howlden.activeDen.mesh.links.get(id)?.senders.mic?.getParameters().encodings[0]?.maxBitrate === 128000, ids.Gabi, 15000);
+    const music = await evalApp(ana, () => {
+      const m = window.howlden.media;
+      const st = m.pipe.raw.getAudioTracks()[0].getSettings();
+      return { mode: m.processing, echo: st.echoCancellation, noise: st.noiseSuppression };
+    });
+    ok(music.mode === 'music' && music.echo !== true && music.noise !== true, `music mode turns the voice filters off ${JSON.stringify(music)}`);
+    await waitFor(gabi, () => !!document.querySelector('.stage .music-tag'));
+    await audioFlows(gabi, ids.Ana, 'Gabi still hears Ana in music mode');
+    log('music mode: voice filters off, 128 kbps cap on the sender, a Music tag for the other person, audio still flows');
+
+    await ana.page.click('.stage-controls .more-btn');
+    await ana.page.click('.call-menu button:has-text("Record this call")');
+    await ana.page.click('.hl-modal .modal-foot .btn-brand');
+    await waitFor(gabi, () => /Ana is recording this call/.test(document.querySelector('.stage-notice:not([hidden])')?.textContent || ''), null, 10000);
+    await waitFor(ana, () => /You are recording/.test(document.querySelector('.stage-notice:not([hidden])')?.textContent || ''));
+    await ana.page.waitForTimeout(2500);
+    await ana.page.click('.stage-notice .rec-stop');
+    await ana.page.waitForSelector('.rec-modal audio', { timeout: 10000 });
+    const file = await evalApp(ana, async () => {
+      const a = document.querySelector('.rec-modal a[download]');
+      const blob = await fetch(a.href).then((r) => r.blob());
+      return { size: blob.size, type: blob.type, name: a.getAttribute('download') };
+    });
+    ok(file.size > 2000 && /^audio\//.test(file.type) && /^howlden-gabi-\d{4}-\d{2}-\d{2}-\d{4}\.(webm|ogg|m4a)$/.test(file.name), `the recording is a local audio file ${JSON.stringify(file)}`);
+    await waitFor(gabi, () => document.querySelector('.stage-notice').hidden);
+    await ana.page.click('.rec-modal .modal-foot .btn-ghost');
+    log(`local recording: Gabi saw "Ana is recording", Ana got a ${Math.round(file.size / 1024)} KB ${file.type} file, the notice went away`);
+
+    await gabi.page.click('.stage-controls .more-btn');
+    await gabi.page.click('.call-menu button:has-text("Push to talk")');
+    await gabi.page.waitForSelector('.ptt-btn:visible');
+    ok(!(await evalApp(gabi, () => window.howlden.media.live)), 'push to talk: the mic is closed until the button is held');
+    const box = await gabi.page.locator('.ptt-btn').boundingBox();
+    await gabi.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await gabi.page.mouse.down();
+    await waitFor(gabi, () => window.howlden.media.live && document.querySelector('.ptt-btn').classList.contains('held'));
+    await gabi.page.mouse.up();
+    await waitFor(gabi, () => !window.howlden.media.live);
+    await evalApp(gabi, () => window.howlden.media.setInputMode('voice'));
+    log('push to talk: holding the talk button opens the mic, letting go closes it');
+
+    for (const p of [ana, gabi]) await evalApp(p, () => window.howlden.media.leave());
+  }
 
   // Calling a known friend needs only the six words
   await ana.page.click('.rail-home .rail-btn');

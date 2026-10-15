@@ -276,9 +276,9 @@ export function openSettings(app, section = 'profile') {
         };
         window.addEventListener('keydown', grab, true);
       });
-      const mode = (value, label) => h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'mode', value, checked: s.inputMode === value, onchange: () => ((s.inputMode = value), app.saveSettings(), app.media._gate(), app.render(), renderMode()) }), label);
+      const mode = (value, label) => h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'mode', value, checked: s.inputMode === value, onchange: () => (app.media.setInputMode(value), app.render(), renderMode()) }), label);
       const pttRow = h('div');
-      const renderMode = () => replace(pttRow, s.inputMode === 'ptt' ? h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.pttKey')), pttKey) : null);
+      const renderMode = () => replace(pttRow, s.inputMode === 'ptt' ? h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.pttKey')), pttKey, h('p', { class: 'field-hint' }, t('settings.pttTouch'))) : null);
       renderMode();
       const noise = (value) =>
         h(
@@ -363,14 +363,6 @@ export function openSettings(app, section = 'profile') {
       return h(
         'div',
         { class: 'hl-stack' },
-        h(
-          'fieldset',
-          { class: 'set-sec' },
-          h('legend', { class: 'sr-only' }, t('settings.pairMode')),
-          h('h2', null, t('settings.pairMode')),
-          h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'pair-mode', checked: s.pairMode !== 'link', onchange: () => ((s.pairMode = 'words'), app.saveSettings()) }), h('span', null, h('strong', null, t('settings.pairWords')), h('br'), h('small', { class: 'muted' }, t('settings.pairWordsHint')))),
-          h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'pair-mode', checked: s.pairMode === 'link', onchange: () => ((s.pairMode = 'link'), app.saveSettings()) }), h('span', null, h('strong', null, t('settings.pairLink')), h('br'), h('small', { class: 'muted' }, t('settings.pairLinkHint')))),
-        ),
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.stun')), h('p', { class: 'muted' }, t('settings.stunHint')), h('ul', { class: 'mono-list' }, STUN_SERVERS.map((u) => h('li', null, h('code', null, u))))),
         h(
           'section',

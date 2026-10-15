@@ -7,7 +7,7 @@ import { modal, toast } from './ui-modal.js';
 import { avatarUrl } from '../core/avatar.js';
 import { randomId } from '../core/crypto.js';
 import { findCode } from '../core/invite.js';
-import { resolvePhrase, splitPhrase } from '../core/words.js';
+import { resolvePhrase, splitPhrase, wordsFromLink } from '../core/words.js';
 import { LANGS } from './i18n.js';
 
 /** Image source for an avatar value: a generated seed or an uploaded data URL. */
@@ -177,10 +177,10 @@ export function avatarPicker(t, initial, onChange) {
 }
 
 /**
- * The first screen. Left: create a local profile. Right: join with an invite
- * (camera scan or paste). Calls app.createProfile() and app.handleCode().
+ * The first screen. Left: create a local profile. Right: join with six
+ * words (typed, pasted or scanned from the QR code). Calls app.createProfile().
  */
-export function loginCard(app, { invite, words } = {}) {
+export function loginCard(app, { words } = {}) {
   const t = (k, v) => app.t(k, v);
   const root = document.getElementById('gate');
   const name = h('input', { class: 'input field-input', id: 'login-name', name: 'username', autocomplete: 'nickname', maxlength: 32, required: true, placeholder: t('onboard.namePlaceholder') });
@@ -220,7 +220,7 @@ export function loginCard(app, { invite, words } = {}) {
       },
     },
     h('h1', { class: 'login-title' }, t('login.title')),
-    h('p', { class: 'login-lead' }, invite ? t('login.leadInvite', { host: invite.host.name }) : t('login.lead')),
+    h('p', { class: 'login-lead' }, t('login.lead')),
     h('label', { class: 'hl-field', for: 'login-name' }, h('span', { class: 'field-label' }, t('login.username'), h('span', { class: 'req', 'aria-hidden': 'true' }, ' *')), name),
     h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('settings.avatar')), picker.el),
     h('div', { class: 'hl-field field-row' }, h('label', { class: 'switch-row' }, useAccent, h('span', null, t('login.accentUse'))), accent),
@@ -242,31 +242,19 @@ export function loginCard(app, { invite, words } = {}) {
     h('label', { class: 'hl-field', for: 'login-invite' }, h('span', { class: 'field-label' }, t('pair.loginField')), paste),
     joinMsg,
     h('button', { class: 'btn btn-ghost btn-block', type: 'button', onclick: () => useCode() }, t('join.continue')),
-    invite ? h('div', { class: 'login-invite' }, h('img', { class: 'av', src: avatarSrc(invite.host.avatar || invite.host.id), alt: '', width: 40, height: 40 }), h('div', null, h('strong', null, invite.kind === 'dm' ? t('login.friendInvite', { host: invite.host.name }) : t('login.denInvite', { host: invite.host.name, den: invite.den.name })), h('p', null, t('login.inviteHold')))) : null,
   );
 
-  async function useCode() {
-    const found = findCode(paste.value);
-    if (!found) {
-      const res = resolvePhrase(splitPhrase(paste.value));
-      if (!res.ok) {
-        joinMsg.textContent = t('fail.empty');
-        return;
-      }
-      app.pendingWords = res.words;
-      joinMsg.className = 'form-ok';
-      joinMsg.textContent = t('login.inviteSaved');
-      name.focus();
+  function useCode() {
+    const res = resolvePhrase(wordsFromLink(paste.value) || splitPhrase(paste.value));
+    if (!res.ok) {
+      joinMsg.className = 'form-error';
+      joinMsg.textContent = t(findCode(paste.value) ? 'fail.oldLink' : 'words.incomplete');
       return;
     }
-    joinMsg.textContent = '';
-    await app.handleCode(found, { fromGate: true, onError: (msg) => (joinMsg.textContent = msg) });
-    if (app.pendingInvite) {
-      replace(joinMsg);
-      joinMsg.className = 'form-ok';
-      joinMsg.textContent = t('login.inviteSaved');
-      name.focus();
-    }
+    app.pendingWords = res.words;
+    joinMsg.className = 'form-ok';
+    joinMsg.textContent = t('login.inviteSaved');
+    name.focus();
   }
 
   replace(

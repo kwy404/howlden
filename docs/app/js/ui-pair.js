@@ -1,16 +1,17 @@
-// Inviting and joining: six words through encrypted public relays (the
-// default), or an invite link and a reply link with zero third parties.
+// Inviting and joining: the inviter shows six words and a QR code, the
+// friend types or scans them, and the handshake travels encrypted through
+// public relays that cannot read it.
 
 import { h, replace, copyText } from './dom.js';
 import { icon } from './icons.js';
 import { modal, toast } from './ui-modal.js';
 import { avatarSrc } from './ui-account.js';
-import { codeErrorText, failureBox, qrElement, shareOrCopy, shareRow } from './ui-flows.js';
-import { findCode, readInvite, readReply, unpackCode } from '../core/invite.js';
+import { codeErrorText, failureBox, qrElement } from './ui-flows.js';
+import { findCode, readInvite, readReply } from '../core/invite.js';
 import { MeshError } from '../core/mesh.js';
 import { CODE_LIFETIME_MS, CodeCreator, CodeJoiner } from '../core/pairing.js';
 import { WORDLIST } from '../core/wordlist.js';
-import { WORD_COUNT, normalizeWord, resolvePhrase, resolveWord, splitPhrase, suggestWords, wordsLink } from '../core/words.js';
+import { WORD_COUNT, normalizeWord, resolvePhrase, resolveWord, splitPhrase, suggestWords, wordsFromLink, wordsLink } from '../core/words.js';
 import { randomId } from '../core/crypto.js';
 
 // Six word inputs
@@ -134,14 +135,12 @@ async function makeInvite(app, { session, friend }) {
 }
 
 /**
- * Invite modal. In words mode the inviter shows six words and a small QR; the
- * friend types or scans them and nothing has to be sent back. In link mode
- * (Zero third parties) the invite link and the reply link are exchanged by hand.
+ * Invite modal: the inviter shows six words and a QR code (which holds the
+ * same words); the friend types or scans them and nothing has to be sent back.
  */
-export async function inviteModal(app, { session, friend = false, autoShare = false, title, mode }) {
+export async function inviteModal(app, { session, friend = false, autoShare = false, title, call = false }) {
   const t = app.t;
-  const useWords = (mode || app.settings.pairMode) !== 'link';
-  const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t(useWords ? 'pair.making' : 'invite.making'));
+  const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('pair.making'));
   const body = h('div', { class: 'hl-stack' }, status);
   const err = h('p', { class: 'form-error', role: 'alert' });
   const setError = (text) => (err.textContent = text);
@@ -203,7 +202,7 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
       s.on('link-failed', (f) => {
         if (f.peerId !== peerId || state === 'done') return;
         state = 'failed';
-        replace(body, failureBox(app, f.diagnosis, () => (m.close(), inviteModal(app, { session, friend, title, mode }))));
+        replace(body, failureBox(app, f.diagnosis, () => (m.close(), inviteModal(app, { session, friend, title, call }))));
       }),
     );
   };
@@ -247,13 +246,16 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
       return setError(t('fail.expired'));
     }
     state = 'connecting';
-    connectBtn && (connectBtn.disabled = true);
     peerName = reply.peer.name;
     setStatus('', h('span', { class: 'spinner spinner-xs' }), t('invite.connecting', { name: peerName }));
     try {
+      // Listen before the answer is applied: a full den can refuse the guest at once.
+      if (session) watch(session, reply.peer.id, nonce);
       const target = await invite.accept(reply, { hold });
+      // "Call a friend": ring them as soon as the link is up.
+      if (call && target.isDirect && !target.pendingCall) target.pendingCall = 'voice';
       if (hold) target.expectPairing(reply.peer.id, nonce);
-      watch(target, reply.peer.id, nonce);
+      if (target !== session) watch(target, reply.peer.id, nonce);
       setError('');
     } catch (e) {
       if (e instanceof MeshError && e.reason === 'answered') {
@@ -261,24 +263,11 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
         return setStatus('ok', icon('check', { size: 18 }), t('fail.answered'));
       }
       state = 'waiting';
-      connectBtn && (connectBtn.disabled = false);
       setStatus('', h('span', { class: 'dot alone' }), t('invite.waiting'));
       setError(codeErrorText(t, e));
     }
   }
 
-  async function submitText(text) {
-    const found = findCode(text);
-    if (!found) return setError(t('fail.empty'));
-    if (found.kind === 'i') return setError(t('fail.notReply'));
-    try {
-      await accept(readReply(await unpackCode(found.code)));
-    } catch (e) {
-      setError(codeErrorText(t, e));
-    }
-  }
-
-  let connectBtn = null;
   try {
     invite = await makeInvite(app, { session, friend });
   } catch (e) {
@@ -286,113 +275,103 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
     return;
   }
   if (!m.open) return invite.cancel?.();
-  app.invites.set(invite.inviteId, { submit: submitText, accept });
+  app.invites.set(invite.inviteId, { accept });
   const notes = [
     session?.den.locked ? h('p', { class: 'callout-warn' }, icon('lock', { size: 16 }), t('invite.locked')) : null,
     invite.full ? h('p', { class: 'callout-warn full-note', role: 'status' }, icon('members', { size: 16 }), t('invite.full', { count: invite.count, max: invite.max })) : null,
   ];
 
-  if (useWords) {
-    const nonce = randomId(12);
-    creator = new CodeCreator(Promise.resolve({ invite: invite.payload, nonce }));
-    creator.on('status', (st) => relays && (relays.textContent = relaysText(t, st)));
-    creator.on('expired', () => {
-      if (state !== 'waiting') return;
-      state = 'failed';
-      clearInterval(countdown);
-      replace(body, h('div', { class: 'fail-box', role: 'alert' }, h('div', { class: 'fail-head' }, icon('warning', { size: 20 }), h('strong', null, t('pair.expired'))), h('button', { class: 'btn btn-brand btn-sm', type: 'button', onclick: () => (m.close(), inviteModal(app, { session, friend, title, mode })) }, t('fail.retry'))));
-    });
-    creator.on('answer', async (msg) => {
-      creator.stop();
-      clearInterval(countdown);
-      try {
-        await accept(readReply(msg.reply), { hold: true, nonce });
-      } catch (e) {
-        setError(codeErrorText(t, e));
-      }
-    });
-    const relays = h('span', { class: 'pair-relays' }, t('pair.relaysConnecting'));
-    let words;
+
+  const nonce = randomId(12);
+  creator = new CodeCreator(Promise.resolve({ invite: invite.payload, nonce }));
+  creator.on('status', (st) => relays && (relays.textContent = relaysText(t, st)));
+  creator.on('expired', () => {
+    if (state !== 'waiting') return;
+    state = 'failed';
+    clearInterval(countdown);
+    replace(body, h('div', { class: 'fail-box', role: 'alert' }, h('div', { class: 'fail-head' }, icon('warning', { size: 20 }), h('strong', null, t('pair.expired'))), h('button', { class: 'btn btn-brand btn-sm', type: 'button', onclick: () => (m.close(), inviteModal(app, { session, friend, title, call })) }, t('fail.retry'))));
+  });
+  creator.on('answer', async (msg) => {
+    creator.stop();
+    clearInterval(countdown);
     try {
-      words = await creator.start();
-    } catch {
-      if (!m.open) return;
-      creator.stop();
-      replace(body, h('div', { class: 'fail-box', role: 'alert' }, h('div', { class: 'fail-head' }, icon('warning', { size: 20 }), h('strong', null, t('pair.norelay'))), h('button', { class: 'btn btn-brand btn-sm', type: 'button', onclick: () => (m.close(), inviteModal(app, { session, friend, title, mode: 'link' })) }, t('pair.useLink'))));
-      return;
+      await accept(readReply(msg.reply), { hold: true, nonce });
+    } catch (e) {
+      setError(codeErrorText(t, e));
     }
-    if (!m.open) return creator.stop();
-    relays.textContent = relaysText(t, creator.hub.status());
-    const link = wordsLink(app.baseUrl, words);
-    const timer = h('span', { class: 'pair-timer', 'aria-label': t('pair.expiresIn') });
-    const tick = () => {
-      const left = Math.max(0, creator.expires - Date.now());
-      timer.textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
-      timer.classList.toggle('low', left < 60000);
-      timer.style.setProperty('--left', String(left / CODE_LIFETIME_MS));
-    };
-    tick();
-    countdown = setInterval(tick, 1000);
-    const copyBtn = h(
-      'button',
-      {
-        class: 'btn btn-ghost btn-sm',
-        type: 'button',
-        onclick: async () => {
-          await copyText(words.join(' '));
-          toast(t('notice.copied'), 'ok');
-        },
-      },
-      icon('copy', { size: 16 }),
-      t('pair.copyWords'),
-    );
-    replace(
-      body,
-      h('p', { class: 'muted' }, friend ? t('pair.leadFriend') : t('pair.lead')),
-      h(
-        'div',
-        { class: 'pair-hero' },
-        wordList(words, 'invite-words'),
-        h('div', { class: 'pair-side' }, h('div', { class: 'share-qr small' }, qrElement(link, t('pair.qrLabel'))), h('span', { class: 'pair-scan' }, t('pair.scanHint')), h('div', { class: 'pair-meta' }, icon('signal', { size: 14 }), timer)),
-      ),
-      h('div', { class: 'row-btns' }, copyBtn, navigator.share ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => navigator.share({ title: 'howlden', text: t('pair.shareText', { words: words.join(' ') }), url: link }).catch(() => {}) }, icon('share', { size: 16 }), t('invite.share')) : null, relays),
-      notes,
-      h('p', { class: 'pair-note' }, icon('shield', { size: 16 }), t('pair.privacy')),
-      err,
-      status,
-      h('button', { class: 'link-btn', type: 'button', onclick: () => (m.close(), inviteModal(app, { session, friend, title, mode: 'link' })) }, t('pair.useLink')),
-    );
-    setStatus('', h('span', { class: 'dot alone' }), t('pair.waiting'));
-    if (autoShare) {
-      const how = await shareOrCopy(link, 'howlden');
-      if (how === 'copied') toast(t('notice.copied'), 'ok');
-    }
+  });
+  const relays = h('span', { class: 'pair-relays' }, t('pair.relaysConnecting'));
+  let words;
+  try {
+    words = await creator.start();
+  } catch {
+    if (!m.open) return;
+    creator.stop();
+    replace(body, h('div', { class: 'fail-box', role: 'alert' }, h('div', { class: 'fail-head' }, icon('warning', { size: 20 }), h('strong', null, t('pair.norelay'))), h('button', { class: 'btn btn-brand btn-sm', type: 'button', onclick: () => (m.close(), inviteModal(app, { session, friend, title, call })) }, t('fail.retry'))));
     return;
   }
-
-  // Link mode: zero third parties
-  const replyInput = h('textarea', { class: 'input field-input mono', rows: 2, placeholder: t('invite.replyPlaceholder'), 'aria-label': t('invite.step2') });
-  connectBtn = h('button', { class: 'btn btn-brand', type: 'button', onclick: () => submitText(replyInput.value) }, t('invite.connect'));
-  setStatus('', h('span', { class: 'dot alone' }), t('invite.waiting'));
+  if (!m.open) return creator.stop();
+  relays.textContent = relaysText(t, creator.hub.status());
+  const link = wordsLink(app.baseUrl, words);
+  const timer = h('span', { class: 'pair-timer', 'aria-label': t('pair.expiresIn') });
+  const tick = () => {
+    const left = Math.max(0, creator.expires - Date.now());
+    timer.textContent = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+    timer.classList.toggle('low', left < 60000);
+    timer.style.setProperty('--left', String(left / CODE_LIFETIME_MS));
+  };
+  tick();
+  countdown = setInterval(tick, 1000);
+  const copyBtn = h(
+    'button',
+    {
+      class: 'btn btn-ghost btn-sm',
+      type: 'button',
+      onclick: async () => {
+        await copyText(words.join(' '));
+        toast(t('notice.copied'), 'ok');
+      },
+    },
+    icon('copy', { size: 16 }),
+    t('pair.copyWords'),
+  );
+  const shareText = t('pair.shareText', { words: words.join(' ') });
+  const shareBtn = navigator.share ? h('button', { class: `btn btn-sm ${call ? 'btn-brand' : 'btn-ghost'}`, type: 'button', onclick: () => shareWords(false) }, icon('share', { size: 16 }), t('invite.share')) : null;
+  // Only the words are shared, as text. The share sheet needs a recent tap;
+  // when the words took too long, the Share button asks for one.
+  async function shareWords(auto) {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'howlden', text: shareText });
+        return;
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
+        if (auto && shareBtn) {
+          shareBtn.classList.add('nudge');
+          shareBtn.focus({ preventScroll: true });
+          return;
+        }
+      }
+    }
+    if (await copyText(shareText)) toast(t('notice.copiedWords'), 'ok');
+  }
   replace(
     body,
-    h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '1'), t('invite.step1')), h('p', { class: 'muted' }, t('invite.step1Hint')), shareRow(app, invite.link, t('invite.step1')), notes),
+    h('p', { class: 'muted' }, call ? t('pair.leadCall') : friend ? t('pair.leadFriend') : t('pair.lead')),
     h(
-      'section',
-      { class: 'hl-step' },
-      h('h3', { class: 'step-title' }, h('span', { class: 'step-num' }, '2'), t('invite.step2')),
-      h('p', { class: 'muted' }, t('invite.step2Hint')),
-      replyInput,
-      err,
-      h('div', { class: 'row-btns' }, connectBtn, h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.scanFlow((text) => ((replyInput.value = text), submitText(text))) }, icon('scan', { size: 16 }), t('invite.scan'))),
+      'div',
+      { class: 'pair-hero' },
+      wordList(words, 'invite-words'),
+      h('div', { class: 'pair-side' }, h('div', { class: 'share-qr small' }, qrElement(link, t('pair.qrLabel'))), h('span', { class: 'pair-scan' }, t('pair.scanHint')), h('div', { class: 'pair-meta' }, icon('signal', { size: 14 }), timer)),
     ),
+    h('div', { class: 'row-btns' }, shareBtn, copyBtn, relays),
+    notes,
+    h('p', { class: 'pair-note' }, icon('shield', { size: 16 }), t('pair.privacy')),
+    err,
     status,
   );
-  replyInput.addEventListener('paste', () => setTimeout(() => findCode(replyInput.value)?.kind === 'r' && submitText(replyInput.value), 0));
-  if (autoShare) {
-    const how = await shareOrCopy(invite.link, 'howlden');
-    if (how === 'copied') toast(t('notice.copied'), 'ok');
-  }
+  setStatus('', h('span', { class: 'dot alone' }), t(call ? 'pair.waitingCall' : 'pair.waiting'));
+  if (autoShare) await shareWords(true);
 }
 
 // Joining
@@ -429,9 +408,9 @@ function inviteCard(app, invite) {
 }
 
 /**
- * Guest side. With a link, the reply link is shown to send back. With six
- * words (options.joiner), the reply goes back through the relays by itself,
- * then the guest shows confirmation words for the inviter to type.
+ * Guest side, after the six words found the invite (options.joiner): the
+ * reply goes back through the relays by itself, then the guest shows
+ * confirmation words for the inviter to type.
  */
 export function joinModal(app, invite, { joiner, nonce, m: existing } = {}) {
   const t = app.t;
@@ -469,12 +448,8 @@ export function joinModal(app, invite, { joiner, nonce, m: existing } = {}) {
     }
     if (!m.open) return;
     const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('join.waiting', { host: invite.host.name }));
-    if (joiner) {
-      joiner.sendAnswer({ reply: reply.payload });
-      replace(body, card.el[0], status);
-    } else {
-      replace(body, h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, t('join.replyTitle', { host: invite.host.name })), h('p', { class: 'muted' }, t('join.replyHint', { host: invite.host.name })), shareRow(app, reply.link, t('join.replyTitle', { host: invite.host.name }))), status);
-    }
+    joiner?.sendAnswer({ reply: reply.payload });
+    replace(body, card.el[0], status);
     let welcomed = false;
     const fail = (text, cls = 'warning') => {
       offs.forEach((off) => off());
@@ -516,7 +491,6 @@ export function joinModal(app, invite, { joiner, nonce, m: existing } = {}) {
         replace(body, failureBox(app, f.diagnosis));
       }),
     ];
-    if (!joiner && invite.kind === 'dm') shareOrCopy(reply.link, 'howlden').then((how) => how === 'copied' && toast(t('notice.copied'), 'ok'));
   };
   accept.addEventListener('click', go);
   // Calling a known friend needs only the six words: their key is already trusted.
@@ -557,11 +531,10 @@ export async function joinWordsModal(app, words) {
   }
 }
 
-/** The Join dialog: six words (default) or an invite link, or a scan. */
+/** The Join dialog: type the six words, or scan the QR code. */
 export function joinEntryModal(app) {
   const t = app.t;
   const err = h('p', { class: 'form-error', role: 'alert' });
-  const linkInput = h('input', { class: 'input field-input', id: 'paste-invite', placeholder: t('join.pastePlaceholder'), autocomplete: 'off' });
   let done = false;
   const goWords = (words) => {
     if (done) return;
@@ -570,16 +543,11 @@ export function joinEntryModal(app) {
     joinWordsModal(app, words);
   };
   const inputs = wordInputs(t, { idPrefix: 'join-word', auto: true, onReady: goWords });
-  const goText = async (text) => {
-    const found = findCode(text);
-    if (found) {
-      done = true;
-      m.close();
-      return app.handleCode(found, { onError: (msg) => toast(msg, 'error') });
-    }
-    const res = resolvePhrase(splitPhrase(text));
+  // A scanned QR code holds the words (as a link a phone camera can open).
+  const goText = (text) => {
+    const res = resolvePhrase(wordsFromLink(text) || splitPhrase(text));
     if (res.ok) return goWords(res.words);
-    err.textContent = t('fail.empty');
+    err.textContent = t(findCode(text) ? 'fail.oldLink' : 'words.incomplete');
   };
   const m = modal({
     title: t('join.title'),
@@ -588,12 +556,9 @@ export function joinEntryModal(app) {
     closeLabel: t('common.close'),
     body: [
       h('section', { class: 'hl-step' }, h('h3', { class: 'step-title' }, t('pair.typeWords')), inputs.el, h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-brand', type: 'button', onclick: () => (inputs.values().ok ? goWords(inputs.values().words) : (err.textContent = t('words.incomplete'))) }, t('join.continue')), h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.scanFlow((text) => goText(text)) }, icon('scan', { size: 16 }), t('invite.scan')))),
-      h('section', { class: 'hl-step' }, h('label', { class: 'hl-field', for: 'paste-invite' }, h('span', { class: 'field-label' }, t('pair.orLink')), linkInput)),
       err,
       h('p', { class: 'pair-note' }, icon('shield', { size: 16 }), t('pair.privacy')),
     ],
   });
-  linkInput.addEventListener('keydown', (e) => e.key === 'Enter' && goText(linkInput.value));
-  linkInput.addEventListener('paste', () => setTimeout(() => linkInput.value && goText(linkInput.value), 0));
   setTimeout(() => inputs.focus(), 30);
 }

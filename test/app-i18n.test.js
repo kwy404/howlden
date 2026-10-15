@@ -2,6 +2,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DICTS, translator } from '../docs/app/js/i18n.js';
 import { MAX_MEMBERS } from '../src/mesh.js';
+import { REACTIONS, STICKERS } from '../src/history.js';
+import { SOUND_NAMES } from '../docs/app/js/sounds.js';
 
 const dir = new URL('../docs/app/js/', import.meta.url);
 const sources = readdirSync(dir).map((f) => readFileSync(new URL(f, dir), 'utf8'));
@@ -14,11 +16,13 @@ describe('interface text', () => {
     }
     for (const n of ['logo', 'moon', 'sun', 'bell', 'globe', 'file']) used.add(`login.pick.${n}`);
     for (const k of ['offline', 'blocked', 'no-stun', 'strict-nat', 'timeout', 'answered', 'expired', 'den', 'self', 'already', 'full', 'closed', 'damaged', 'version', 'kind']) used.add(`fail.${k}`);
-    for (const k of ['join', 'leave', 'peerJoin', 'peerLeave', 'mute', 'unmute', 'deafen', 'message', 'mention', 'ring', 'screen', 'connected', 'lost']) used.add(`sound.${k}`);
+    for (const k of SOUND_NAMES) used.add(`sound.${k}`);
+    for (const k of STICKERS) used.add(`chat.sticker.${k}`);
+    for (const k of REACTIONS) used.add(`chat.reaction.${k}`);
     for (const k of ['off', 'standard', 'strong']) used.add(`voice.noise.${k}`).add(`voice.noise.${k}Hint`);
     for (const k of ['empty', 'format', 'auth']) used.add(`settings.turnErr.${k}`);
     for (const k of ['format', 'password', 'other']) used.add(`account.err.${k}`);
-    for (const k of ['mic-denied', 'mic-missing', 'mic-failed', 'camera-denied', 'camera-failed', 'screen-unsupported', 'screen-failed', 'autoplay']) used.add(`notice.${k}`);
+    for (const k of ['mic-denied', 'mic-missing', 'mic-failed', 'camera-denied', 'camera-failed', 'screen-unsupported', 'screen-failed', 'autoplay', 'record-failed']) used.add(`notice.${k}`);
     expect(used.size).toBeGreaterThan(300);
     const missing = [...used].filter((k) => !(k in DICTS.en) || !(k in DICTS.pt));
     expect(missing).toEqual([]);

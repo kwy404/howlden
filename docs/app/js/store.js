@@ -205,7 +205,6 @@ export const DEFAULT_SETTINGS = {
   lang: null,
   theme: 'dark',
   turn: [],
-  pairMode: 'words',
   inputMode: 'voice',
   pttKey: 'Backquote',
   noiseMode: 'strong',

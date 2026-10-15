@@ -1,7 +1,9 @@
 // Voice and video: the local microphone, camera and screen, remote playback,
-// per member volume, output device, push to talk and the speaking ring.
+// per member volume, output device, push to talk, music mode, local call
+// recording and the speaking ring.
 
 import { Emitter } from '../core/mesh.js';
+import { MUSIC_BITRATE, micConstraints, pickRecordingType, tunedParameters, usesDenoise } from '../core/call.js';
 
 const SLOTS = ['mic', 'camera', 'screen'];
 const SPEAK_LEVEL = 0.018;
@@ -18,6 +20,8 @@ export class MediaManager extends Emitter {
     this.muted = false;
     this.deafened = false;
     this.pttHeld = false;
+    this.music = false;
+    this.recorder = null;
     this.remote = new Map();
     this.ctx = null;
     this.meters = new Map();
@@ -40,7 +44,7 @@ export class MediaManager extends Emitter {
 
   stateFor(session) {
     if (!this.inVoice(session)) return null;
-    return { channel: this.current.channel, muted: this.muted || !this.mic, deafened: this.deafened, camera: !!this.camera, screen: !!this.screen };
+    return { channel: this.current.channel, muted: this.muted || !this.mic, deafened: this.deafened, camera: !!this.camera, screen: !!this.screen, music: this.music, rec: !!this.recorder };
   }
 
   /** Noise suppression mode: 'off', 'standard' (browser only) or 'strong' (browser plus our own DSP). */
@@ -52,15 +56,10 @@ export class MediaManager extends Emitter {
     return (this.settings.gateSensitivity ?? 50) / 100;
   }
 
-  /** Echo cancellation and automatic gain are always on; noise suppression and voice isolation follow the mode. */
+  /** Voice: echo cancellation and automatic gain always on, noise suppression by mode. Music: all of them off. */
   _constraints() {
-    const s = this.settings;
-    const clean = this.noiseMode !== 'off';
-    const audio = { echoCancellation: true, autoGainControl: true, noiseSuppression: clean };
     const supported = navigator.mediaDevices?.getSupportedConstraints?.() || {};
-    if (supported.voiceIsolation) audio.voiceIsolation = clean;
-    if (s.inputId) audio.deviceId = { exact: s.inputId };
-    return audio;
+    return micConstraints({ noiseMode: this.noiseMode, music: this.music, supported, inputId: this.settings.inputId });
   }
 
   /**
@@ -69,7 +68,8 @@ export class MediaManager extends Emitter {
    */
   async _openPipe() {
     const raw = await this._openMic();
-    if (this.noiseMode !== 'strong' || !this.ctx?.audioWorklet || typeof AudioWorkletNode === 'undefined') return { raw, out: raw, chain: null };
+    for (const track of raw.getAudioTracks()) if ('contentHint' in track) track.contentHint = this.music ? 'music' : 'speech';
+    if (!usesDenoise({ noiseMode: this.noiseMode, music: this.music }) || !this.ctx?.audioWorklet || typeof AudioWorkletNode === 'undefined') return { raw, out: raw, chain: null };
     try {
       this.workletReady ??= this.ctx.audioWorklet.addModule(new URL('./denoise-worklet.js', import.meta.url));
       await this.workletReady;
@@ -105,7 +105,7 @@ export class MediaManager extends Emitter {
 
   /** Whether the outgoing microphone runs through our own noise suppression right now. */
   get processing() {
-    return this.pipe?.chain ? 'strong' : this.pipe ? this.noiseMode : null;
+    return this.pipe?.chain ? 'strong' : this.pipe ? (this.music ? 'music' : this.noiseMode) : null;
   }
 
   setSensitivity(value) {
@@ -186,8 +186,10 @@ export class MediaManager extends Emitter {
 
   leave() {
     if (!this.current) return;
+    if (this.recorder) this.stopRecording();
     const { session } = this.current;
     this.current = null;
+    this.music = false;
     this._closePipe(this.pipe);
     for (const s of [this.camera, this.screen]) this._stop(s);
     this.pipe = null;
@@ -223,6 +225,7 @@ export class MediaManager extends Emitter {
       const sender = link.senders[slot];
       if (track && sender?.track === track) continue;
       if (track || sender) link.setTrack(slot, track || null, stream);
+      if (slot === 'mic' && track) this._tune(link);
     }
     if (!together) this._dropAudio(`${session.id}:${peerId}`);
   }
@@ -263,6 +266,7 @@ export class MediaManager extends Emitter {
     el.play().catch(() => this.emit('error', 'autoplay'));
     entry.audio.set(stream.id, el);
     this._meter(key, stream);
+    this._recordSources();
   }
 
   _dropAudio(key) {
@@ -274,6 +278,7 @@ export class MediaManager extends Emitter {
     }
     entry.audio.clear();
     this._unmeter(key);
+    this._recordSources();
   }
 
   /** The remote stream of one member in a slot, if it carries a live video track. */
@@ -322,11 +327,121 @@ export class MediaManager extends Emitter {
     this._meter('self', this.mic);
     const session = this.current.session;
     for (const [peerId, link] of session.mesh?.links || []) {
-      if (link.senders?.mic) link.setTrack('mic', this.mic.getAudioTracks()[0], this.mic);
-      else this.sync(session, peerId);
+      if (link.senders?.mic) {
+        link.setTrack('mic', this.mic.getAudioTracks()[0], this.mic);
+        this._tune(link);
+      } else this.sync(session, peerId);
     }
     this._closePipe(old);
     this._gate();
+    this._recordSources();
+  }
+
+  /** Cap (music) or free (voice) the Opus bitrate on one link, once its encodings exist. */
+  _tune(link, tries = 0) {
+    const sender = link.senders?.mic;
+    if (!sender?.getParameters || !sender.setParameters) return;
+    const retry = () => tries < 8 && setTimeout(() => link.senders?.mic === sender && this._tune(link, tries + 1), 600);
+    const params = sender.getParameters();
+    const next = tunedParameters(params, this.music ? MUSIC_BITRATE : null);
+    if (next) sender.setParameters(next).catch(retry);
+    else if (!params.encodings?.length) retry();
+  }
+
+  /**
+   * Music mode for this call: every voice filter off, stereo where the device
+   * has it and up to 128 kbps. It ends with the call.
+   */
+  async setMusic(on) {
+    if (!this.current || this.music === !!on) return;
+    this.music = !!on;
+    await this.restartMic();
+    this._announce();
+    this.emit('change');
+  }
+
+  // Local recording: everything this device hears in the call, mixed into one
+  // audio file that never leaves the device. Everyone in the call is told.
+
+  get recording() {
+    return this.recorder ? { since: this.recorder.since } : null;
+  }
+
+  get canRecord() {
+    return typeof MediaRecorder !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext);
+  }
+
+  startRecording() {
+    if (!this.current || this.recorder || !this.canRecord) return false;
+    this._ensureContext();
+    if (!this.ctx) return false;
+    const dest = this.ctx.createMediaStreamDestination();
+    const type = pickRecordingType((t) => MediaRecorder.isTypeSupported(t));
+    let mr;
+    try {
+      mr = new MediaRecorder(dest.stream, type ? { mimeType: type, audioBitsPerSecond: 128000 } : {});
+    } catch {
+      this.emit('error', 'record-failed');
+      return false;
+    }
+    const rec = { mr, dest, type, sources: new Map(), chunks: [], since: Date.now(), session: this.current.session, channel: this.current.channel };
+    this.recorder = rec;
+    this._recordSources();
+    mr.ondataavailable = (e) => e.data.size && rec.chunks.push(e.data);
+    mr.start(1000);
+    this._announce();
+    this.emit('sound', 'record');
+    this.emit('change');
+    return true;
+  }
+
+  /** Stop, then hand the file to whoever listens for 'recorded'. */
+  stopRecording() {
+    const rec = this.recorder;
+    if (!rec) return;
+    this.recorder = null;
+    const ms = Date.now() - rec.since;
+    rec.mr.onstop = () => {
+      for (const node of rec.sources.values()) node.disconnect();
+      const blob = new Blob(rec.chunks, { type: rec.mr.mimeType || rec.type || 'audio/webm' });
+      this.emit('recorded', { blob, ms, since: rec.since, session: rec.session, channel: rec.channel });
+    };
+    try {
+      rec.mr.stop();
+    } catch {
+      rec.mr.onstop();
+    }
+    this._announce();
+    this.emit('sound', 'record');
+    this.emit('change');
+  }
+
+  /** Keep the recording mix in line with who is in the call. */
+  _recordSources() {
+    const rec = this.recorder;
+    if (!rec || !this.ctx) return;
+    const want = new Map();
+    if (this.mic) want.set('self', this.mic);
+    for (const entry of this.remote.values()) {
+      if (entry.session !== rec.session) continue;
+      for (const [id, el] of entry.audio) if (el.srcObject) want.set(`${entry.peerId}:${id}`, el.srcObject);
+    }
+    for (const [key, node] of rec.sources) {
+      if (want.get(key) === node.stream) continue;
+      node.disconnect();
+      rec.sources.delete(key);
+    }
+    for (const [key, stream] of want) {
+      if (rec.sources.has(key) || !stream.getAudioTracks().length) continue;
+      try {
+        const node = this.ctx.createMediaStreamSource(stream);
+        node.stream = stream;
+        node.connect(rec.dest);
+        rec.sources.set(key, node);
+      } catch {
+        // a stream this browser cannot mix; the rest still records
+      }
+    }
   }
 
   toggleMute() {
@@ -486,12 +601,7 @@ export class MediaManager extends Emitter {
 
   _keys() {
     const typing = (el) => el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
-    const set = (held) => {
-      if (this.pttHeld === held) return;
-      this.pttHeld = held;
-      this._gate();
-      this.emit('change');
-    };
+    const set = (held) => this.setPtt(held);
     window.addEventListener('keydown', (e) => {
       if (this.settings.inputMode !== 'ptt' || e.code !== this.settings.pttKey || e.repeat) return;
       if (typing(e.target) && e.code.startsWith('Key')) return;
@@ -501,6 +611,23 @@ export class MediaManager extends Emitter {
       if (e.code === this.settings.pttKey) set(false);
     });
     window.addEventListener('blur', () => set(false));
+  }
+
+  /** Hold (true) or release (false) push to talk: a key, or the talk button on a touch screen. */
+  setPtt(held) {
+    if (this.pttHeld === held) return;
+    this.pttHeld = held;
+    this._gate();
+    this.emit('change');
+  }
+
+  /** 'voice' (voice activity) or 'ptt' (push to talk). */
+  setInputMode(mode) {
+    this.settings.inputMode = mode === 'ptt' ? 'ptt' : 'voice';
+    this.app.saveSettings();
+    this.pttHeld = false;
+    this._gate();
+    this.emit('change');
   }
 
   async devices() {

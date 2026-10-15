@@ -2,6 +2,23 @@
 
 All notable changes to howlden are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- A big "Call a friend" button on the home screen: one tap makes the six words, opens the share menu (or copies the words where there is none), and starts a voice call as soon as the friend types them; the friend's phone rings.
+- Stickers drawn for howlden: Luna the wolf in eight moods (wave, howl, love, laugh, party, sleepy, thanks, cool), built from SVG shapes, with a small animation when they arrive and on hover.
+- Reactions pop when they are added, and live reactions float over a call from the sender's tile for everyone in it (not stored, rate limited).
+- Push to talk on touch screens: a big "Hold to talk" button in the call, and a Push to talk switch in the call's More menu.
+- Music mode for a call: echo cancellation, noise suppression, automatic gain and our own noise suppression off, stereo where the device has it, and the Opus bitrate raised to 128 kbps. Others see a Music tag.
+- Local call recording: after a confirmation, everything this device hears in the call is mixed into one audio file (WebM or Ogg Opus, or MP4) that stays on this device until you download it. Everyone in the call sees a "Recording" notice with who records, hears a short sound and gets a message; the recorder sees a timer and a Stop button. The notice comes from howlden itself and cannot stop someone who records with another program.
+
+### Changed
+
+- Invites are six words and a QR code only. No link or URL text is shown anywhere, and sharing sends the words as text. The QR code still holds the words so a phone camera opens the app with them.
+- The invite link and reply link mode ("Zero third parties") is gone from the app and from Settings. Opening an invite link from an older version explains that six words are needed now.
+- With reduced motion, the new animations stay still; reactions over a call fade in place instead of flying.
+
 ## [0.1.1] - 2026-10-14
 
 ### Added

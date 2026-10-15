@@ -4,6 +4,7 @@ import { h, replace } from './dom.js';
 import { icon } from './icons.js';
 import { avatarImg, closePopover, popover } from './ui-shell.js';
 import { confirmDialog } from './ui-modal.js';
+import { stickerEl } from './stickers.js';
 import { avatarTraits } from '../core/avatar.js';
 import { DM_TEXT } from './session.js';
 import { MAX_MEMBERS } from '../core/mesh.js';
@@ -63,7 +64,12 @@ export function renderHome(app, el) {
   const friends = app.friends.list();
   const online = friends.filter((f) => app.friends.isOnline(f.id));
   const tabBtn = (key, label) => h('button', { class: `hl-tab${tab === key ? ' active' : ''}${key === 'add' ? ' tab-add' : ''}`, type: 'button', role: 'tab', 'aria-selected': String(tab === key), onclick: () => ((app.homeTab = key), app.render()) }, label);
-  const head = h('div', { class: 'home-tabs', role: 'tablist', 'aria-label': t('home.friends') }, icon('members', { size: 20, cls: 'muted' }), h('strong', null, t('home.friends')), h('span', { class: 'hd-divider' }), tabBtn('online', t('home.online')), tabBtn('all', t('home.all')), tabBtn('add', t('home.addFriend')));
+  const head = h(
+    'div',
+    { class: 'home-tabs' },
+    h('div', { class: 'home-tablist', role: 'tablist', 'aria-label': t('home.friends') }, icon('members', { size: 20, cls: 'muted' }), h('strong', null, t('home.friends')), h('span', { class: 'hd-divider' }), tabBtn('online', t('home.online')), tabBtn('all', t('home.all')), tabBtn('add', t('home.addFriend'))),
+    friends.length && tab !== 'add' ? h('button', { class: 'btn btn-brand btn-sm call-new', type: 'button', onclick: () => app.callNewFriendFlow() }, icon('phone', { size: 16 }), h('span', null, t('home.callButton'))) : null,
+  );
   let body;
   if (tab === 'add' || !friends.length) {
     body = h(
@@ -71,11 +77,21 @@ export function renderHome(app, el) {
       { class: 'home-add' },
       h(
         'section',
-        { class: 'add-card' },
-        friends.length ? null : h('img', { class: 'empty-art left', src: '../assets/art/characters/pip.svg', alt: '', width: 120, height: 120 }),
-        h('h2', null, t('home.addFriend')),
-        h('p', { class: 'muted' }, t('home.addFriendText')),
-        h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-brand', type: 'button', onclick: () => app.friendInviteFlow() }, icon('invite', { size: 18 }), t('home.friendInvite')), h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => app.joinFlow() }, icon('enter', { size: 18 }), t('home.pasteInvite'))),
+        { class: 'call-hero', 'aria-labelledby': 'call-hero-title' },
+        h('div', { class: 'call-hero-art' }, stickerEl('wave', { size: 112, play: true })),
+        h(
+          'div',
+          { class: 'call-hero-text' },
+          h('h2', { id: 'call-hero-title' }, t('home.callTitle')),
+          h('p', { class: 'muted' }, t('home.callLead')),
+          h(
+            'div',
+            { class: 'row-btns' },
+            h('button', { class: 'btn btn-brand btn-lg call-btn', type: 'button', onclick: () => app.callNewFriendFlow() }, icon('phone', { size: 20 }), t('home.callButton')),
+            h('button', { class: 'btn btn-ghost btn-lg', type: 'button', onclick: () => app.joinFlow() }, icon('enter', { size: 18 }), t('home.haveWords')),
+          ),
+          h('button', { class: 'link-btn', type: 'button', onclick: () => app.friendInviteFlow() }, t('home.addOnly')),
+        ),
       ),
       h(
         'div',

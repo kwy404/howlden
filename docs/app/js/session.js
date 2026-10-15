@@ -5,6 +5,7 @@ import { DIRECT_MEMBERS, Emitter, MAX_MEMBERS, Mesh, MeshError } from '../core/m
 import { RtcLink } from '../core/rtc.js';
 import {
   HistorySync,
+  REACTIONS,
   allowedChange,
   batchBySize,
   cleanRecord,
@@ -23,6 +24,7 @@ import { Assembler, CHUNK_SIZE, MAX_FILE, decodeChunk, encodeChunk, slices } fro
 import { mentions } from '../core/markdown.js';
 import { checkProof, friendStatus, nonce, proveIdentity } from '../core/identity.js';
 import { confirmWords } from '../core/words.js';
+import { RateLimit } from '../core/call.js';
 import * as store from './store.js';
 
 const PLAIN_TYPES = new Set(['key', 'key-ok', 'key-bad', 'id-hello', 'id-proof']);
@@ -51,6 +53,7 @@ export class DenSession extends Emitter {
     this.decryptWarned = false;
     this.queue = Promise.resolve();
     this.lastTyping = 0;
+    this.bursts = new RateLimit({ max: 6, windowMs: 2000 });
     this.sync = new HistorySync({
       store: {
         all: async () => this.messages,
@@ -392,7 +395,8 @@ export class DenSession extends Emitter {
         return;
       case 'voice': {
         if (typeof msg.channel === 'string' && this.den.channels.some((c) => c.id === msg.channel && c.kind === 'voice')) {
-          this.voice.set(from, { channel: msg.channel, muted: !!msg.muted, deafened: !!msg.deafened, camera: !!msg.camera, screen: !!msg.screen, since: this.voice.get(from)?.channel === msg.channel ? this.voice.get(from).since : Date.now() });
+          const before = this.voice.get(from);
+          this.voice.set(from, { channel: msg.channel, muted: !!msg.muted, deafened: !!msg.deafened, camera: !!msg.camera, screen: !!msg.screen, music: !!msg.music, rec: !!msg.rec, since: before?.channel === msg.channel ? before.since : Date.now() });
         } else {
           this.voice.delete(from);
         }
@@ -444,6 +448,10 @@ export class DenSession extends Emitter {
         return;
       case 'call-decline':
         this.emit('call-declined', from);
+        return;
+      case 'burst':
+        // A live reaction over the call. Not stored, and only from someone in voice.
+        if (REACTIONS.includes(msg.key) && this.voice.has(from) && this.bursts.allow(from)) this.emit('burst', { from, key: msg.key });
         return;
       case 'key-ok':
         this.verified.add(from);
@@ -555,6 +563,23 @@ export class DenSession extends Emitter {
     this.markRead(channelId);
     await this.send({ type: 'rec', rec });
     return rec;
+  }
+
+  async postSticker(channelId, sticker) {
+    const rec = createRecord({ id: randomId(8), channel: channelId, author: this.self.id, ts: Date.now(), sticker });
+    await this._merge([rec]);
+    this.emit('records', [rec]);
+    this.markRead(channelId);
+    await this.send({ type: 'rec', rec });
+    return rec;
+  }
+
+  /** Send a live reaction to everyone in the call and show it here too. */
+  sendBurst(key) {
+    if (!REACTIONS.includes(key) || !this.bursts.allow(this.self.id)) return false;
+    this.emit('burst', { from: this.self.id, key });
+    this.send({ type: 'burst', key });
+    return true;
   }
 
   async _update(id, fn) {
