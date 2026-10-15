@@ -49,7 +49,7 @@
 <li>Your friend types the six words. Both browsers derive a meeting place and an AES-GCM key from the words and meet on public MQTT relays. The offers travel sealed with that key, so the relays only see ciphertext. The words work once and expire after ten minutes.</li>
 <li>Your friend sees six confirmation words made from both connection certificates and reads them back. The member who invited types them, and the two browsers connect directly. A friend whose key is already known is let in on the signature alone.</li>
 </ol>
-<p>Would you rather involve no relay at all? Switch to links in Settings: you send an invite link (or QR) and get a reply link back by hand. Either way you never see raw technical text, and nobody can wander into a den uninvited: without that exchange, and without the inviter confirming it, there is no way in.</p>
+<p>You never see raw technical text, and nobody can wander into a den uninvited: without the six words, and without the inviter typing the confirmation words, there is no way in.</p>
 </section>
 <section id="locking-the-line"><h2>Problem three: keeping the line private</h2>
 <p>Once a route is found, WebRTC sets up encryption before anything else flows. Data channels (text and files) use <strong>DTLS</strong>, and audio and video use <strong>SRTP</strong> with keys agreed through that DTLS handshake. This is built into every modern browser and cannot be switched off. The result is that the connection is end to end encrypted between the two browsers.</p>

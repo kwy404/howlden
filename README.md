@@ -1,207 +1,96 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/banner-dark.svg">
-    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/banner.svg" width="880" alt="howlden banner: Luna the wolf howls into her headset mic. Serverless group chat, voice and video in your browser, with no account, end to end encryption, invites only and up to 5 people">
+    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/banner.svg" width="880" alt="howlden banner: Luna the wolf howls into her headset mic">
   </picture>
 </p>
 
-<h1 align="center">howlden: serverless group chat, voice and video in your browser</h1>
+<h1 align="center">howlden</h1>
+
+<p align="center">Group chat, voice and video between browsers, for up to 5 friends. No account, and no server of ours in the middle.</p>
 
 <p align="center">
-  <a href="https://github.com/kwy404/howlden/actions/workflows/ci.yml"><img src="https://github.com/kwy404/howlden/actions/workflows/ci.yml/badge.svg" alt="CI status of howlden"></a>
+  <a href="https://github.com/kwy404/howlden/actions/workflows/ci.yml"><img src="https://github.com/kwy404/howlden/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="https://github.com/kwy404/howlden/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-7c5cff" alt="MIT license"></a>
-  <a href="https://kwy404.github.io/howlden/app/"><img src="https://img.shields.io/badge/open-the%20app-ff8a3d" alt="Open the howlden app in your browser"></a>
-  <img src="https://img.shields.io/badge/server-none%20of%20ours-1b1240" alt="No server of ours">
-  <img src="https://img.shields.io/badge/account-none-1b1240" alt="No account, no sign up">
-  <img src="https://img.shields.io/badge/encryption-end%20to%20end-3ee6a0" alt="End to end encrypted with WebRTC">
 </p>
 
 <p align="center">
-  <a href="https://kwy404.github.io/howlden/app/"><b>Open a den</b></a> &middot;
+  <a href="https://kwy404.github.io/howlden/app/"><b>Open the app</b></a> &middot;
   <a href="https://kwy404.github.io/howlden/">Website</a> &middot;
-  <a href="https://kwy404.github.io/howlden/#invite">How inviting works</a> &middot;
   <a href="https://kwy404.github.io/howlden/guides.html">Guides</a> &middot;
-  <a href="https://github.com/kwy404/howlden/blob/main/i18n/README.pt-BR.md">Leia em Português (pt-BR)</a>
+  <a href="https://github.com/kwy404/howlden/blob/main/i18n/README.pt-BR.md">Português</a>
 </p>
 
-**howlden is a free, open source group chat that runs entirely in your browser, with the layout you know from gaming chat apps: dens (servers), text channels, voice channels, video and screen share.** There is no account and no sign up: you create a local profile (a username, an avatar and an identity key made on your device). You invite friends with a link or a QR code, and everything flows directly between your browsers over WebRTC, end to end encrypted. No server of ours ever sees your messages, voice, video or files. A den holds up to 5 people, or just you and one friend.
+howlden is a small group chat that runs entirely in the browser: dens with text channels, voice channels, video and screen share. You pick a name and an avatar, share six words with a friend, and you are talking. Messages, calls and files go straight between the browsers over WebRTC, end to end encrypted.
 
-<p align="center">
-  <a href="https://kwy404.github.io/howlden/"><img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/social-preview.png" width="820" alt="The howlden website: a den for your pack, no server in sight, with a pack of wolves around a campfire"></a>
-</p>
+## Quick start
 
-## Table of contents
+1. Open **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)** and pick a name and an avatar.
+2. Create a den and click **Invite**. Read the six words to a friend, or send them in any messenger.
+3. Your friend types the words and reads six confirmation words back. Type them, and you are connected.
 
-- [Open the app](#open-the-app)
-- [Features](#features)
-- [How inviting works](#how-inviting-works)
-- [Why it is private](#why-it-is-private)
-- [Honest limits](#honest-limits)
-- [Server based or direct](#server-based-or-direct)
-- [Run it yourself](#run-it-yourself)
-- [Development](#development)
-- [FAQ](#faq)
-- [Guides](#guides)
-- [Art](#art)
-- [More from kwy404](#more-from-kwy404)
-- [Author](#author)
-- [License](#license)
-
-## Open the app
-
-Go to **[kwy404.github.io/howlden/app](https://kwy404.github.io/howlden/app/)**, pick a username and an avatar, open a den and send an invite. That is it: nothing to download, no email, no password, no phone number. Works in current Chrome, Edge, Firefox and Safari, on desktop and on phones. You can install it from the browser as an app, and it opens offline once loaded (calls still need a network, of course).
+Nothing to install. It works in current Chrome, Edge, Firefox and Safari, on desktop and on phones, and you can install it as an app from the browser.
 
 ## Features
 
-| | |
-| --- | --- |
-| **Dens** | A group space with text channels, voice channels and a member list. Each den is its own private circle of up to 5 people. |
-| **Text channels** | Messages with bold, italic, strike, spoilers, code, quotes, lists and links. Mentions, replies, edits, deletes and reactions. |
-| **Voice channels** | Take a seat and howl. A ring lights up around whoever is speaking. Mute and deafen are one click away. |
-| **Video and screen share** | Turn on a camera or share a window, a tab or the whole screen inside any voice channel. |
-| **Files** | Drop a file in the chat and it goes straight from your browser to your friends. Nothing is uploaded anywhere. |
-| **Local profile** | A username, an avatar and a signing key pair (Ed25519 where the browser supports it) made on your device. Your tag, like `luna#7c1f`, comes from that key. Lock it with a PIN, or move it with an encrypted backup file. |
-| **Invites** | Six words (or their QR code) through encrypted public relays, confirmed with six more words. Or, with zero third parties, an invite link out and a reply link back. |
-| **Privacy extras** | An optional den passphrase for a second layer of encryption and a connection fingerprint you can compare. |
-| **Network help** | Clear words when a strict network blocks a direct connection, and a setting for your own TURN server. |
-| **Installable** | A PWA with a service worker: install it, and it opens offline once loaded. |
+- **Dens** with text channels, voice channels and a member list, for up to 5 people.
+- **Text chat** with formatting, replies, mentions, edits, reactions and stickers of Luna that animate when they arrive.
+- **Voice, video and screen share** inside voice channels, with mute, deafen and noise suppression.
+- **Call a friend** from the home screen: one tap makes the six words and opens the share menu.
+- **Push to talk**, with a big Hold to talk button on phones.
+- **Music mode**: no noise or echo filters, stereo where the device has it, up to 128 kbps.
+- **Local recording** of a call, saved only on your device, with a Recording notice and a sound for everyone in the call.
+- **Files** sent straight from browser to browser.
+- **A local profile**: a name, an avatar and an identity key made on your device. Lock it with a PIN, or move it with an encrypted backup file.
+- **Six word invites** with a QR code. No links to copy, nothing technical to paste.
+- **Privacy extras**: an optional den passphrase and a connection fingerprint you can compare.
 
 ## How inviting works
 
-There is no server to introduce you, so friends introduce themselves. By default it takes six words:
+There is no server to introduce you, so friends introduce themselves with six words. Both browsers derive a meeting place and an AES-GCM key from the words and meet on public MQTT relays, so the relays only ever see ciphertext. The words work once and expire after 10 minutes. Your friend then reads six confirmation words, made from both connection certificates, back to you. A friend whose key you already know is let in on the signature alone.
 
-1. **Show six words.** Click Invite in your den. howlden shows six words (and a small QR code with them). Read them out, or send them in any messenger.
-2. **Your friend types them.** Both devices derive a random topic and an AES-GCM key from the words and meet on public MQTT relays (EMQX, HiveMQ, Mosquitto). The short WebRTC handshake travels sealed with that key, so the relays only see ciphertext. Nothing has to be sent back. The words work once and expire after 10 minutes.
-3. **Confirm and howl together.** Your friend sees six confirmation words made from both connection certificates; you type them, and they are in. A friend whose identity key you already know is let in on the signature alone, so calling a known friend needs only the six words. howlden then connects them to everyone else in the den by itself, passing the setup messages over the encrypted links that already exist, so every member ends up linked to every other member.
+Friends can type the words, paste them or scan the QR code. The inviter always confirms the newcomer, so leaked words alone are not enough. More in [how howlden works](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html).
 
-Prefer zero third parties? In Settings, switch to links: you send an invite link (or QR) and get a reply link back, and nothing but the STUN servers is contacted. Either way, the member who invited has to confirm the newcomer, so leaked words or a leaked link alone are not enough to get in. Nobody ever sees JSON or anything technical. More in [peer to peer chat, explained](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html).
+## Privacy and limits
 
-## Why it is private
+- No server of ours ever sees your messages, voice, video or files. The website and the app are static files.
+- WebRTC encrypts every connection with DTLS, and audio and video with SRTP.
+- Your profile, settings, dens and messages live in your browser. Clearing site data removes them unless you saved a backup.
+- A recording notice comes from the howlden app. It cannot stop someone who records with another program.
+- Private is not anonymous: members of a den connect directly and can see each other's network address.
+- Everyone has to be online at the same time. Members who are online share what you missed.
+- When both sides are behind a strict NAT, you need a TURN relay. howlden says so in plain words and lets you add one in Settings. See [when a connection fails](https://kwy404.github.io/howlden/webrtc-connection-failed-strict-nat.html).
 
-- **No server of ours.** There is no howlden backend, database or account system. No server of ours ever sees your messages, voice, video or files. The website and the app are static files on GitHub Pages.
-- **Encrypted by WebRTC.** Every connection is encrypted end to end with DTLS, and audio and video with SRTP. This is built into the browser and cannot be switched off.
-- **STUN only asks one question.** To find a route, each browser asks a public STUN server "what is my public address?". STUN servers never see your conversations.
-- **Relays cannot read.** When a strict network blocks a direct path, a TURN relay can forward the traffic. A TURN relay only forwards encrypted packets and cannot read them.
-- **Nothing stored online.** Your profile, settings, dens and messages live in your own browser.
-- **Optional passphrase.** A den passphrase adds a second layer: PBKDF2 derives an AES-GCM key, so only members who know it can read messages and files.
-- **Fingerprint.** howlden shows a short connection fingerprint. Compare it on a call: if both sides see the same code, nobody is in the middle.
-
-Private is not the same as anonymous: members of a den connect directly, so they can see each other's network address. And your security still depends on your device and your browser. Read the [security policy](https://github.com/kwy404/howlden/blob/main/SECURITY.md).
-
-## Honest limits
-
-- **Up to 5 people per den.** A den is a full mesh: everyone sends their audio and video to everyone else. Upload bandwidth grows with each person, so for large communities a server based tool is the better fit.
-- **Everyone has to be online.** There is no server holding messages. When you come back, members who are online share what you missed; if nobody is online, the den is quiet.
-- **Strict NAT on both sides** (some office, school, hotel and mobile carrier networks) can block a direct connection. Then you need a TURN relay; howlden tells you when this happens. See [fixing a failed connection](https://kwy404.github.io/howlden/webrtc-connection-failed-strict-nat.html).
-- **Video is heavy.** Audio stays light even in a full den; five cameras ask a lot of a home connection.
-- **Clearing your browser data removes your profile**, unless you saved an encrypted backup.
-
-## Server based or direct
-
-Both approaches are good at different things. This compares approaches, not brands.
-
-| | Server based chat apps | howlden (direct) |
-| --- | --- | --- |
-| Where messages go | Through the provider's servers, which store and forward them | Straight between the members' browsers |
-| Account | Usually an email or a phone number and a password | A local profile on your device |
-| Group size | Large communities | Up to 5 per den, or just two of you |
-| Friends who are away | Messages wait on the server | Everyone chats while online; history syncs from members who are online |
-| How people join | Public servers, search and invite links | Invite only |
-| Encryption | Depends on the app | End to end by WebRTC, plus an optional passphrase |
-| Moderation and bots | Often rich | Kept simple, for small groups who know each other |
-| Who runs it | The provider | Nobody: the members' browsers do the work |
+Read the [security policy](https://github.com/kwy404/howlden/blob/main/SECURITY.md) for more.
 
 ## Run it yourself
 
-howlden is static files. Serve the `docs/` folder from any static host (GitHub Pages, Netlify, your own nginx) over HTTPS, because browsers only allow the microphone and camera on secure pages:
+howlden is static files. Serve the `docs/` folder from any static host over HTTPS (browsers only allow the microphone and camera on secure pages):
 
 ```bash
 git clone https://github.com/kwy404/howlden.git
 cd howlden
 npm install
-npm run serve   # http://127.0.0.1:8080/ for local testing
+npm run serve   # http://127.0.0.1:8080/
 ```
 
 ## Development
 
 | Command | What it does |
 | --- | --- |
-| `npm test` | Unit tests for the core modules (QR encoder, invites, crypto, mesh, history, identity) and the site checks, with Vitest |
+| `npm test` | Unit tests for the core modules and the site checks (Vitest) |
 | `npm run lint` | ESLint |
-| `npm run rules` | House rules: no emoji, no en or em dashes, no names of other CSS frameworks |
+| `npm run rules` | House rules for every text file |
 | `npm run core` | Copies the shared modules from `src/` to `docs/app/core/` |
 | `npm run e2e` | A real two browser connection test with fake media devices |
-| `npm run site` | Builds the website pages, guides, sitemap and art from `scripts/site/` |
+| `npm run site` | Builds the website, guides, sitemap and art from `scripts/site/` |
 | `npm run site:check` | Fails when the built site is stale or has a broken internal link |
-| `npm run site:images` | Renders the Open Graph images and the social preview |
 
-The website is built with [Monsoon](https://kwy404.github.io/monsoon/) and its interactive parts with [Voodoo.js](https://kwy404.github.io/Voodoo.js/). See [CONTRIBUTING.md](https://github.com/kwy404/howlden/blob/main/CONTRIBUTING.md).
-
-## FAQ
-
-### Is there a chat app that needs no sign up and no account?
-Yes. howlden asks for no email, password or phone number. You create a local profile on your device and share an invite link. See [chat without signing up](https://kwy404.github.io/howlden/chat-without-signing-up.html).
-
-### How do I voice chat in the browser with no download?
-Open the app, join a voice channel and allow the microphone. Everything runs on WebRTC, which every modern browser ships. See [voice chat in the browser with no download](https://kwy404.github.io/howlden/voice-chat-in-browser-no-download.html).
-
-### Does howlden have text and voice channels?
-Yes. Each den has text channels, voice channels, a member list and screen share, the familiar layout of community chat apps, with no account and no server in the middle. It is built for small private groups, not big public communities. See [peer to peer chat explained](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html).
-
-### Is howlden end to end encrypted?
-Yes. WebRTC encrypts every connection with DTLS and SRTP, a passphrase can add a second layer, and a fingerprint lets you check that nobody is in the middle.
-
-### Why does my WebRTC connection fail?
-Usually because both sides are behind a strict NAT. Add a TURN server in Settings. See [WebRTC connection failed](https://kwy404.github.io/howlden/webrtc-connection-failed-strict-nat.html).
-
-### How many people can join?
-Up to 5 per den. It works just as well for two.
-
-## Guides
-
-- [Chat without signing up](https://kwy404.github.io/howlden/chat-without-signing-up.html)
-- [Voice chat in the browser with no download](https://kwy404.github.io/howlden/voice-chat-in-browser-no-download.html)
-- [Private group voice call](https://kwy404.github.io/howlden/private-group-voice-call.html)
-- [Peer to peer chat explained](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html)
-- [Screen share without an app](https://kwy404.github.io/howlden/screen-share-without-app.html)
-- [Encrypted group chat for free](https://kwy404.github.io/howlden/free-encrypted-group-chat.html)
-- [Voice chat for gaming in the browser](https://kwy404.github.io/howlden/browser-voice-chat-for-gaming.html)
-- [How WebRTC voice chat works](https://kwy404.github.io/howlden/how-webrtc-voice-works.html)
-- [A safe chat for kids' study groups](https://kwy404.github.io/howlden/safe-chat-for-kids-study-groups.html)
-- [WebRTC connection failed: strict NAT and TURN](https://kwy404.github.io/howlden/webrtc-connection-failed-strict-nat.html)
-- [Group video call without an account](https://kwy404.github.io/howlden/group-video-call-without-account.html)
-- Em português: [chat sem cadastro](https://kwy404.github.io/howlden/pt/chat-sem-cadastro.html) e [chamada de voz no navegador](https://kwy404.github.io/howlden/pt/chamada-de-voz-no-navegador.html)
-
-## Art
-
-Luna (a young wolf with a gaming headset), her pack, 44 icons and 14 night scenes are original SVG, each in a dusk and a night version, drawn in code in [scripts/site](https://github.com/kwy404/howlden/tree/main/scripts/site) and exported to [assets](https://github.com/kwy404/howlden/tree/main/assets). They are MIT licensed like the code.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/icons-sheet-dark.svg">
-    <img src="https://cdn.jsdelivr.net/gh/kwy404/howlden@5a825300d45710bd67a8134cb2591ac638670bca/assets/icons-sheet.svg" width="640" alt="The howlden icon set: den, text and voice channels, mute, deafen, screen share, camera, invite, QR, lock, fingerprint, mesh, campfire, relay and more">
-  </picture>
-</p>
-
-## More from kwy404
-
-- [Monsoon](https://kwy404.github.io/monsoon/): utility first CSS with no build step and a theme from one seed color.
-- [Voodoo.js](https://kwy404.github.io/Voodoo.js/): reactive attributes and JSX in plain HTML.
-- [filefinch](https://kwy404.github.io/filefinch/): send files peer to peer in the browser, no server.
-- [breakhound](https://kwy404.github.io/breakhound/): find bugs in any JavaScript library automatically.
-- [vueleap](https://kwy404.github.io/vueleap/): Vue 2 to Vue 3 migration.
-- [graphemely](https://kwy404.github.io/graphemely/): grapheme aware string utilities.
-- [numberparrot](https://kwy404.github.io/numberparrot/): parse localized numbers.
-- [edgegoat](https://kwy404.github.io/edgegoat/): edge case inputs for JavaScript testing.
-- [cookieowl](https://kwy404.github.io/cookieowl/): cookie consent for LGPD and GDPR that really blocks trackers.
-- [installkite](https://kwy404.github.io/installkite/): make any website installable and offline capable.
-- [a11ymedic](https://kwy404.github.io/a11ymedic/): accessibility checker with exact fixes.
-- [fontsketch](https://kwy404.github.io/fontsketch/): turn your handwriting into a font.
-- [kastor](https://kwy404.github.io/kastor/): TypeScript ORM for many databases.
+The website is built with [Monsoon](https://kwy404.github.io/monsoon/) and its interactive parts with [Voodoo.js](https://kwy404.github.io/Voodoo.js/). The art (Luna, her pack, the icons and the scenes) is original SVG drawn in code in `scripts/site/`. See [CONTRIBUTING.md](https://github.com/kwy404/howlden/blob/main/CONTRIBUTING.md).
 
 ## Author
 
-Created by **Alexandre Kohler** ([GitHub](https://github.com/kwy404) and [LinkedIn](https://www.linkedin.com/in/alexandre-silva-173687256/)).
+Made by **Alexandre Kohler** ([GitHub](https://github.com/kwy404), [LinkedIn](https://www.linkedin.com/in/alexandre-silva-173687256/)). More projects: [Monsoon](https://kwy404.github.io/monsoon/), [Voodoo.js](https://kwy404.github.io/Voodoo.js/), [filefinch](https://kwy404.github.io/filefinch/) and others on [GitHub](https://github.com/kwy404).
 
 ## License
 

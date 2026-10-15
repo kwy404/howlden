@@ -173,7 +173,7 @@ ${owl(P, 360, 170, 1.05)}`);
     },
   },
   'reply-code': {
-    alt: 'Two wolf dens on opposite hills. An invite link travels from the left den to the right one, and a short reply code travels back.',
+    alt: 'Two wolf dens on opposite hills. Six words travel from the left den to the right one, and six confirmation words travel back.',
     draw(P, id) {
       return frame(id, P, `${sky(P, id, { moon: [320, 70, 30], seed: 5 })}${hills(P)}${den(P, 120, 372, 0.62)}${den(P, 520, 372, 0.62)}
 <path d="M150 250 C230 120 410 120 490 250" stroke="${P.setA}" stroke-width="5" stroke-dasharray="3 13" stroke-linecap="round" fill="none"/>

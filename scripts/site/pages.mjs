@@ -3,8 +3,8 @@ import { SCENES } from './scenes.mjs';
 import { SITE, UPDATED, art, esc, icon, pic } from './layout.mjs';
 
 const L = {
-  en: { home: 'Home', guides: 'Guides', guide: 'Guide', updated: 'Updated', read: 'min read', toc: 'On this page', faq: 'Frequently asked questions', related: 'Keep reading', cta: 'Ready to try it?', ctaText: 'Open a den, send one invite link and talk. No account, no download, no server of ours.', open: 'Open a den', other: 'Leia em português', all: 'All guides' },
-  pt: { home: 'Início', guides: 'Guias', guide: 'Guia', updated: 'Atualizado em', read: 'min de leitura', toc: 'Nesta página', faq: 'Perguntas frequentes', related: 'Continue lendo', cta: 'Quer experimentar?', ctaText: 'Abra um den, mande um link de convite e converse. Sem conta, sem download, sem servidor nosso.', open: 'Abrir um den', other: 'Read in English', all: 'Todos os guias' },
+  en: { home: 'Home', guides: 'Guides', guide: 'Guide', updated: 'Updated', read: 'min read', toc: 'On this page', faq: 'Frequently asked questions', related: 'Keep reading', cta: 'Ready to try it?', ctaText: 'Open a den, share six words and talk. No account, no download, no server of ours.', open: 'Open a den', other: 'Leia em português', all: 'All guides' },
+  pt: { home: 'Início', guides: 'Guias', guide: 'Guia', updated: 'Atualizado em', read: 'min de leitura', toc: 'Nesta página', faq: 'Perguntas frequentes', related: 'Continue lendo', cta: 'Quer experimentar?', ctaText: 'Abra um den, passe seis palavras e converse. Sem conta, sem download, sem servidor nosso.', open: 'Abrir um den', other: 'Read in English', all: 'Todos os guias' },
 };
 
 const DATE = { en: 'October 14, 2026', pt: '14 de outubro de 2026' };

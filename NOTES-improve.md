@@ -21,3 +21,10 @@ New features you can mention (all real, all in the app now):
 - Push to talk on phones: a big "Hold to talk" button in the call (Push to talk is in the call's More menu).
 - Music mode for a call: noise and echo filters off, stereo where the device has it, up to 128 kbps.
 - Local call recording: everything this device hears, saved only on this device after the user confirms; everyone in the call sees a "Recording" notice and hears a short sound. Note for copy: the notice comes from the howlden app; it cannot stop someone who records with another program.
+
+## From site to product
+
+- Done: the landing page, the guides and both READMEs now describe six words and a QR code only. Link mode, invite links and reply codes are gone from the copy, and the live preview's scripted chat no longer mentions a link.
+- Done: Call a friend, stickers, push to talk, music mode and local recording (with the "cannot stop another program" caveat) are on the landing page, in the voice guide and in both READMEs.
+- Done: package.json description and keywords were trimmed by the site agent (flag-risk cleanup). No need to touch them.
+- The guides are now four in English and two in Portuguese. If app copy links to a guide, only these exist: chat-without-signing-up, voice-chat-in-browser-no-download, peer-to-peer-chat-explained, webrtc-connection-failed-strict-nat, pt/chat-sem-cadastro, pt/chamada-de-voz-no-navegador.

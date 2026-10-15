@@ -183,7 +183,7 @@ function demo() {
 
 export const TOUR = [
   ['moonlit-den', 'Open the app', 'Pick a name and an avatar. No email, no password, no phone number.', '<span class="tr-chip"><img src="assets/art/avatars/luna.svg" width="32" height="32" alt=""><b>luna</b><s>Email</s><s>Password</s></span>'],
-  ['owl-invite', 'Share six words', 'Click Invite and read the six words out, or send them in any messenger.', `<span class="tr-chip tr-words">${INVITE_WORDS.map((w) => `<i>${w}</i>`).join('')}</span>`],
+  ['owl-invite', 'Share six words', 'Tap Call a friend, or Invite in a den, and read the six words out or send them in any messenger.', `<span class="tr-chip tr-words">${INVITE_WORDS.map((w) => `<i>${w}</i>`).join('')}</span>`],
   ['reply-code', 'Confirm and you are in', 'Your friend types the words, then reads six words back to you. That is the whole handshake.', `<span class="tr-chip">${icon('check')}<b>Nova joined Moonlight Pack</b></span>`],
   ['study-group', 'Chat in channels', 'Text channels with replies, reactions and files that go straight from browser to browser.', `<span class="tr-chip">${art('campfire')}<b>4</b>${art('laugh')}<b>2</b>${art('heart')}<b>3</b></span>`],
   ['gaming-squad', 'Talk, video, share a screen', 'Join a voice channel with one click. Turn on a camera or share a game while you talk.', `<span class="tr-chip tr-bar"><i>${icon('mic')}</i><i>${icon('video')}</i><i class="on">${icon('screen')}</i></span>`],
@@ -212,15 +212,15 @@ const TRUTHS = [
 ];
 
 const STEPS = [
-  ['owl-invite', 'Show six words', 'Click <b>Invite</b> in your den and howlden shows six words, plus a small QR code. Read them out on a call or send them in any messenger.', 'invite', 'An owl carries the invite link'],
-  ['reply-code', 'Your friend types them', 'The six words find your den through public relays that only ever see an encrypted handshake. Nothing to send back, and the words expire in ten minutes.', 'reply', 'The reply code travels back'],
+  ['owl-invite', 'Show six words', 'Click <b>Invite</b> in your den and howlden shows six words, plus a small QR code. Read them out on a call or send them in any messenger.', 'invite', 'An owl carries the six words'],
+  ['reply-code', 'Your friend types them', 'The six words find your den through public relays that only ever see an encrypted handshake. Nothing to send back, and the words expire in ten minutes.', 'reply', 'The confirmation words travel back'],
   ['pack-mesh', 'Confirm and howl', 'Type the six confirmation words your friend sees and they are in. Known friends are let in on their verified key. Then chat, voice and files go device to device.', 'mesh', 'The pack is connected'],
 ];
 
 const PRIVATE = [
   ['no-server', 'No server of ours', 'There is no howlden backend, database or account system. No server of ours ever sees your messages, voice, video or files. This website is static files.'],
   ['lock', 'Encrypted by WebRTC', 'Every connection is encrypted end to end with DTLS, and audio and video with SRTP. It is built into the browser and cannot be switched off.'],
-  ['relay', 'Relays cannot read', 'The six word handshake travels encrypted through public relays (EMQX, HiveMQ, Mosquitto) that cannot read it, and a TURN relay, when a strict network needs one, only forwards encrypted packets. Prefer zero third parties? Use invite links instead.'],
+  ['relay', 'Relays cannot read', 'The six word handshake travels encrypted through public relays (EMQX, HiveMQ, Mosquitto) that cannot read it, and a TURN relay, when a strict network needs one, only forwards encrypted packets.'],
   ['no-account', 'Nothing stored online', 'No email, no phone number, no profile in the cloud. Your profile, settings and dens live in your own browser.'],
   ['key', 'Optional passphrase', 'Give a den a passphrase for a second layer: PBKDF2 derives an AES-GCM key, so only members who know it can read messages and files.'],
   ['fingerprint', 'Compare a fingerprint', 'howlden shows a short connection fingerprint. Read it aloud on a call: if both sides see the same code, nobody is in the middle.'],
@@ -246,13 +246,14 @@ const COMPARE = [
 ];
 
 export const FAQ = [
-  ['Is howlden really serverless?', 'Yes. The site and the app are static files on GitHub Pages, and once the page is loaded your messages, voice, video and files go directly between browsers. To find a route, each browser asks a public STUN server one question, "what is my public address?". When no direct route exists, an optional TURN relay forwards encrypted packets it cannot read. No server of ours ever sees your conversations.'],
+  ['Is howlden really serverless?', 'Yes. The site and the app are static files on GitHub Pages, and once the page is loaded your messages, voice, video and files go directly between browsers. To find each other, the browsers pass a short handshake, sealed with a key made from the six words, through public relays that only see ciphertext, and each browser asks a public STUN server one question, "what is my public address?". When no direct route exists, an optional TURN relay forwards encrypted packets it cannot read. No server of ours ever sees your conversations.'],
   ['Do I need an account or to sign up?', 'No email, no password and no phone number. You create a local profile: a username, an avatar and a cryptographic identity key (Ed25519 where the browser supports it), all made in your browser and kept on your device. The dens you join see your name, your avatar and your public key, nothing else.'],
   ['How many people can be in a den?', 'Up to 5, or just two of you. A den is a full mesh: every member sends their audio, video and messages to every other member directly. That keeps everything private, but upload bandwidth grows with each person, so for big communities a server based tool is the better fit.'],
   ['Do my friends need to be online?', 'Yes, to talk everyone has to be online at the same time, because there is no server holding messages. When you come back, members who are online share the messages you missed, but if nobody is online the den is quiet.'],
   ['Why can\'t I connect to a friend?', 'Most often both of you are behind a strict NAT (some office, school, hotel and mobile carrier networks). Then a direct connection is not possible and you need a TURN relay. howlden tells you in plain words when this happens, and you can add your own TURN server in Settings.'],
   ['Is howlden end to end encrypted?', 'Yes. WebRTC encrypts every connection end to end with DTLS (and SRTP for audio and video). You can add a den passphrase for a second layer, and compare the connection fingerprint to make sure nobody is in the middle. Your security still depends on your device: encryption cannot protect a device that is already compromised.'],
-  ['Can strangers find or join my den?', 'No. A den has no public address and is not listed anywhere. To get in, someone needs an invite from a member, and the member who invited them has to accept their reply code. A link that leaks is not enough on its own.'],
+  ['Can strangers find or join my den?', 'No. A den has no public address and is not listed anywhere. To get in, someone needs six words from a member, and that member has to type the confirmation words the newcomer reads back. Words that leak are not enough on their own, and they expire after ten minutes.'],
+  ['Can someone record a call?', 'The app has a local recording option: it saves what that device hears, only on that device, after the person confirms, and everyone in the call sees a Recording notice and hears a short sound. The notice comes from the howlden app, so it cannot stop someone who records with another program. Only talk with people you trust.'],
   ['What happens if I clear my browser data?', 'Your local profile, identity key and dens live in your browser, so clearing site data removes them. There is no server copy to restore from, which is exactly the point, so save an encrypted backup file from Settings first: you can import it on any device, and only your backup password opens it.'],
   ['Does it work on phones?', 'Yes, in modern mobile browsers on Android and iOS, with text, voice and video. Screen sharing from a phone browser is limited by the phone, not by howlden.'],
   ['Is howlden free and open source?', 'Yes. It is free, MIT licensed and has no ads and no tracking. The code is on GitHub, so anyone can read how it works.'],
@@ -361,8 +362,8 @@ export function homeBody({ guides, qr }) {
 </section>
 
 <div class="panels">
-${panel({ id: 'chat', tone: 'pink', media: chatMock(), kicker: `${art('text-channel')}Text channels`, title: 'Chat, react, howl', text: 'Text channels with bold, italic, spoilers, code and quotes. Reply to a friend, mention the whole pack, react with a howl or a campfire, drop a file that goes straight from your browser to theirs. It all feels like the chat app you know, minus the company in the middle.', extra: `<a href="chat-without-signing-up.html" class="more">Getting started${icon('arrow')}</a>` })}
-${panel({ id: 'share', flip: true, tone: 'mint', media: shareMock(), kicker: `${art('screen-share')}Voice, video, screen share`, title: 'Talk, see and share, no server watching', text: 'Click a voice channel to sit down, click again to leave. Turn on cameras, share a game or a tab, and watch the ring light up around whoever speaks. Mute and deafen are one click away, and every stream travels directly between you, sealed with DTLS and SRTP.', extra: `<a href="voice-chat-in-browser-no-download.html" class="more">Voice and video calls${icon('arrow')}</a>` })}
+${panel({ id: 'chat', tone: 'pink', media: chatMock(), kicker: `${art('text-channel')}Text channels`, title: 'Chat, react, howl', text: 'Text channels with bold, italic, spoilers, code and quotes. Reply to a friend, mention the whole pack, react with a howl or a campfire, send a Luna sticker, drop a file that goes straight from your browser to theirs. It all feels like the chat app you know, minus the company in the middle.', extra: `<a href="chat-without-signing-up.html" class="more">Getting started${icon('arrow')}</a>` })}
+${panel({ id: 'share', flip: true, tone: 'mint', media: shareMock(), kicker: `${art('screen-share')}Voice, video, screen share`, title: 'Talk, see and share, no server watching', text: 'Click a voice channel to sit down, click again to leave. Turn on cameras, share a game or a tab, and watch the ring light up around whoever speaks. Mute and deafen are one click away, and every stream travels directly between you, sealed with DTLS and SRTP.', extra: `<ul class="ticks"><li>${icon('check')}<span><b>Push to talk</b>, with a big Hold to talk button on phones.</span></li><li>${icon('check')}<span><b>Music mode</b> turns the noise and echo filters off and raises the quality for instruments and singing.</span></li><li>${icon('check')}<span><b>Local recording</b>, saved only on your device, with a notice everyone in the call can see.</span></li></ul><a href="voice-chat-in-browser-no-download.html" class="more">Voice and video calls${icon('arrow')}</a>` })}
 </div>
 
 <div class="marquee" aria-hidden="true"><div class="mq-track"><div class="mq-row">${band}</div><div class="mq-row">${band}</div></div></div>
@@ -378,9 +379,9 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
     <div class="qr-demo rv">
       <div class="qr-card"><div class="qr-svg">${qr}</div><p>${art('qr')}A real QR code drawn by howlden's own encoder. This one opens the app.</p></div>
       <div class="qr-copy">
-        <h3>Link, QR code or paste</h3>
-        <p>Invites and replies are compressed so they fit in a link and a QR code. Share them through any messenger you already trust, show the QR on your screen for someone in the room, or paste the code by hand. Your friend never sees anything technical.</p>
-        <ul class="ticks"><li>${icon('check')}<span>The member who invited has to accept the reply, so a leaked link is not enough to get in.</span></li><li>${icon('check')}<span>Phones scan with the camera where the browser supports it, with paste as a fallback.</span></li><li>${icon('check')}<span>After the first link, the den connects the newcomer to everyone else by itself.</span></li></ul>
+        <h3>Say them, send them or scan them</h3>
+        <p>Read the six words aloud on a call, send them in any messenger you already trust, or show the QR code to someone in the room. On a phone, <b>Call a friend</b> makes the words and opens the share menu in one tap. Your friend never sees anything technical.</p>
+        <ul class="ticks"><li>${icon('check')}<span>The member who invited types the confirmation words, so leaked words are not enough to get in.</span></li><li>${icon('check')}<span>Phones scan the QR with the camera where the browser supports it, or type the words.</span></li><li>${icon('check')}<span>After the first friend, the den connects each newcomer to everyone else by itself.</span></li></ul>
         <a href="peer-to-peer-chat-explained.html" class="more">How howlden works${icon('arrow')}</a>
       </div>
     </div>
@@ -458,7 +459,7 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
   <div class="hx-sky" aria-hidden="true">${floaters([['moon', 'c-moon'], ['star', 'c-star1'], ['star', 'c-star2'], ['flame', 'c-flame']])}</div>
   <div class="wrap closing-in">
     <h2 id="final-title" class="mega">Your pack is waiting. Start howling.</h2>
-    <p>Open a den, send one link, and you are around the campfire in under a minute. No account to make, nothing to download, no server of ours.</p>
+    <p>Open a den, share six words, and you are around the campfire in under a minute. No account to make, nothing to download, no server of ours.</p>
     <a href="app/" class="btn-big btn-white">${art('den')}Open howlden in your browser</a>
   </div>
   <div class="lineup" aria-hidden="true">
@@ -487,7 +488,7 @@ export function homeJsonLd(guides) {
       isAccessibleForFree: true,
       license: 'https://opensource.org/licenses/MIT',
       softwareVersion: '0.1.0',
-      featureList: ['Local profile with a cryptographic identity key, no email or password', 'Text channels', 'Voice channels', 'Video calls', 'Screen share', 'File sharing', 'Reactions', 'QR code invites', 'End to end encryption with WebRTC', 'Optional passphrase', 'Connection fingerprint', 'Installable PWA', 'Up to 5 people per den'],
+      featureList: ['Local profile with a cryptographic identity key, no email or password', 'Text channels', 'Voice channels', 'Video calls', 'Screen share', 'File sharing', 'Reactions and stickers', 'Six word invites with a QR code', 'Push to talk', 'Music mode', 'Local call recording with a notice for everyone', 'End to end encryption with WebRTC', 'Optional passphrase', 'Connection fingerprint', 'Installable PWA', 'Up to 5 people per den'],
       screenshot: `${SITE}og.png`,
       image: `${SITE}assets/mascot.svg`,
       author: { '@type': 'Person', name: 'Alexandre Kohler', url: 'https://github.com/kwy404', sameAs: ['https://www.linkedin.com/in/alexandre-silva-173687256/'] },

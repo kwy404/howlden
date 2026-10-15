@@ -33,7 +33,7 @@
 }
 -->
 <section id="what-the-error-means"><h2>What "connection failed" actually means</h2>
-<p>Your friend typed the six words, and then nothing: the call never connects, or howlden tells you the connection failed. In a direct connection app, this message almost always has the same cause. The two browsers could not find any network path to each other. The handshake worked fine (that part travels sealed through the relays, or through your messenger with links), but the actual connection between the two devices was blocked somewhere along the way.</p>
+<p>Your friend typed the six words, and then nothing: the call never connects, or howlden tells you the connection failed. In a direct connection app, this message almost always has the same cause. The two browsers could not find any network path to each other. The handshake worked fine (that part travels sealed through the relays), but the actual connection between the two devices was blocked somewhere along the way.</p>
 <p>This guide explains why that happens, how to tell what kind of network you are on, and when a TURN server is the real fix. A quick refresher first: howlden has no server in the middle. Each pair of people connects directly with WebRTC, so if two browsers cannot reach each other, there is nothing to fall back on unless you provide one. If that model is new to you, <a href="peer-to-peer-chat-explained.html">how howlden works</a> covers the basics.</p>
 </section>
 <section id="nat-in-plain-words"><h2>NAT in plain words</h2>

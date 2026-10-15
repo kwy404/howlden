@@ -109,8 +109,8 @@ const msg = (who, text, extra = {}) => ({ id: nextId++, who, text, time: extra.t
 const SCRIPT = [
   ['fang', 'Who is up for a match tonight?', { react: [{ k: 'gamepad', n: 2, mine: false }] }],
   ['pip', 'Me! Homework is done, for once.'],
-  ['luna', 'Sent Nova an invite link. Scan the QR if you are on your phone.'],
-  ['nova', 'Reply code sent back. I am in!', { react: [{ k: 'paw', n: 3, mine: false }] }],
+  ['luna', 'Sent Nova six words. Scan the QR if you are on your phone.'],
+  ['nova', 'Read the confirmation words back. I am in!', { react: [{ k: 'paw', n: 3, mine: false }] }],
   ['fang', 'Fingerprint matches on my side: 4F2A 91C3.', { react: [{ k: 'shield', n: 1, mine: false }] }],
   ['nova', 'Here is the map for the strategy.', { file: 'raid-map.png' }],
   ['luna', 'Jump in Howl lounge, Nova is sharing her screen.', { react: [{ k: 'campfire', n: 2, mine: false }] }],
