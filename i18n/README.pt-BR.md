@@ -117,8 +117,8 @@ Sim. O howlden não pede e-mail, senha nem telefone. Veja o guia [chat sem cadas
 ### Dá para fazer chamada de voz pelo navegador sem baixar nada?
 Dá. Abra o app, entre num canal de voz e permita o microfone. Veja [chamada de voz no navegador](https://kwy404.github.io/howlden/pt/chamada-de-voz-no-navegador.html).
 
-### Existe alternativa ao Discord sem conta?
-Para grupos pequenos e privados, sim. Não é feito para comunidades públicas grandes. Veja [alternativa ao Discord sem conta](https://kwy404.github.io/howlden/pt/alternativa-ao-discord-sem-conta.html).
+### O howlden tem canais de texto e de voz?
+Tem. Cada den tem canais de texto, canais de voz e lista de membros, o layout conhecido dos apps de chat em comunidade. É feito para grupos pequenos e privados, não para comunidades públicas grandes. Veja [chat sem cadastro](https://kwy404.github.io/howlden/pt/chat-sem-cadastro.html).
 
 ### Por que a conexão falha?
 Geralmente porque os dois lados estão atrás de NAT restrito. Adicione um servidor TURN nas configurações.
@@ -127,7 +127,6 @@ Geralmente porque os dois lados estão atrás de NAT restrito. Adicione um servi
 
 - [Chat sem cadastro](https://kwy404.github.io/howlden/pt/chat-sem-cadastro.html)
 - [Chamada de voz pelo navegador sem baixar nada](https://kwy404.github.io/howlden/pt/chamada-de-voz-no-navegador.html)
-- [Alternativa ao Discord sem conta](https://kwy404.github.io/howlden/pt/alternativa-ao-discord-sem-conta.html)
 - Em inglês: [todos os guias](https://kwy404.github.io/howlden/guides.html)
 
 ## Mais de kwy404

@@ -43,7 +43,7 @@ function readGuides(dir) {
 
 // Reading order of the English guides.
 const ORDER = [
-  'chat-without-signing-up', 'voice-chat-in-browser-no-download', 'discord-alternative-without-account', 'private-group-voice-call',
+  'chat-without-signing-up', 'voice-chat-in-browser-no-download', 'private-group-voice-call',
   'peer-to-peer-chat-explained', 'screen-share-without-app', 'free-encrypted-group-chat', 'browser-voice-chat-for-gaming',
   'how-webrtc-voice-works', 'safe-chat-for-kids-study-groups', 'webrtc-connection-failed-strict-nat', 'group-video-call-without-account',
 ];

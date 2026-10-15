@@ -145,8 +145,8 @@ Yes. howlden asks for no email, password or phone number. You create a local pro
 ### How do I voice chat in the browser with no download?
 Open the app, join a voice channel and allow the microphone. Everything runs on WebRTC, which every modern browser ships. See [voice chat in the browser with no download](https://kwy404.github.io/howlden/voice-chat-in-browser-no-download.html).
 
-### Is there a Discord alternative without an account?
-For small private groups, yes: howlden has dens, text and voice channels and screen share, with no account and no server in the middle. It is not built for big public communities. See [a Discord alternative without an account](https://kwy404.github.io/howlden/discord-alternative-without-account.html).
+### Does howlden have text and voice channels?
+Yes. Each den has text channels, voice channels, a member list and screen share, the familiar layout of community chat apps, with no account and no server in the middle. It is built for small private groups, not big public communities. See [peer to peer chat explained](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html).
 
 ### Is howlden end to end encrypted?
 Yes. WebRTC encrypts every connection with DTLS and SRTP, a passphrase can add a second layer, and a fingerprint lets you check that nobody is in the middle.
@@ -161,7 +161,6 @@ Up to 5 per den. It works just as well for two.
 
 - [Chat without signing up](https://kwy404.github.io/howlden/chat-without-signing-up.html)
 - [Voice chat in the browser with no download](https://kwy404.github.io/howlden/voice-chat-in-browser-no-download.html)
-- [Discord alternative without an account](https://kwy404.github.io/howlden/discord-alternative-without-account.html)
 - [Private group voice call](https://kwy404.github.io/howlden/private-group-voice-call.html)
 - [Peer to peer chat explained](https://kwy404.github.io/howlden/peer-to-peer-chat-explained.html)
 - [Screen share without an app](https://kwy404.github.io/howlden/screen-share-without-app.html)
@@ -171,7 +170,7 @@ Up to 5 per den. It works just as well for two.
 - [A safe chat for kids' study groups](https://kwy404.github.io/howlden/safe-chat-for-kids-study-groups.html)
 - [WebRTC connection failed: strict NAT and TURN](https://kwy404.github.io/howlden/webrtc-connection-failed-strict-nat.html)
 - [Group video call without an account](https://kwy404.github.io/howlden/group-video-call-without-account.html)
-- Em português: [chat sem cadastro](https://kwy404.github.io/howlden/pt/chat-sem-cadastro.html), [chamada de voz no navegador](https://kwy404.github.io/howlden/pt/chamada-de-voz-no-navegador.html), [alternativa ao Discord sem conta](https://kwy404.github.io/howlden/pt/alternativa-ao-discord-sem-conta.html)
+- Em português: [chat sem cadastro](https://kwy404.github.io/howlden/pt/chat-sem-cadastro.html) e [chamada de voz no navegador](https://kwy404.github.io/howlden/pt/chamada-de-voz-no-navegador.html)
 
 ## Art
 

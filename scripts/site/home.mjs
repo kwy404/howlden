@@ -330,7 +330,7 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="compare-note">Want the long version? Read <a href="discord-alternative-without-account.html">a Discord alternative without an account</a> or <a href="free-encrypted-group-chat.html">encrypted group chat for free</a>.</p>
+    <p class="compare-note">Want the long version? Read <a href="peer-to-peer-chat-explained.html">peer to peer chat explained</a> or <a href="free-encrypted-group-chat.html">encrypted group chat for free</a>.</p>
   </div>
 </section>
 

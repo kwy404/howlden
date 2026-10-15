@@ -15,9 +15,9 @@ const pt = readdirSync(join(process.cwd(), 'scripts', 'site', 'guides', 'pt')).f
 const pages = ['index.html', 'guides.html', '404.html', ...en, ...pt.map((f) => `pt/${f}`)];
 
 describe('site pages', () => {
-  it('has at least 10 English guides and 3 Portuguese guides', () => {
+  it('has at least 10 English guides and 2 Portuguese guides', () => {
     expect(en.length).toBeGreaterThanOrEqual(10);
-    expect(pt.length).toBeGreaterThanOrEqual(3);
+    expect(pt.length).toBeGreaterThanOrEqual(2);
   });
 
   it.each(pages)('%s has a title, a description, OG tags and the footer', (p) => {

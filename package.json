@@ -10,20 +10,12 @@
     "webrtc chat",
     "webrtc voice chat",
     "webrtc video call",
-    "group video call without account",
     "voice chat in browser",
     "screen share in browser",
-    "private chat app",
-    "encrypted chat",
     "end to end encrypted chat",
-    "chat without server",
     "chat without sign up",
-    "mesh network chat",
-    "discord alternative",
-    "self hosted chat alternative",
     "pwa chat",
-    "qr code invite",
-    "offline first chat"
+    "qr code invite"
   ],
   "homepage": "https://kwy404.github.io/howlden/",
   "bugs": {
