@@ -14,6 +14,9 @@
 export const MAX_TEXT = 4000;
 export const MAX_FILES = 10;
 export const REACTIONS = ['like', 'love', 'laugh', 'wow', 'sad', 'fire', 'howl', 'check'];
+// Stickers drawn for howlden. A sticker message carries one of these keys and
+// no text; the art lives in the app (docs/app/js/stickers.js).
+export const STICKERS = ['wave', 'howl', 'love', 'laugh', 'party', 'sleepy', 'thanks', 'cool'];
 
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const num = (v) => (Number.isFinite(v) ? v : 0);
@@ -35,6 +38,7 @@ export function cleanRecord(rec) {
     files: [],
     reactions: {},
   };
+  if (STICKERS.includes(rec.sticker)) out.sticker = rec.sticker;
   if (Array.isArray(rec.files)) {
     for (const f of rec.files.slice(0, MAX_FILES)) {
       if (!f || !hex(f.id)) continue;
@@ -63,7 +67,7 @@ export function cleanRecord(rec) {
   return out;
 }
 
-function tombstone(rec) {
+function tombstone({ sticker: _gone, ...rec }) {
   return { ...rec, text: '', editedAt: 0, files: [], reply: null, reactions: {}, deleted: true, deletedAt: rec.deletedAt || rec.ts };
 }
 
@@ -91,6 +95,8 @@ export function mergeRecord(a, b) {
   out.text = newer.text;
   out.editedAt = newer.editedAt || 0;
   out.files = base.files || [];
+  const sticker = [a.sticker, b.sticker].filter(Boolean).sort()[0];
+  if (sticker) out.sticker = sticker;
   out.reactions = {};
   for (const key of new Set([...Object.keys(a.reactions || {}), ...Object.keys(b.reactions || {})])) {
     const ua = a.reactions?.[key] || {};
@@ -129,13 +135,18 @@ export function reactors(rec, key) {
 }
 
 /** A new message record. */
-export function createRecord({ id, channel, author, text = '', ts, reply = null, files = [] }) {
-  return { id, channel, author, ts, text: text.slice(0, MAX_TEXT), editedAt: 0, deleted: false, deletedAt: 0, reply, files, reactions: {} };
+export function createRecord({ id, channel, author, text = '', ts, reply = null, files = [], sticker = null }) {
+  const rec = { id, channel, author, ts, text: text.slice(0, MAX_TEXT), editedAt: 0, deleted: false, deletedAt: 0, reply, files, reactions: {} };
+  if (sticker) {
+    if (!STICKERS.includes(sticker)) throw new Error(`unknown sticker ${sticker}`);
+    return { ...rec, text: '', files: [], sticker };
+  }
+  return rec;
 }
 
 /** Edit a record (author only). */
 export function editRecord(rec, text, at) {
-  if (rec.deleted) return rec;
+  if (rec.deleted || rec.sticker) return rec;
   return { ...rec, text: String(text).slice(0, MAX_TEXT), editedAt: Math.max(at, num(rec.editedAt) + 1, rec.ts + 1) };
 }
 
@@ -162,7 +173,8 @@ export function allowedChange(before, after, sender) {
   if (!before) return true;
   if (after.author !== before.author || after.channel !== before.channel || after.ts !== before.ts) return false;
   const textChanged = after.text !== before.text || num(after.editedAt) !== num(before.editedAt);
-  if ((textChanged || (after.deleted && !before.deleted)) && sender !== before.author) return false;
+  const stickerChanged = !after.deleted && (after.sticker || null) !== (before.sticker || null);
+  if ((textChanged || stickerChanged || (after.deleted && !before.deleted)) && sender !== before.author) return false;
   return true;
 }
 

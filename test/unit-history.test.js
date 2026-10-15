@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HistorySync,
   MemoryStore,
+  STICKERS,
   allowedChange,
   batchBySize,
   cleanRecord,
@@ -73,6 +74,38 @@ describe('records', () => {
     expect(allowedChange(m, toggleReaction(m, 'love', BIA, 200), BIA)).toBe(true);
     expect(allowedChange(m, { ...m, author: BIA }, BIA)).toBe(false);
     expect(allowedChange(null, m, CAU)).toBe(true);
+  });
+});
+
+describe('stickers', () => {
+  const sticker = (id, key = 'wave') => createRecord({ id, channel: 'general', author: ANA, ts: 500, text: 'ignored', sticker: key });
+
+  it('carry a known key and no text, and cannot be edited', () => {
+    const rec = sticker('0101');
+    expect(rec).toMatchObject({ sticker: 'wave', text: '', files: [] });
+    expect(STICKERS).toContain('howl');
+    expect(() => sticker('0102', 'nope')).toThrow(/unknown sticker/);
+    expect(editRecord(rec, 'text', 600)).toBe(rec);
+    expect(reactors(toggleReaction(rec, 'love', BIA, 600), 'love')).toEqual([BIA]);
+  });
+
+  it('survive cleaning, merging and relaying, and vanish with a delete', () => {
+    const rec = sticker('0103', 'party');
+    expect(cleanRecord(JSON.parse(JSON.stringify(rec))).sticker).toBe('party');
+    expect(cleanRecord({ ...rec, sticker: '<script>' }).sticker).toBeUndefined();
+    expect(cleanRecord(msg('0104', 1)).sticker).toBeUndefined();
+    const stripped = { ...rec };
+    delete stripped.sticker;
+    expect(mergeRecord(rec, stripped).sticker).toBe('party');
+    expect(mergeRecord(stripped, rec).sticker).toBe('party');
+    expect(sameRecord(mergeRecord(rec, stripped), mergeRecord(stripped, rec))).toBe(true);
+    expect(allowedChange(rec, stripped, BIA)).toBe(false);
+    expect(allowedChange(msg('0105', 500), { ...msg('0105', 500), sticker: 'wave' }, BIA)).toBe(false);
+    expect(allowedChange(rec, toggleReaction(rec, 'like', BIA, 700), BIA)).toBe(true);
+    const gone = deleteRecord(rec, 800);
+    expect(gone.deleted).toBe(true);
+    expect('sticker' in gone).toBe(false);
+    expect('sticker' in mergeRecord(rec, gone)).toBe(false);
   });
 });
 
