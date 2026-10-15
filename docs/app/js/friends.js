@@ -47,6 +47,7 @@ export class Friends extends Emitter {
       tag: peer.tag,
       avatar: peer.avatar || have?.avatar || '',
       status: peer.status || '',
+      statusUntil: peer.statusUntil || 0,
       accent: peer.accent || '',
       publicKey: peer.publicKey,
       alg: peer.alg,

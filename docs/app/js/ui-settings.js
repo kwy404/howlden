@@ -11,6 +11,7 @@ import { STUN_SERVERS, parseTurn } from '../core/rtc.js';
 import { BackupError } from '../core/identity.js';
 import { SOUND_NAMES } from './sounds.js';
 import { VERSION } from '../core/version.js';
+import { activeStatus } from '../core/mesh.js';
 
 const SECTIONS = [
   ['user', [['profile', 'edit'], ['account', 'lock'], ['privacy', 'shield']]],
@@ -94,7 +95,28 @@ export function openSettings(app, section = 'profile') {
     profile() {
       const p = app.profile;
       const name = h('input', { class: 'input field-input', id: 'set-name', maxlength: 32, value: p.name });
-      const status = h('input', { class: 'input field-input', id: 'set-status', maxlength: 128, value: p.status || '', placeholder: t('profile.statusPlaceholder') });
+      const status = h('input', { class: 'input field-input', id: 'set-status', maxlength: 128, value: activeStatus(p), placeholder: t('profile.statusPlaceholder') });
+      // How long the status stays: minutes, 'today' (until midnight) or 0 (until cleared).
+      const until = h(
+        'select',
+        { class: 'select', id: 'set-status-until', 'aria-label': t('profile.statusUntil') },
+        [
+          [0, t('profile.until.never')],
+          [30, t('profile.until.30m')],
+          [60, t('profile.until.1h')],
+          [240, t('profile.until.4h')],
+          ['today', t('profile.until.today')],
+        ].map(([v, label]) => h('option', { value: String(v) }, label)),
+      );
+      const statusEnd = () => {
+        if (until.value === 'today') {
+          const d = new Date();
+          d.setHours(23, 59, 59, 0);
+          return d.getTime();
+        }
+        const minutes = Number(until.value);
+        return minutes ? Date.now() + minutes * 60000 : 0;
+      };
       const accent = h('input', { class: 'color-swatch', id: 'set-accent', type: 'color', value: p.accent || '#ff8a3d' });
       const useAccent = h('input', { class: 'toggle', type: 'checkbox', checked: !!p.accent, 'aria-label': t('login.accentUse') });
       const picker = avatarPicker(t, p.avatar);
@@ -105,13 +127,16 @@ export function openSettings(app, section = 'profile') {
           onsubmit: async (e) => {
             e.preventDefault();
             if (!name.value.trim()) return name.focus();
-            await app.updateProfile({ name: name.value.trim(), status: status.value.trim(), avatar: picker.value, accent: useAccent.checked ? accent.value : '' });
+            const text = status.value.trim();
+            const keep = text === activeStatus(p) && until.value === '0' ? p.statusUntil || 0 : statusEnd();
+            await app.updateProfile({ name: name.value.trim(), status: text, statusUntil: text ? keep : 0, avatar: picker.value, accent: useAccent.checked ? accent.value : '' });
             toast(t('notice.saved'), 'ok');
           },
         },
         h('div', { class: 'profile-preview', style: { '--banner': p.accent || null } }, h('div', { class: 'profile-banner' }), picker.el, h('div', null, h('strong', { class: 'profile-handle' }, `${p.name}#${p.tag}`), h('p', { class: 'muted' }, t('profile.tagHint')))),
         field(t('settings.name'), name, null, 'set-name'),
-        field(t('profile.status'), status, t('profile.statusHint'), 'set-status'),
+        field(t('profile.status'), status, p.statusUntil && activeStatus(p) ? t('profile.statusEnds', { when: new Date(p.statusUntil).toLocaleString(app.lang, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) }) : t('profile.statusHint'), 'set-status'),
+        field(t('profile.statusUntil'), until, null, 'set-status-until'),
         h('div', { class: 'hl-field field-row' }, h('label', { class: 'switch-row' }, useAccent, h('span', null, t('login.accentUse'))), accent),
         h('div', { class: 'hl-field' }, h('span', { class: 'field-label' }, t('profile.key')), h('code', { class: 'fp' }, `${app.identity.alg}, ${app.identity.id}`), h('span', { class: 'field-hint' }, t('profile.keyHint'))),
         h('div', null, h('button', { class: 'btn btn-brand', type: 'submit' }, t('common.save'))),

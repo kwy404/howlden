@@ -85,6 +85,20 @@ export function formatDuration(ms) {
   return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
+/** Average levels into n points scaled to 0 to 100, the loudest at 100 (a voice message waveform). */
+export function downsample(levels, n) {
+  if (!levels.length) return Array(n).fill(0);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const from = Math.floor((i * levels.length) / n);
+    const to = Math.max(from + 1, Math.floor(((i + 1) * levels.length) / n));
+    const part = levels.slice(from, Math.min(to, levels.length));
+    out.push(part.length ? part.reduce((a, b) => a + b, 0) / part.length : 0);
+  }
+  const top = Math.max(...out) || 1;
+  return out.map((v) => Math.round((v / top) * 100));
+}
+
 /** At most `max` events per key in any `windowMs`. */
 export class RateLimit {
   constructor({ max = 6, windowMs = 2000 } = {}) {

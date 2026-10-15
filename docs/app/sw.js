@@ -1,7 +1,7 @@
 // howlden service worker: keeps the app shell available offline and opens
 // the right channel when a mention notification is clicked.
 
-const CACHE = 'howlden-app-v3';
+const CACHE = 'howlden-app-v4';
 const SHELL = [
   './',
   'index.html',
@@ -30,10 +30,15 @@ const SHELL = [
   'js/ui-pair.js',
   'js/sounds.js',
   'js/stickers.js',
+  'js/seasonal.js',
+  'js/ui-chat-kinds.js',
   'js/denoise-worklet.js',
   'core/avatar.js',
   'core/bytes.js',
   'core/call.js',
+  'core/commands.js',
+  'core/highlight.js',
+  'core/search.js',
   'core/dsp.js',
   'core/mqtt.js',
   'core/pairing.js',
@@ -54,6 +59,7 @@ const SHELL = [
   'core/rtc.js',
   'core/version.js',
   'https://cdn.jsdelivr.net/npm/monsooncss@0.2.0/dist/monsoon.min.css',
+  '../seasons.js',
   '../assets/mascot-head.svg',
   '../assets/art/characters/luna.svg',
   '../assets/art/characters/ember.svg',

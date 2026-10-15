@@ -46,6 +46,20 @@ export const RECIPES = {
   record: (ctx, out, t) => seq(ctx, out, t, [[880], [880, 0.16], [1318.51, 0.32]], { type: 'sine', dur: 0.1, gain: 0.4, attack: 0.004 }),
 };
 
+// Seasonal variants of the message sounds, played only while a season is on:
+// small bells at Christmas, a sparkle at New Year, a soft spooky glide at Halloween.
+export const SEASON_RECIPES = {
+  christmas: {
+    message: (ctx, out, t) => seq(ctx, out, t, [[1318.51], [1567.98, 0.08], [2093, 0.16]], { dur: 0.22, gain: 0.22, attack: 0.002 }),
+  },
+  newyear: {
+    message: (ctx, out, t) => seq(ctx, out, t, [[1567.98], [2093, 0.05], [2637.02, 0.1]], { dur: 0.12, gain: 0.18, attack: 0.002 }),
+  },
+  halloween: {
+    message: (ctx, out, t) => note(ctx, out, t, { freq: 523.25, to: 369.99, type: 'triangle', dur: 0.32, gain: 0.3 }),
+  },
+};
+
 export class Sounds {
   constructor(app) {
     this.app = app;
@@ -97,7 +111,8 @@ export class Sounds {
     const out = ctx.createGain();
     out.gain.value = (this.volume / 100) * 0.35;
     out.connect(ctx.destination);
-    RECIPES[name](ctx, out, ctx.currentTime + 0.01);
+    const season = document.documentElement.dataset.season;
+    (SEASON_RECIPES[season]?.[name] || RECIPES[name])(ctx, out, ctx.currentTime + 0.01);
     this.played = (this.played || 0) + 1;
     return true;
   }

@@ -2,12 +2,13 @@
 
 import { h, replace } from './dom.js';
 import { icon } from './icons.js';
-import { avatarImg, closePopover, popover } from './ui-shell.js';
+import { avatarImg, chatTools, closePopover, popover } from './ui-shell.js';
 import { confirmDialog } from './ui-modal.js';
 import { stickerEl } from './stickers.js';
+import { season, seasonAvailable, seasonLabel, setSeasonOff } from './seasonal.js';
 import { avatarTraits } from '../core/avatar.js';
 import { DM_TEXT } from './session.js';
-import { MAX_MEMBERS } from '../core/mesh.js';
+import { MAX_MEMBERS, activeStatus } from '../core/mesh.js';
 
 const ago = (app, ts) => {
   if (!ts) return '';
@@ -42,7 +43,7 @@ export function renderHomeSide(app) {
               'button',
               { class: `ch dm-link${active ? ' active' : ''}${u.count && !active ? ' unread' : ''}`, type: 'button', 'aria-current': active ? 'page' : null, onclick: () => app.openSession(s) },
               h('span', { class: 'avatar-wrap s32' }, avatarImg(f.avatar || f.id, { size: 32 }), h('span', { class: `status-dot ${online ? 'on' : 'off'}` })),
-              h('span', { class: 'dm-text' }, h('span', { class: 'ch-name' }, f.name), f.status ? h('span', { class: 'dm-sub' }, f.status) : null),
+              h('span', { class: 'dm-text' }, h('span', { class: 'ch-name' }, f.name), activeStatus(f) ? h('span', { class: 'dm-sub' }, activeStatus(f)) : null),
               u.count && !active ? h('span', { class: 'badge-count' }, String(u.count)) : null,
             );
           })
@@ -75,10 +76,11 @@ export function renderHome(app, el) {
     body = h(
       'div',
       { class: 'home-add' },
+      seasonChip(app),
       h(
         'section',
         { class: 'call-hero', 'aria-labelledby': 'call-hero-title' },
-        h('div', { class: 'call-hero-art' }, stickerEl('wave', { size: 112, play: true })),
+        h('div', { class: 'call-hero-art' }, stickerEl(season() || 'wave', { size: 112, play: true })),
         h(
           'div',
           { class: 'call-hero-text' },
@@ -108,6 +110,7 @@ export function renderHome(app, el) {
     body = h(
       'div',
       { class: 'friends' },
+      seasonChip(app),
       h('h2', { class: 'members-head' }, `${t(tab === 'online' ? 'home.online' : 'home.all')}, ${shown.length}`),
       shown.length
         ? h(
@@ -118,7 +121,7 @@ export function renderHome(app, el) {
               return h(
                 'li',
                 { class: 'friend' },
-                h('button', { class: 'friend-main', type: 'button', onclick: () => app.messageFriend(f) }, h('span', { class: 'avatar-wrap s32' }, avatarImg(f.avatar || f.id, { size: 32 }), h('span', { class: `status-dot ${on ? 'on' : 'off'}` })), h('span', { class: 'friend-text' }, h('span', { class: 'friend-name' }, f.name, h('span', { class: 'friend-tag' }, `#${f.tag}`)), h('span', { class: 'friend-sub' }, f.status || (on ? t('home.connected') : t('home.lastSeen', { when: ago(app, f.lastSeen) }))))),
+                h('button', { class: 'friend-main', type: 'button', onclick: () => app.messageFriend(f) }, h('span', { class: 'avatar-wrap s32' }, avatarImg(f.avatar || f.id, { size: 32 }), h('span', { class: `status-dot ${on ? 'on' : 'off'}` })), h('span', { class: 'friend-text' }, h('span', { class: 'friend-name' }, f.name, h('span', { class: 'friend-tag' }, `#${f.tag}`)), h('span', { class: 'friend-sub' }, activeStatus(f) || (on ? t('home.connected') : t('home.lastSeen', { when: ago(app, f.lastSeen) }))))),
                 h('span', { class: 'verified', title: t('id.verifiedHint') }, icon('shield', { size: 14 }), t('id.verified')),
                 h(
                   'div',
@@ -170,6 +173,21 @@ export function renderHome(app, el) {
   replace(el, head, body);
 }
 
+/** "Halloween mode" with an off switch, on the days of a season. */
+function seasonChip(app) {
+  const id = seasonAvailable();
+  if (!id) return null;
+  const on = season() === id;
+  const name = seasonLabel(id, app.lang);
+  return h(
+    'div',
+    { class: `season-chip${on ? ' on' : ''}` },
+    on ? stickerEl(id, { size: 28 }) : null,
+    h('span', null, app.t('season.mode', { name })),
+    h('input', { class: 'toggle', type: 'checkbox', checked: on, 'aria-label': app.t('season.toggle', { name }), onchange: (e) => (setSeasonOff(id, !e.target.checked), app.render()) }),
+  );
+}
+
 /** Header for a direct conversation. */
 export function renderDmHeader(app, el, s) {
   const t = app.t;
@@ -185,6 +203,7 @@ export function renderDmHeader(app, el, s) {
     idState?.status && idState.status !== 'verified' && idState.status !== 'pending' ? h('span', { class: 'warn-tag' }, icon('warning', { size: 14 }), t('id.failed')) : null,
     h('span', { class: 'hd-status' }, online ? t('home.connected') : t('home.notConnected')),
     h('span', { class: 'hd-spacer' }),
+    chatTools(app),
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('call.voice', { name: f.name }), 'data-tip': t('call.voiceShort'), onclick: () => app.callFriend(f, false) }, icon('speaker', { size: 22 })),
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('call.video', { name: f.name }), 'data-tip': t('call.videoShort'), onclick: () => app.callFriend(f, true) }, icon('camera', { size: 22 })),
     online ? null : h('button', { class: 'btn btn-brand btn-sm', type: 'button', onclick: () => app.reconnectFriend(f) }, icon('link', { size: 16 }), t('call.reconnect')),

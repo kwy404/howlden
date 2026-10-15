@@ -263,13 +263,21 @@ export function loginCard(app, { words } = {}) {
       'main',
       { class: 'login', id: 'main' },
       h('a', { class: 'login-brand', href: '../', 'aria-label': 'howlden' }, h('img', { src: '../assets/mascot-head.svg', alt: '', width: 40, height: 40 }), h('span', null, 'howlden')),
-      h('img', { class: 'login-art', src: '../assets/art/characters/luna.svg', alt: '', width: 200, height: 200 }),
+      lunaArt(),
       h('img', { class: 'login-art right', src: '../assets/art/characters/ember.svg', alt: '', width: 150, height: 150 }),
       h('div', { class: 'login-card' }, form, h('div', { class: 'login-divider', 'aria-hidden': 'true' }), joinSide),
     ),
   );
   root.hidden = false;
   setTimeout(() => name.focus(), 50);
+}
+
+/** Luna on the first screen, in costume during a season (art from the site, with a fallback). */
+function lunaArt() {
+  const id = document.documentElement.dataset.season;
+  const img = h('img', { class: `login-art${id ? ' seasonal' : ''}`, src: id ? `../assets/seasons/${id}/luna.svg` : '../assets/art/characters/luna.svg', alt: '', width: 200, height: 200 });
+  if (id) img.addEventListener('error', () => ((img.src = '../assets/art/characters/luna.svg'), img.classList.remove('seasonal')), { once: true });
+  return img;
 }
 
 /** PIN unlock screen for a locked account. */

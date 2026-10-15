@@ -2,7 +2,8 @@
 // with fake cameras and microphones create profiles; a den is built with six
 // words (confirmed with six more words) and no link is ever shown, wrong
 // words and a sixth member are refused, five people chat and talk with noise
-// suppression on (audio bytes must flow), friends pair with six words, "Call
+// suppression on (audio bytes must flow), polls, threads, pins, edit history,
+// voice messages and search sync, friends pair with six words, "Call
 // a friend" rings a new friend, stickers, live reactions, music mode, push
 // to talk and a local recording with its notice work in that call, a known
 // friend is called with only six words, a screen share fills the call view,
@@ -251,6 +252,54 @@ try {
   await bia.page.press('.composer-input', 'Enter');
   await waitFor(ana, () => !!document.querySelector('.msg.mentioned'));
   log('messages, markdown, reactions (which pop when they arrive) and mentions sync to every member');
+
+  // Richer chat between five people: polls, threads, pins, edit history, voice messages and search
+  {
+    await ana.page.fill('.composer-input', '/poll Lunch? | Pizza | Tacos');
+    await ana.page.press('.composer-input', 'Enter');
+    await bia.page.waitForSelector('.poll-opt:has-text("Tacos")');
+    await bia.page.click('.poll-opt:has-text("Tacos")');
+    await waitFor(ana, () => /100%/.test(document.querySelector('.poll-opt.lead')?.textContent || '') && /1 vote/.test(document.querySelector('.poll-foot')?.textContent || ''));
+    log('a /poll is posted and a vote shows up live for everyone');
+
+    const root = await evalApp(ana, () => window.howlden.activeDen.timeline(window.howlden.channelId).find((r) => r.text.includes('Hello'))?.id);
+    await bia.page.hover(`.msg[data-id="${root}"]`);
+    await bia.page.click(`.msg[data-id="${root}"] .msg-actions button[aria-label="Reply in thread"]`);
+    await bia.page.fill('.chat-panel .thread-input', 'thread reply from Bia');
+    await bia.page.press('.chat-panel .thread-input', 'Enter');
+    await waitFor(ana, (id) => /1 reply/.test(document.querySelector(`.msg[data-id="${id}"] .thread-link`)?.textContent || ''), root);
+    ok(!(await ana.page.locator('.messages .msg-content:has-text("thread reply from Bia")').count()), 'thread replies stay out of the main timeline');
+    await ana.page.click(`.msg[data-id="${root}"] .thread-link`);
+    await ana.page.waitForSelector('.chat-panel .msg-content:has-text("thread reply from Bia")');
+    await ana.page.click('.chat-panel .panel-head button');
+    log('a reply in a thread shows "1 reply" under the message and opens in the side panel');
+
+    await evalApp(caio, (id) => window.howlden.activeDen.pin(id, true), root);
+    await waitFor(dani, (id) => !!document.querySelector(`.msg.pinned[data-id="${id}"]`), root);
+    await evalApp(ana, (id) => window.howlden.activeDen.edit(id, 'Hello **pack**, edited'), root);
+    await waitFor(edu, (id) => window.howlden.activeDen.messages.get(id)?.history?.length === 1, root);
+    log('pins and edit history sync to every member');
+
+    await dani.page.click('.composer-mic');
+    await dani.page.waitForSelector('.composer-box.recording');
+    await dani.page.waitForTimeout(1500);
+    await dani.page.click('.composer-box.recording .composer-send');
+    await waitFor(edu, () => [...window.howlden.activeDen.messages.values()].some((r) => r.files?.some((f) => f.voice && window.howlden.activeDen.fileUrl(f.id))), null, 30000);
+    const vm = await evalApp(edu, async () => {
+      const s = window.howlden.activeDen;
+      const f = [...s.messages.values()].flatMap((r) => r.files || []).find((x) => x.voice);
+      const blob = await fetch(s.fileUrl(f.id)).then((r) => r.blob());
+      return { size: blob.size, dur: f.dur, wave: f.wave.length, ui: !!document.querySelector('.vm .vm-play') };
+    });
+    ok(vm.size > 1000 && vm.dur >= 1 && vm.wave === 48 && vm.ui, `a voice message arrives with its waveform ${JSON.stringify(vm)}`);
+    log(`a recorded voice message reaches the others with a 48 point waveform (${vm.size} bytes, ${vm.dur} s)`);
+
+    await ana.page.click('.hd-tool[aria-label="Search"]');
+    await ana.page.fill('.chat-panel input[type="search"]', 'tacos has:poll');
+    await ana.page.waitForSelector('.chat-panel .search-count:has-text("1 result")');
+    await ana.page.click('.chat-panel .panel-head button');
+    log('search with a has:poll filter finds the poll');
+  }
 
   // The author card stays inside the viewport near the composer
   {

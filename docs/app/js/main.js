@@ -165,7 +165,8 @@ app.deleteAccount = async () => {
 app.updateProfile = async (patch) => {
   Object.assign(app.profile, patch);
   await account.saveProfile(app.profile);
-  for (const s of app.sessions.values()) s.mesh?.setProfile({ name: app.profile.name, avatar: app.profile.avatar, status: app.profile.status, accent: app.profile.accent });
+  if (!app.profile.status) app.profile.statusUntil = 0;
+  for (const s of app.sessions.values()) s.mesh?.setProfile({ name: app.profile.name, avatar: app.profile.avatar, status: app.profile.status, statusUntil: app.profile.statusUntil || 0, accent: app.profile.accent });
   app.render();
 };
 
@@ -493,6 +494,16 @@ app.toggleMembers = () => {
   app.render();
 };
 
+/** Open (or close) a chat side panel: search, pins, gallery or saved. */
+app.chatPanel = (kind) => {
+  if (!chat) return;
+  if (kind === 'saved' && !app.activeDen) return;
+  chat.openPanel(kind);
+  app.render();
+};
+
+app.chatPanelKind = () => chat?.panelKind() || null;
+
 app.mention = (m) => {
   if (app.view !== 'chat') return;
   chat.mention(m);
@@ -650,9 +661,52 @@ function showRecording({ blob, ms, since, session }) {
 let chat;
 let voice;
 
+/** Reminders on messages and the end of my status: checked every 15 seconds. */
+function tick() {
+  const now = Date.now();
+  for (const s of app.sessions.values()) {
+    const due = (s.den.reminders || []).filter((r) => r.at <= now);
+    if (!due.length) continue;
+    s.setLocal('reminders', s.den.reminders.filter((r) => r.at > now));
+    for (const r of due) {
+      const rec = s.messages.get(r.id);
+      if (!rec) continue;
+      const author = s.member(rec.author)?.name || app.t('chat.unknown');
+      const text = rec.sticker ? app.t('chat.stickerSent') : rec.poll ? rec.poll.q : plainText(rec.text, (id) => s.member(id)).slice(0, 120);
+      reminderCard(s, rec, author, text);
+      app.sounds.play('mention', { force: !settings.dnd });
+      if (settings.notify && !settings.dnd && typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+        const opts = { body: `${author}: ${text}`, tag: `remind-${rec.id}`, icon: 'icons/icon-192.png', data: { den: s.id, channel: rec.channel } };
+        navigator.serviceWorker?.ready.then((reg) => reg.showNotification(app.t('remind.notice'), opts)).catch(() => {});
+      }
+    }
+  }
+  if (app.profile?.status && app.profile.statusUntil && app.profile.statusUntil <= now) app.updateProfile({ status: '', statusUntil: 0 });
+}
+
+function reminderCard(s, rec, author, text) {
+  const t = app.t;
+  const card = h(
+    'div',
+    { class: 'remind-card', role: 'alertdialog', 'aria-label': t('remind.notice') },
+    h('p', { class: 'remind-title' }, icon('clock', { size: 18 }), h('strong', null, t('remind.notice'))),
+    h('p', { class: 'remind-text' }, h('strong', null, `${author}: `), text),
+    h(
+      'div',
+      { class: 'row-btns' },
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => card.remove() }, t('remind.dismiss')),
+      h('button', { class: 'btn btn-brand btn-sm', type: 'button', onclick: () => (card.remove(), chat.jumpTo(rec.id, s)) }, t('remind.open')),
+    ),
+  );
+  document.body.append(card);
+}
+
 function setupShell() {
   chat = createChat(app);
   voice = createVoice(app);
+  setInterval(tick, 15000);
+  setTimeout(tick, 2000);
+  window.addEventListener('howlden:season', () => app.render());
   $('#scrim').addEventListener('click', () => app.drawer(null));
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && $('#app').dataset.drawer && !document.querySelector('dialog[open]')) app.drawer(null);

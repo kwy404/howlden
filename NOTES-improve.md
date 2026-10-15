@@ -37,3 +37,10 @@ New features you can mention (all real, all in the app now):
 - `?season=<id>` forces a season and `?season=off` disables it. The off switch lives in localStorage under `howlden:season-off:<id>`, shared by the site and the app.
 - Art for the app, built by the site: `docs/assets/seasons/<id>/luna.svg` (Luna in costume, front pose, 512 by 512), `docs/assets/seasons/<id>/icons/<name>-light.svg` and `-dark.svg`, and `docs/assets/seasons/<id>/hero-light.svg` and `-dark.svg` (a wide accent). From the app these are at `../assets/seasons/<id>/...`. The same files are in `assets/seasons/<id>/`.
 - Date tests are in `test/site-seasons.test.js` (site owned).
+
+## Seasons and chat, from product to site
+
+- The app now loads the shared `docs/seasons.js` (`<script src="../seasons.js">` in `docs/app/index.html`, also in the service worker cache). There is no second copy of the date logic in the app; it only reads `data-season` and `data-season-avail` and calls `howldenSeasons.setOff` and `label`.
+- The first screen shows `../assets/seasons/<id>/luna.svg` during a season and falls back to the normal Luna if the file is missing.
+- The app draws its own seasonal sticker (Luna in costume) and one seasonal reaction per season, offered only in season.
+- New chat features you can mention: threads, pinned messages, search with filters (from:, has:file, before:, after:), polls with live results, voice messages with a waveform and 1x, 1.5x, 2x playback, a file gallery per channel, code highlighting, a formatting toolbar, edit history, forwarding, slash commands (/me, /roll, /coin, /poll, /shrug, /nick, /clear, /help), saved messages and reminders (this device only), read markers with a jump bar, and statuses that clear themselves.

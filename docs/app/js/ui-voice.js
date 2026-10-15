@@ -9,6 +9,8 @@ import { confirmDialog } from './ui-modal.js';
 import { avatarTraits } from '../core/avatar.js';
 import { BASE_REACTIONS } from '../core/history.js';
 import { formatDuration } from '../core/call.js';
+import { season } from './seasonal.js';
+import { stickerEl } from './stickers.js';
 
 export function createVoice(app) {
   const t = (k, v) => app.t(k, v);
@@ -176,7 +178,7 @@ export function createVoice(app) {
 
     empty.hidden = people.length > 0;
     const c = s.den.channels.find((x) => x.id === state.channel);
-    replace(empty, h('img', { class: 'empty-art', src: '../assets/art/characters/fang.svg', alt: '', width: 120, height: 120 }), h('h2', null, s.isDirect ? s.den.name : c?.name || ''), h('p', null, t('voice.emptyHint')));
+    replace(empty, season() ? h('div', { class: 'empty-art' }, stickerEl(season(), { size: 120 })) : h('img', { class: 'empty-art', src: '../assets/art/characters/fang.svg', alt: '', width: 120, height: 120 }), h('h2', null, s.isDirect ? s.den.name : c?.name || ''), h('p', null, t('voice.emptyHint')));
 
     renderNotice(people);
     const m = app.media;

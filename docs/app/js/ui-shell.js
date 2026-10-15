@@ -8,6 +8,7 @@ import { avatarSrc } from './ui-account.js';
 import { renderHomeSide } from './ui-home.js';
 import { DM_TEXT } from './session.js';
 import { visibleChannels } from '../core/denstate.js';
+import { activeStatus } from '../core/mesh.js';
 
 /** Display color for a member: their accent, or a color from their avatar. */
 export const colorOf = (m, id = '') => m?.accent || nameColor(m?.avatar || id || m?.id || '');
@@ -415,9 +416,23 @@ export function renderHeader(app, el) {
     h('span', { class: `hd-status ${s.status}` }, h('span', { class: `dot ${s.status}` }), status, s.den.locked ? h('span', { class: 'hd-lock', title: t('den.locked') }, icon('lock', { size: 14 })) : null),
     h('span', { class: `hd-count${s.onlineCount >= s.maxMembers ? ' full' : ''}`, title: t('den.countLabel', { count: s.onlineCount, max: s.maxMembers }), 'aria-label': t('den.countLabel', { count: s.onlineCount, max: s.maxMembers }) }, icon('members', { size: 14 }), t('den.count', { count: s.onlineCount, max: s.maxMembers })),
     h('span', { class: 'hd-spacer' }),
+    app.view === 'chat' ? chatTools(app) : null,
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('den.invite'), 'data-tip': t('den.invite'), onclick: () => app.inviteFlow(s) }, icon('invite', { size: 22 })),
     h('button', { class: `icon-btn${app.showMembers ? ' on' : ''}`, type: 'button', 'aria-pressed': String(app.showMembers), 'aria-label': t('members.toggle'), 'data-tip': t('members.toggle'), onclick: () => app.toggleMembers() }, icon('members', { size: 22 })),
   );
+}
+
+/** Search, pins, and a small menu with the file gallery and saved messages. */
+export function chatTools(app) {
+  const t = app.t;
+  const open = app.chatPanelKind?.();
+  const tool = (kind, ico, label) => h('button', { class: `icon-btn hd-tool tool-${kind}${open === kind ? ' on' : ''}`, type: 'button', 'aria-pressed': String(open === kind), 'aria-label': label, 'data-tip': label, onclick: () => app.chatPanel(kind) }, icon(ico, { size: 22 }));
+  const item = (kind, ico, label) => h('button', { class: 'hl-menu-item', type: 'button', role: 'menuitem', onclick: () => (closePopover(), app.chatPanel(kind)) }, h('span', null, label), icon(ico, { size: 16 }));
+  return [
+    tool('search', 'search', t('search.title')),
+    tool('pins', 'pin', t('pins.title')),
+    h('button', { class: `icon-btn hd-tool${open === 'gallery' || open === 'saved' ? ' on' : ''}`, type: 'button', 'aria-haspopup': 'menu', 'aria-label': t('chat.moreTools'), 'data-tip': t('chat.moreTools'), onclick: (e) => popover(e.currentTarget, h('div', { class: 'hl-menu', role: 'menu' }, item('pins', 'pin', t('pins.title')), item('gallery', 'image', t('gallery.title')), item('saved', 'bookmark', t('saved.title'))), { placement: 'below' }) }, icon('dots', { size: 22 })),
+  ];
 }
 
 // Member list
@@ -441,7 +456,7 @@ export function renderMembers(app, el) {
           'span',
           { class: 'member-text' },
           h('span', { class: 'member-name', style: { color: colorOf(m) } }, m.name, m.id === app.profile.id ? h('span', { class: 'member-you' }, ` (${t('members.you')})`) : null),
-          s.voice.get(m.id) || (m.id === app.profile.id && app.media.inVoice(s)) ? h('span', { class: 'member-sub' }, icon('speaker', { size: 12 }), t('members.inVoice')) : m.status ? h('span', { class: 'member-sub' }, m.status) : null,
+          s.voice.get(m.id) || (m.id === app.profile.id && app.media.inVoice(s)) ? h('span', { class: 'member-sub' }, icon('speaker', { size: 12 }), t('members.inVoice')) : activeStatus(m) ? h('span', { class: 'member-sub' }, activeStatus(m)) : null,
         ),
         m.id === app.profile.id ? null : idBadge(app, s, m.id),
         s.relay === m.id && m.online ? h('span', { class: 'relay-badge', title: t('members.relayHint'), 'aria-label': t('members.relay') }, icon('relay', { size: 14 })) : null,
@@ -482,7 +497,7 @@ export function memberCard(app, s, m, anchor) {
       { class: 'm-card' },
       h('div', { class: 'card-banner', style: { '--den-hue': avatarTraits(m.avatar || m.id).hue, background: m.accent || null } }),
       h('div', { class: 'card-avatar' }, avatarWithStatus(m, 80, app)),
-      h('div', { class: 'card-inner' }, h('h3', { class: 'card-name' }, m.name, h('span', { class: 'friend-tag' }, `#${m.id.slice(0, 4)}`)), m.status ? h('p', { class: 'card-status' }, m.status) : null, self ? null : idBadgeLine(app, s, m.id), s.relay === m.id ? h('p', { class: 'card-tag' }, icon('relay', { size: 14 }), t('members.relay')) : null, s.verified.has(m.id) ? h('p', { class: 'card-tag ok' }, icon('shield', { size: 14 }), t('members.verified')) : null),
+      h('div', { class: 'card-inner' }, h('h3', { class: 'card-name' }, m.name, h('span', { class: 'friend-tag' }, `#${m.id.slice(0, 4)}`)), activeStatus(m) ? h('p', { class: 'card-status' }, activeStatus(m)) : null, self ? null : idBadgeLine(app, s, m.id), s.relay === m.id ? h('p', { class: 'card-tag' }, icon('relay', { size: 14 }), t('members.relay')) : null, s.verified.has(m.id) ? h('p', { class: 'card-tag ok' }, icon('shield', { size: 14 }), t('members.verified')) : null),
       self
         ? null
         : h(

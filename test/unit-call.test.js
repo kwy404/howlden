@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MUSIC_BITRATE, RateLimit, formatDuration, micConstraints, pickRecordingType, recordingFileName, tunedParameters, usesDenoise } from '../src/call.js';
+import { MUSIC_BITRATE, RateLimit, downsample, formatDuration, micConstraints, pickRecordingType, recordingFileName, tunedParameters, usesDenoise } from '../src/call.js';
 
 describe('microphone constraints', () => {
   it('keeps voice filters on for voice and turns them all off for music', () => {
@@ -76,5 +76,15 @@ describe('rate limit', () => {
     expect(rl.allow('ana', 1001)).toBe(true);
     expect(rl.allow('ana', 1005)).toBe(false);
     expect(rl.allow('ana', 1031)).toBe(true);
+  });
+});
+
+describe('voice message waveform', () => {
+  it('averages levels into points scaled to the loudest', () => {
+    expect(downsample([0.1, 0.1, 0.4, 0.4], 2)).toEqual([25, 100]);
+    expect(downsample([], 3)).toEqual([0, 0, 0]);
+    expect(downsample([0.5], 4)).toEqual([100, 100, 100, 100]);
+    expect(downsample(Array(1000).fill(0.2), 48)).toHaveLength(48);
+    expect(downsample([0, 0], 2)).toEqual([0, 0]);
   });
 });

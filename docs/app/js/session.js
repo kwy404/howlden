@@ -14,6 +14,8 @@ import {
   editRecord,
   mergeRecord,
   sameRecord,
+  setPinned,
+  votePoll,
   sortRecords,
   toggleReaction,
 } from '../core/history.js';
@@ -173,7 +175,7 @@ export class DenSession extends Emitter {
       this._rememberMembers(list);
       for (const m of list) {
         const f = m.online && app.friends?.get(m.id);
-        if (f && (f.name !== m.name || f.avatar !== m.avatar || f.status !== m.status || f.accent !== m.accent)) app.friends.touch(m.id, { name: m.name, avatar: m.avatar, status: m.status, accent: m.accent });
+        if (f && (f.name !== m.name || f.avatar !== m.avatar || f.status !== m.status || (f.statusUntil || 0) !== (m.statusUntil || 0) || f.accent !== m.accent)) app.friends.touch(m.id, { name: m.name, avatar: m.avatar, status: m.status, statusUntil: m.statusUntil || 0, accent: m.accent });
       }
       this.emit('members');
     });
@@ -484,7 +486,7 @@ export class DenSession extends Emitter {
     st.status = result;
     if (result === 'verified') {
       const m = this.member(peerId) || this.mesh?.held.get(peerId)?.peer || {};
-      const card = { id: peerId, name: m.name, avatar: m.avatar, status: m.status, accent: m.accent, publicKey: st.claim.publicKey, alg: st.claim.alg, tag: st.claim.tag || peerId.slice(0, 4) };
+      const card = { id: peerId, name: m.name, avatar: m.avatar, status: m.status, statusUntil: m.statusUntil || 0, accent: m.accent, publicKey: st.claim.publicKey, alg: st.claim.alg, tag: st.claim.tag || peerId.slice(0, 4) };
       // Someone waiting to be let in (or the inviter before it lets us in) is
       // not a friend yet: remember the card and save it only once both agree.
       const waiting = this.mesh?.held.has(peerId) || (this.mesh?.introducer === peerId && !this.mesh?.welcomed);
@@ -556,22 +558,82 @@ export class DenSession extends Emitter {
     return sortRecords([...this.messages.values()].filter((r) => r.channel === channelId));
   }
 
-  async post(channelId, text, { reply = null, files = [] } = {}) {
-    const rec = createRecord({ id: randomId(8), channel: channelId, author: this.self.id, ts: Date.now(), text, reply, files });
+  /** Messages of the channel's main timeline: no thread replies, nothing cleared on this device. */
+  timeline(channelId) {
+    const cleared = this.den.cleared?.[channelId] || 0;
+    return this.channelMessages(channelId).filter((r) => !r.thread && r.ts > cleared);
+  }
+
+  /** Replies in the thread under a message, oldest first. */
+  threadOf(rootId) {
+    return sortRecords([...this.messages.values()].filter((r) => r.thread === rootId));
+  }
+
+  /** Post any kind of message: text, a sticker, a poll, a thread reply, a forward or /me. */
+  async post(channelId, text, { reply = null, files = [], sticker = null, poll = null, thread = null, fwd = null, me = false } = {}) {
+    const rec = createRecord({ id: randomId(8), channel: channelId, author: this.self.id, ts: Date.now(), text, reply, files, sticker, poll, thread, fwd, me });
     await this._merge([rec]);
     this.emit('records', [rec]);
-    this.markRead(channelId);
+    if (!thread) this.markRead(channelId);
     await this.send({ type: 'rec', rec });
     return rec;
   }
 
-  async postSticker(channelId, sticker) {
-    const rec = createRecord({ id: randomId(8), channel: channelId, author: this.self.id, ts: Date.now(), sticker });
-    await this._merge([rec]);
-    this.emit('records', [rec]);
-    this.markRead(channelId);
-    await this.send({ type: 'rec', rec });
-    return rec;
+  postSticker(channelId, sticker, opts = {}) {
+    return this.post(channelId, '', { ...opts, sticker });
+  }
+
+  postPoll(channelId, poll, opts = {}) {
+    return this.post(channelId, '', { ...opts, poll });
+  }
+
+  vote(id, option) {
+    return this._update(id, (r) => votePoll(r, option, this.self.id, Date.now()));
+  }
+
+  pin(id, on) {
+    return this._update(id, (r) => setPinned(r, on, Date.now()));
+  }
+
+  /** A recorded voice message: sent like a file, with its length and waveform. */
+  async postVoice(channelId, blob, { dur, wave }, opts = {}) {
+    const ext = /ogg/.test(blob.type) ? 'ogg' : /mp4/.test(blob.type) ? 'm4a' : 'webm';
+    const file = new File([blob], `voice-message.${ext}`, { type: blob.type || 'audio/webm' });
+    const p = await this.prepareFile(file);
+    Object.assign(p.meta, { voice: true, dur: Math.round(dur * 10) / 10, wave });
+    await this.post(channelId, '', { ...opts, files: [p.meta] });
+    const peers = this.mesh ? [...this.mesh.links.keys()] : [];
+    this._push(p.meta.id, p.data, peers);
+  }
+
+  // Local only: drafts, saved messages, reminders and the /clear mark live in
+  // this device's copy of the den and are never sent.
+
+  setLocal(field, value) {
+    this.den[field] = value;
+    this.save();
+  }
+
+  isSaved(id) {
+    return !!this.den.saved?.[id];
+  }
+
+  toggleSaved(id) {
+    const saved = { ...this.den.saved };
+    if (saved[id]) delete saved[id];
+    else saved[id] = Date.now();
+    this.setLocal('saved', saved);
+    this.emit('records', []);
+    return !!saved[id];
+  }
+
+  remind(id, at) {
+    this.setLocal('reminders', [...(this.den.reminders || []).filter((r) => r.id !== id), { id, at }]);
+  }
+
+  clearChannel(channelId, at = Date.now()) {
+    this.setLocal('cleared', { ...this.den.cleared, [channelId]: at });
+    this.emit('records', []);
   }
 
   /** Send a live reaction to everyone in the call and show it here too. */
@@ -712,10 +774,10 @@ export class DenSession extends Emitter {
     return { meta, data };
   }
 
-  async postFiles(channelId, text, files, reply) {
+  async postFiles(channelId, text, files, reply, opts = {}) {
     const prepared = [];
     for (const f of files) prepared.push(await this.prepareFile(f));
-    await this.post(channelId, text, { reply, files: prepared.map((p) => p.meta) });
+    await this.post(channelId, text, { ...opts, reply, files: prepared.map((p) => p.meta) });
     const peers = this.mesh ? [...this.mesh.links.keys()] : [];
     for (const p of prepared) this._push(p.meta.id, p.data, peers);
   }
