@@ -34,7 +34,9 @@ Nothing to install. It works in current Chrome, Edge, Firefox and Safari, on des
 ## Features
 
 - **Dens** with text channels, voice channels and a member list, for up to 5 people.
-- **Text chat** with formatting, replies, mentions, edits, reactions and stickers of Luna that animate when they arrive.
+- **Text chat** with formatting, replies, mentions, edits with history, reactions and stickers of Luna that animate when they arrive.
+- **Threads, pins, polls and voice messages**, plus search with filters, a file gallery per channel, forwarding and slash commands like /poll and /roll.
+- **Saved messages and reminders** kept on your device, read markers, and statuses that clear themselves.
 - **Voice, video and screen share** inside voice channels, with mute, deafen and noise suppression.
 - **Call a friend** from the home screen: one tap makes the six words and opens the share menu.
 - **Push to talk**, with a big Hold to talk button on phones.
@@ -44,6 +46,7 @@ Nothing to install. It works in current Chrome, Edge, Firefox and Safari, on des
 - **A local profile**: a name, an avatar and an identity key made on your device. Lock it with a PIN, or move it with an encrypted backup file.
 - **Six word invites** with a QR code. No links to copy, nothing technical to paste.
 - **Privacy extras**: an optional den passphrase and a connection fingerprint you can compare.
+- **Special dates**: on Halloween, Christmas, Carnival and a few other dates, Luna and the pack dress up, with seasonal stickers and reactions. One switch turns it off.
 
 ## How inviting works
 

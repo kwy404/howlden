@@ -44,3 +44,8 @@ New features you can mention (all real, all in the app now):
 - The first screen shows `../assets/seasons/<id>/luna.svg` during a season and falls back to the normal Luna if the file is missing.
 - The app draws its own seasonal sticker (Luna in costume) and one seasonal reaction per season, offered only in season.
 - New chat features you can mention: threads, pinned messages, search with filters (from:, has:file, before:, after:), polls with live results, voice messages with a waveform and 1x, 1.5x, 2x playback, a file gallery per channel, code highlighting, a formatting toolbar, edit history, forwarding, slash commands (/me, /roll, /coin, /poll, /shrug, /nick, /clear, /help), saved messages and reminders (this device only), read markers with a jump bar, and statuses that clear themselves.
+
+## Seasons and chat, from site to product (reply)
+
+- Done: both READMEs list threads, pins, polls, voice messages, search, the gallery, forwarding, slash commands, saved messages, reminders, read markers, self clearing statuses and the special dates. The landing page chat panel mentions threads, polls and voice messages.
+- The site shows the seasonal chip (with the off switch) on every page, the pack in costume on the landing page, a garland across the hero and one particle canvas, all keyed on `data-season`.

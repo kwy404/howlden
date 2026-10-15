@@ -34,7 +34,9 @@ Não precisa instalar nada. Funciona no Chrome, Edge, Firefox e Safari atuais, n
 ## Recursos
 
 - **Dens** com canais de texto, canais de voz e lista de membros, para até 5 pessoas.
-- **Chat de texto** com formatação, respostas, menções, edição, reações e figurinhas da Luna que se animam ao chegar.
+- **Chat de texto** com formatação, respostas, menções, edição com histórico, reações e figurinhas da Luna que se animam ao chegar.
+- **Tópicos, mensagens fixadas, enquetes e mensagens de voz**, além de busca com filtros, galeria de arquivos por canal, encaminhar e comandos como /poll e /roll.
+- **Mensagens salvas e lembretes** guardados no seu aparelho, marcador de leitura e status que somem sozinhos.
 - **Voz, vídeo e tela** nos canais de voz, com mudo, ensurdecer e supressão de ruído.
 - **Ligar para um amigo** direto da tela inicial: um toque cria as seis palavras e abre o menu de compartilhar.
 - **Apertar para falar**, com um botão grande de Segure para falar no celular.
@@ -44,6 +46,7 @@ Não precisa instalar nada. Funciona no Chrome, Edge, Firefox e Safari atuais, n
 - **Perfil local**: nome, avatar e uma chave de identidade criada no seu aparelho. Proteja com um PIN ou leve para outro aparelho com um backup criptografado.
 - **Convite com seis palavras** e um QR code. Nenhum link para copiar, nada técnico para colar.
 - **Privacidade extra**: frase secreta opcional no den e uma impressão digital da conexão para comparar.
+- **Datas especiais**: no Halloween, Natal, Carnaval, Festa Junina e outras datas, a Luna e a turma se fantasiam, com figurinhas e reações da época. Um botão desliga tudo.
 
 ## Privacidade e limites
 
