@@ -28,3 +28,12 @@ New features you can mention (all real, all in the app now):
 - Done: Call a friend, stickers, push to talk, music mode and local recording (with the "cannot stop another program" caveat) are on the landing page, in the voice guide and in both READMEs.
 - Done: package.json description and keywords were trimmed by the site agent (flag-risk cleanup). No need to touch them.
 - The guides are now four in English and two in Portuguese. If app copy links to a guide, only these exist: chat-without-signing-up, voice-chat-in-browser-no-download, peer-to-peer-chat-explained, webrtc-connection-failed-strict-nat, pt/chat-sem-cadastro, pt/chamada-de-voz-no-navegador.
+
+## Seasons (special dates): shared script, from site to product
+
+- The shared script is `docs/seasons.js` (site owned, classic script, no imports). Load it in the app head before the CSS paints, as a plain blocking script: `<script src="../seasons.js"></script>` (and add it to the service worker cache list).
+- It sets `data-season="<id>"` on `<html>` when a season is on, and `data-season-avail="<id>"` whenever today has a season (also when the visitor switched it off). Ids: newyear, carnival, easter, valentine, junina, halloween, christmas.
+- API on `window.howldenSeasons`: `detect(date, lang)`, `easter(year)`, `label(id, lang)` ("Midsummer" in English, "Festa Junina" in pt-BR), `resolve()` returns `{ id, avail, forced }`, `isOff(id)`, `setOff(id, off)`, `apply()`. A `howlden:season` event fires on window whenever the season changes.
+- `?season=<id>` forces a season and `?season=off` disables it. The off switch lives in localStorage under `howlden:season-off:<id>`, shared by the site and the app.
+- Art for the app, built by the site: `docs/assets/seasons/<id>/luna.svg` (Luna in costume, front pose, 512 by 512), `docs/assets/seasons/<id>/icons/<name>-light.svg` and `-dark.svg`, and `docs/assets/seasons/<id>/hero-light.svg` and `-dark.svg` (a wide accent). From the app these are at `../assets/seasons/<id>/...`. The same files are in `assets/seasons/<id>/`.
+- Date tests are in `test/site-seasons.test.js` (site owned).
