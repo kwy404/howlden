@@ -396,6 +396,193 @@ if (tourEl && !reduced) {
   document.addEventListener('visibilitychange', sync);
 }
 
+// ---------- Special dates (docs/seasons.js sets data-season) ----------
+// The chip names the season and has an off switch. The pack wears costumes,
+// and the hero gets one light canvas of particles that pauses off screen,
+// in a hidden tab, and does not run at all with reduced motion.
+
+const SEASONS = window.howldenSeasons;
+const CHIP_ICON = { halloween: 'pumpkin', christmas: 'tree', carnival: 'mask', junina: 'bonfire', valentine: 'heart', easter: 'egg', newyear: 'firework' };
+const chip = $('#season-chip');
+const seasonNow = () => document.documentElement.getAttribute('data-season') || '';
+
+function dressPack(id) {
+  for (const img of $$('img[data-char]')) {
+    const who = img.dataset.char;
+    const src = new URL(id ? `assets/seasons/${id}/${who}.svg` : `assets/art/characters/${who}.svg`, BASE).href;
+    if (img.src !== src) img.src = src;
+  }
+}
+
+function showChip() {
+  const avail = document.documentElement.getAttribute('data-season-avail') || '';
+  if (!chip || !SEASONS) return;
+  chip.hidden = !avail;
+  if (!avail) return;
+  const pt = document.documentElement.lang === 'pt-BR';
+  const name = SEASONS.label(avail, pt ? 'pt-BR' : 'en');
+  const on = seasonNow() === avail;
+  $('.sc-label', chip).textContent = pt ? `Modo ${name}` : `${name} mode`;
+  $('use', chip).setAttribute('href', `#s-${avail}-${CHIP_ICON[avail]}`);
+  $('.sc-switch', chip).setAttribute('aria-checked', on ? 'true' : 'false');
+  chip.classList.toggle('off', !on);
+}
+
+chip?.querySelector('.sc-switch').addEventListener('click', () => {
+  const avail = document.documentElement.getAttribute('data-season-avail');
+  if (avail) SEASONS.setOff(avail, seasonNow() === avail);
+});
+
+// Particles: a few shapes per season, drawn on one canvas in the hero.
+const FX = {
+  halloween: { n: 16, kind: 'leaf', colors: ['#ff8a3d', '#d9601a', '#ffd166', '#a8452a'], fall: 1 },
+  christmas: { n: 46, kind: 'snow', colors: ['#ffffff', '#efeaff'], fall: 1 },
+  carnival: { n: 34, kind: 'confetti', colors: ['#ff7eb3', '#ffd166', '#3ee6a0', '#8b6bff', '#ff8a3d'], fall: 1 },
+  junina: { n: 26, kind: 'spark', colors: ['#ffd166', '#ff8a3d', '#ff5e3a'], fall: -1 },
+  valentine: { n: 20, kind: 'petal', colors: ['#ff5e7e', '#ff9fb8', '#ffc4d4'], fall: 1 },
+  easter: { n: 18, kind: 'petal', colors: ['#9be3c6', '#ffd166', '#ffb3c6', '#cdbdff'], fall: 1 },
+  newyear: { n: 0, kind: 'firework', colors: ['#ffd166', '#ff7eb3', '#3ee6a0', '#cdbdff'], fall: 0 },
+};
+const canvas = $('.season-fx');
+let fx = null;
+function startFx(id) {
+  if (fx) {
+    fx.stop();
+    fx = null;
+  }
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const clear = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
+  clear();
+  const cfg = FX[id];
+  if (!cfg || reduced) return;
+  const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+  let w = 0;
+  let h = 0;
+  const size = () => {
+    w = canvas.clientWidth;
+    h = canvas.clientHeight;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  size();
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = () => cfg.colors[Math.floor(Math.random() * cfg.colors.length)];
+  const make = (spread) => ({ x: rnd(0, w), y: spread ? rnd(0, h) : cfg.fall < 0 ? h + 10 : -10, s: rnd(0.6, 1.2), vy: rnd(0.3, 0.9) * cfg.fall, vx: rnd(-0.25, 0.25), r: rnd(0, 6.28), vr: rnd(-0.03, 0.03), c: pick(), ph: rnd(0, 6.28), life: 1 });
+  const parts = Array.from({ length: cfg.n }, () => make(true));
+  let bursts = [];
+  let next = 0;
+  const draw = (p) => {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.r);
+    ctx.fillStyle = p.c;
+    ctx.globalAlpha = cfg.kind === 'spark' ? Math.max(0, p.life) * 0.9 : 0.75;
+    if (cfg.kind === 'snow' || cfg.kind === 'spark') {
+      ctx.beginPath();
+      ctx.arc(0, 0, (cfg.kind === 'snow' ? 2.2 : 1.8) * p.s, 0, 6.28);
+      ctx.fill();
+    } else if (cfg.kind === 'confetti') {
+      ctx.scale(1, Math.cos(p.ph));
+      ctx.fillRect(-4 * p.s, -2.5 * p.s, 8 * p.s, 5 * p.s);
+    } else {
+      // A leaf or a petal: a pointed oval, with a vein for leaves.
+      const k = cfg.kind === 'leaf' ? 7 : 5;
+      ctx.scale(p.s, p.s * Math.max(0.35, Math.abs(Math.cos(p.ph))));
+      ctx.beginPath();
+      ctx.moveTo(-k, 0);
+      ctx.quadraticCurveTo(0, -k * 0.9, k, 0);
+      ctx.quadraticCurveTo(0, k * 0.9, -k, 0);
+      ctx.fill();
+      if (cfg.kind === 'leaf') {
+        ctx.strokeStyle = 'rgba(80, 30, 10, .45)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(-k, 0);
+        ctx.lineTo(k, 0);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  };
+  let raf = 0;
+  const tick = (t) => {
+    raf = requestAnimationFrame(tick);
+    clear();
+    for (const p of parts) {
+      p.ph += 0.03;
+      p.x += p.vx + Math.sin(p.ph) * 0.35;
+      p.y += p.vy;
+      p.r += p.vr;
+      if (cfg.kind === 'spark') p.life -= 0.004;
+      if (p.y > h + 12 || p.y < -14 || p.x < -14 || p.x > w + 14 || p.life <= 0) Object.assign(p, make(false));
+      draw(p);
+    }
+    if (cfg.kind === 'firework') {
+      if (t > next) {
+        next = t + rnd(900, 1800);
+        const x = rnd(w * 0.1, w * 0.9);
+        const y = rnd(h * 0.08, h * 0.45);
+        const c = pick();
+        bursts.push(...Array.from({ length: 22 }, (_, i) => ({ x, y, vx: Math.cos((i / 22) * 6.28) * rnd(1, 2.2), vy: Math.sin((i / 22) * 6.28) * rnd(1, 2.2), c, life: 1 })));
+      }
+      bursts = bursts.filter((b) => b.life > 0);
+      for (const b of bursts) {
+        b.x += b.vx;
+        b.y += b.vy;
+        b.vy += 0.02;
+        b.vx *= 0.985;
+        b.life -= 0.014;
+        ctx.globalAlpha = Math.max(0, b.life);
+        ctx.fillStyle = b.c;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 1.8, 0, 6.28);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  };
+  let running = false;
+  let seen = true;
+  const run = (go) => {
+    if (go === running) return;
+    running = go;
+    if (go) {
+      size();
+      raf = requestAnimationFrame(tick);
+    } else cancelAnimationFrame(raf);
+  };
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+    seen = entries.some((e) => e.isIntersecting);
+    run(seen && !document.hidden);
+  }) : null;
+  io?.observe(canvas);
+  const onVis = () => run(seen && !document.hidden);
+  const onSize = () => running && size();
+  document.addEventListener('visibilitychange', onVis);
+  window.addEventListener('resize', onSize);
+  fx = {
+    stop() {
+      run(false);
+      io?.disconnect();
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('resize', onSize);
+      clear();
+    },
+  };
+  run(!document.hidden);
+}
+
+function seasonChanged() {
+  const id = seasonNow();
+  dressPack(id);
+  showChip();
+  startFx(id);
+}
+window.addEventListener('howlden:season', seasonChanged);
+seasonChanged();
+
 // ---------- Reveal on scroll ----------
 
 const reveal = $$('.rv');

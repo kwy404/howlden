@@ -320,6 +320,9 @@ export function homeBody({ guides, qr }) {
   return `
 <section class="hx" aria-labelledby="hero-title">
   <div class="hx-sky" aria-hidden="true">${floaters(FLOAT)}</div>
+  <div class="season-accent" aria-hidden="true"></div>
+  <canvas class="season-fx" aria-hidden="true"></canvas>
+  <div class="season-bats" aria-hidden="true">${[1, 2, 3].map((n) => `<svg class="sb sb-${n}" viewBox="-70 -24 140 48"><path class="sb-w" d="M0 4 C-14 -14 -42 -20 -66 -10 C-56 -4 -54 4 -58 12 C-46 8 -36 10 -28 18 C-22 10 -12 8 0 12 C12 8 22 10 28 18 C36 10 46 8 58 12 C54 4 56 -4 66 -10 C42 -20 14 -14 0 4 Z"/><circle cy="2" r="11"/><circle cx="-4" cy="1" r="2.4" class="sb-e"/><circle cx="4" cy="1" r="2.4" class="sb-e"/></svg>`).join('')}</div>
   <div class="wrap hx-grid">
     <div class="hx-copy">
       <h1 id="hero-title" class="mega">Call your pack. <span class="mega-glow">No server in sight.</span></h1>
@@ -355,8 +358,8 @@ export function homeBody({ guides, qr }) {
     <header class="sec-head rv"><p class="kicker">${art('den')}Live preview</p><h2 id="look-title" class="mega mega-md">Look around a den</h2><p>This is the real layout. Click the channels, react, mute yourself or type a message. It all stays on this page.</p></header>
     <div class="pv-scene rv">
       <div class="monitor">${preview()}</div>
-      <img class="char ch-luna" src="assets/art/characters/luna.svg" width="512" height="512" alt="Luna the wolf howling into her headset" loading="lazy">
-      <img class="char ch-fang" src="assets/art/characters/fang.svg" width="260" height="410" alt="Fang with a game controller" loading="lazy">
+      <img class="char ch-luna" data-char="luna" src="assets/art/characters/luna.svg" width="512" height="512" alt="Luna the wolf howling into her headset" loading="lazy">
+      <img class="char ch-fang" data-char="fang" src="assets/art/characters/fang.svg" width="260" height="410" alt="Fang with a game controller" loading="lazy">
     </div>
   </div>
 </section>
@@ -463,12 +466,12 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
     <a href="app/" class="btn-big btn-white">${art('den')}Open howlden in your browser</a>
   </div>
   <div class="lineup" aria-hidden="true">
-    <img src="assets/art/characters/moss.svg" width="260" height="410" alt="" loading="lazy">
-    <img src="assets/art/characters/nova.svg" width="260" height="410" alt="" loading="lazy">
-    <img class="lu-luna" src="assets/art/characters/luna.svg" width="512" height="512" alt="" loading="lazy">
-    <img src="assets/art/characters/fang.svg" width="260" height="410" alt="" loading="lazy">
-    <img src="assets/art/characters/pip.svg" width="260" height="410" alt="" loading="lazy">
-    <img src="assets/art/characters/ember.svg" width="260" height="410" alt="" loading="lazy">
+    <img data-char="moss" src="assets/art/characters/moss.svg" width="260" height="410" alt="" loading="lazy">
+    <img data-char="nova" src="assets/art/characters/nova.svg" width="260" height="410" alt="" loading="lazy">
+    <img class="lu-luna" data-char="luna" src="assets/art/characters/luna.svg" width="512" height="512" alt="" loading="lazy">
+    <img data-char="fang" src="assets/art/characters/fang.svg" width="260" height="410" alt="" loading="lazy">
+    <img data-char="pip" src="assets/art/characters/pip.svg" width="260" height="410" alt="" loading="lazy">
+    <img data-char="ember" src="assets/art/characters/ember.svg" width="260" height="410" alt="" loading="lazy">
   </div>
 </section>`;
 }

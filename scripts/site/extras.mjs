@@ -24,7 +24,12 @@ export const OBJECTS = {
 
 // ---------- The pack ----------
 
-function front(fur, { headset = false, glasses = false, bow = false, prop = '' } = {}) {
+/**
+ * A pack member facing front, drawn around the face center (0, 0): ears reach
+ * y -122, the body ends at y 250. A costume adds layers: back (behind the
+ * body), neck (over the body), hat (over the head) and held (in front).
+ */
+export function figure(fur, { headset = false, glasses = false, bow = false, prop = '', costume = {} } = {}) {
   const P = { ...PAL.dark, ...FURS[fur] };
   const body = `<path d="M-64 50 C-92 110 -100 200 -88 250 H88 C100 200 92 110 64 50Z" fill="${P.fur}"/><path d="M-88 250 C-96 210 -96 170 -84 130 C-70 170 -60 220 -50 250Z M88 250 C96 210 96 170 84 130 C70 170 60 220 50 250Z" fill="${P.furD}"/><path d="M-38 60 C-44 120 -32 176 0 200 C32 176 44 120 38 60Z" fill="${P.furL}"/><ellipse cx="-44" cy="250" rx="30" ry="14" fill="${P.furL}"/><ellipse cx="44" cy="250" rx="30" ry="14" fill="${P.furL}"/>`;
   const props = {
@@ -38,7 +43,13 @@ function front(fur, { headset = false, glasses = false, bow = false, prop = '' }
   let extra = '';
   if (glasses) extra += `<g fill="none" stroke="#1a1338" stroke-width="5"><circle cx="-30" cy="-14" r="19"/><circle cx="30" cy="-14" r="19"/><path d="M-11 -16 Q0 -22 11 -16"/></g>`;
   if (bow) extra += `<g transform="translate(46 -62) rotate(18)"><path d="M0 0 L-22 -14 L-22 14Z M0 0 L22 -14 L22 14Z" fill="#ff5e3a"/><circle r="6" fill="#ff8a3d"/></g>`;
-  return doc(260, 410, `<ellipse cx="130" cy="392" rx="96" ry="12" fill="#000" opacity=".22"/><g transform="translate(130 138)">${body}${props[prop] || ''}${b.art.join('')}${extra}</g>`);
+  const c = costume;
+  const held = c.held ? c.held : props[prop] || '';
+  return `${c.back || ''}${body}${c.neck || ''}${held}${b.art.join('')}${extra}${c.face || ''}${c.hat || ''}${c.front || ''}`;
+}
+
+function front(fur, opts = {}) {
+  return doc(260, 410, `<ellipse cx="130" cy="392" rx="96" ry="12" fill="#000" opacity=".22"/><g transform="translate(130 138)">${figure(fur, opts)}</g>`);
 }
 
 export const CHARACTERS = {

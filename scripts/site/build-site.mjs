@@ -21,6 +21,7 @@ import { SITE, UPDATED, esc, page } from './layout.mjs';
 import { guideBody, guideJsonLd, indexBody, indexJsonLd, notFoundBody, words } from './pages.mjs';
 import { encodeQR, qrSvg } from '../../src/qr.js';
 import { CHARACTERS, OBJECTS, markSvg } from './extras.mjs';
+import { seasonFiles } from './seasons-art.mjs';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const here = join(root, 'scripts', 'site');
@@ -255,6 +256,7 @@ for (const [n, f] of Object.entries(CHARACTERS)) {
   files[`assets/characters/${n}.svg`] = f();
 }
 files['assets/mark.svg'] = markSvg('#7c5cff');
+Object.assign(files, seasonFiles());
 files['assets/icons-sheet.svg'] = `${iconSheet('light')}\n`;
 files['assets/icons-sheet-dark.svg'] = `${iconSheet('dark')}\n`;
 for (const theme of ['light', 'dark']) {

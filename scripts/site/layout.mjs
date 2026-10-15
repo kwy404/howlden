@@ -3,6 +3,7 @@
 // internal link is written relative to `p.base` ('' or '../').
 import { ICON_NAMES, iconSymbol } from './icons.mjs';
 import { markSymbol } from './extras.mjs';
+import { seasonSymbols } from './seasons-art.mjs';
 
 export const SITE = 'https://kwy404.github.io/howlden/';
 export const VERSION = '0.1.0';
@@ -102,7 +103,7 @@ export function sprite() {
   const ui = Object.entries(UI)
     .map(([k, v]) => `<symbol id="i-${k}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${v}</symbol>`)
     .join('');
-  return `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${ui}${ICON_NAMES.map(iconSymbol).join('')}${markSymbol()}</svg>`;
+  return `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${ui}${ICON_NAMES.map(iconSymbol).join('')}${markSymbol()}${seasonSymbols()}</svg>`;
 }
 
 const THEME_SNIPPET = `<script>(function(){try{var t=localStorage.getItem('voodoo:theme');if(t&&t.charAt(0)==='"')t=JSON.parse(t);var r=document.documentElement;if(t==='light'||t==='dark'){r.setAttribute('data-theme',t);r.style.colorScheme=t}else{r.removeAttribute('data-theme')}}catch(e){}})();</script>`;
@@ -125,6 +126,7 @@ export function head(p) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
 ${THEME_SNIPPET}
+<script src="${p.base}seasons.js"></script>
 <title>${esc(p.title)}</title>
 <meta name="description" content="${esc(p.description)}">
 ${p.noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" href="${url}">`}${alts}
@@ -181,6 +183,12 @@ export function topbar(p) {
     </div>
   </div>
 </header>`;
+}
+
+/** The special dates chip, filled and shown by site.js when a season applies. */
+function seasonChip(p) {
+  const pt = p.lang === 'pt';
+  return `<div class="season-chip" id="season-chip" hidden><svg class="hi sc-ic" aria-hidden="true" focusable="false"><use/></svg><span class="sc-label"></span><button type="button" class="sc-switch" role="switch" aria-checked="true" aria-label="${pt ? 'Tema da data especial' : 'Seasonal theme'}"><i></i></button></div>`;
 }
 
 /** The Ctrl K search dialog, filled by site.js from search.json. */
@@ -255,6 +263,7 @@ ${topbar(p)}
 ${body}
 </main>
 ${footer(p, guides)}
+${seasonChip(p)}
 ${searchDialog(p)}
 </body>
 </html>

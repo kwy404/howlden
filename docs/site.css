@@ -1005,6 +1005,86 @@ p { margin: 0; }
 @media (max-width: 1000px) { .foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .foot-grid { grid-template-columns: 1fr; } }
 
+
+/* ---------- Special dates (data-season from seasons.js) ---------- */
+
+.season-accent, .season-fx, .season-bats { display: none; position: absolute; pointer-events: none; }
+.season-accent { left: 0; right: 0; top: 0; height: clamp(44px, 10.8vw, 160px); z-index: -1; background: no-repeat center top / 100% auto; }
+.season-fx { inset: 0; width: 100%; height: 100%; z-index: 0; }
+:root[data-season] .season-accent, :root[data-season] .season-fx { display: block; }
+.hx-grid { position: relative; z-index: 1; }
+:root[data-season] .hx { padding-top: clamp(64px, 10vw, 150px); }
+:root[data-season] .lineup .lu-luna { width: clamp(150px, 25vw, 380px); }
+:root[data-season] .pv-scene .ch-luna { width: clamp(130px, 25%, 280px); }
+.season-chip { position: fixed; left: 16px; bottom: 16px; z-index: 45; display: inline-flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 999px; color: var(--text); background: color-mix(in oklab, var(--panel) 92%, transparent); border: 1px solid var(--line-2); box-shadow: var(--shadow); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font-weight: 700; font-size: 0.86rem; line-height: 1; animation: rise 0.6s 0.8s both; }
+.season-chip[hidden] { display: none; }
+.season-chip .hi { width: 22px; height: 22px; color: var(--text); }
+.season-chip.off { opacity: 0.85; }
+.sc-switch { position: relative; flex: none; width: 40px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: var(--ring); cursor: pointer; transition: background 0.2s; }
+.sc-switch i { position: absolute; top: 4px; left: 20px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); transition: left 0.2s; }
+.season-chip.off .sc-switch { background: var(--soft); }
+.season-chip.off .sc-switch i { left: 4px; }
+@media (max-width: 560px) { .season-chip { left: 10px; bottom: 10px; font-size: 0.8rem; } }
+
+/* Halloween: a harvest moon and a few bats over the hero. */
+:root[data-season='halloween'] .season-bats { display: block; inset: 0; z-index: 0; overflow: hidden; }
+:root[data-season='halloween'] .f-moon { filter: blur(2px) sepia(0.7) saturate(2.6) hue-rotate(-14deg); opacity: 1; }
+.sb { position: absolute; left: 0; width: 54px; height: auto; fill: #2b2155; animation: bat-fly 17s linear infinite; }
+.sb-1 { top: 13%; }
+.sb-2 { top: 3%; width: 36px; animation-duration: 23s; animation-delay: -9s; }
+.sb-3 { top: 21%; width: 28px; animation-duration: 29s; animation-delay: -18s; }
+.sb .sb-e { fill: #ff8a3d; }
+.sb-w { transform-box: fill-box; transform-origin: center; animation: flap 0.26s ease-in-out infinite alternate; }
+@keyframes bat-fly { 0% { transform: translate(-12vw, 0); } 25% { transform: translate(22vw, -34px); } 50% { transform: translate(50vw, 14px); } 75% { transform: translate(78vw, -22px); } 100% { transform: translate(112vw, 0); } }
+@keyframes flap { to { transform: scaleY(0.4); } }
+@media (max-width: 640px) { .sb { width: 34px; } .sb-1 { top: 5%; } .sb-3 { display: none; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sb { fill: #0b0824; } }
+:root[data-theme='dark'] .sb { fill: #0b0824; }
+@media (prefers-reduced-motion: reduce) { .sb { left: 8%; } .sb-2 { left: 70%; } .sb-3 { left: 40%; } }
+
+:root[data-season='halloween'] .mega-glow { background-image: linear-gradient(95deg, #ff8a1f, #e8590c 45%, #8b3fd9); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='halloween'] .mega-glow { background-image: linear-gradient(95deg, #ffb347, #ff6a1f 45%, #b06cff); } }
+:root[data-theme='dark'][data-season='halloween'] .mega-glow { background-image: linear-gradient(95deg, #ffb347, #ff6a1f 45%, #b06cff); }
+:root[data-season='halloween'] .season-accent { background-image: url(assets/seasons/halloween/hero-light.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='halloween'] .season-accent { background-image: url(assets/seasons/halloween/hero-dark.svg); } }
+:root[data-theme='dark'][data-season='halloween'] .season-accent { background-image: url(assets/seasons/halloween/hero-dark.svg); }
+:root[data-season='christmas'] .mega-glow { background-image: linear-gradient(95deg, #e8a400, #e0454f 50%, #139e6a); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='christmas'] .mega-glow { background-image: linear-gradient(95deg, #ffe08a, #ff6b6b 50%, #3ee6a0); } }
+:root[data-theme='dark'][data-season='christmas'] .mega-glow { background-image: linear-gradient(95deg, #ffe08a, #ff6b6b 50%, #3ee6a0); }
+:root[data-season='christmas'] .season-accent { background-image: url(assets/seasons/christmas/hero-light.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='christmas'] .season-accent { background-image: url(assets/seasons/christmas/hero-dark.svg); } }
+:root[data-theme='dark'][data-season='christmas'] .season-accent { background-image: url(assets/seasons/christmas/hero-dark.svg); }
+:root[data-season='carnival'] .mega-glow { background-image: linear-gradient(95deg, #e8a400, #e0457f 45%, #139e6a); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='carnival'] .mega-glow { background-image: linear-gradient(95deg, #ffd166, #ff7eb3 40%, #3ee6a0); } }
+:root[data-theme='dark'][data-season='carnival'] .mega-glow { background-image: linear-gradient(95deg, #ffd166, #ff7eb3 40%, #3ee6a0); }
+:root[data-season='carnival'] .season-accent { background-image: url(assets/seasons/carnival/hero-light.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='carnival'] .season-accent { background-image: url(assets/seasons/carnival/hero-dark.svg); } }
+:root[data-theme='dark'][data-season='carnival'] .season-accent { background-image: url(assets/seasons/carnival/hero-dark.svg); }
+:root[data-season='junina'] .mega-glow { background-image: linear-gradient(95deg, #e8a400, #ff6a1f 45%, #d9321a); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='junina'] .mega-glow { background-image: linear-gradient(95deg, #ffd166, #ff8a3d 45%, #ff5e3a); } }
+:root[data-theme='dark'][data-season='junina'] .mega-glow { background-image: linear-gradient(95deg, #ffd166, #ff8a3d 45%, #ff5e3a); }
+:root[data-season='junina'] .season-accent { background-image: url(assets/seasons/junina/hero-light.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='junina'] .season-accent { background-image: url(assets/seasons/junina/hero-dark.svg); } }
+:root[data-theme='dark'][data-season='junina'] .season-accent { background-image: url(assets/seasons/junina/hero-dark.svg); }
+:root[data-season='valentine'] .mega-glow { background-image: linear-gradient(95deg, #ff6b8e, #e0245e 55%, #c2185b); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='valentine'] .mega-glow { background-image: linear-gradient(95deg, #ffc4d4, #ff5e7e 50%, #ff8ab0); } }
+:root[data-theme='dark'][data-season='valentine'] .mega-glow { background-image: linear-gradient(95deg, #ffc4d4, #ff5e7e 50%, #ff8ab0); }
+:root[data-season='valentine'] .season-accent { background-image: url(assets/seasons/valentine/hero-light.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='valentine'] .season-accent { background-image: url(assets/seasons/valentine/hero-dark.svg); } }
+:root[data-theme='dark'][data-season='valentine'] .season-accent { background-image: url(assets/seasons/valentine/hero-dark.svg); }
+:root[data-season='easter'] .mega-glow { background-image: linear-gradient(95deg, #e8a400, #2f9e6f 45%, #6a45f5); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='easter'] .mega-glow { background-image: linear-gradient(95deg, #fff1a8, #9be3c6 45%, #cdbdff); } }
+:root[data-theme='dark'][data-season='easter'] .mega-glow { background-image: linear-gradient(95deg, #fff1a8, #9be3c6 45%, #cdbdff); }
+:root[data-season='easter'] .season-accent { background-image: url(assets/seasons/easter/hero-light.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='easter'] .season-accent { background-image: url(assets/seasons/easter/hero-dark.svg); } }
+:root[data-theme='dark'][data-season='easter'] .season-accent { background-image: url(assets/seasons/easter/hero-dark.svg); }
+:root[data-season='newyear'] .mega-glow { background-image: linear-gradient(95deg, #e8a400, #ff8a3d 45%, #6a45f5); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='newyear'] .mega-glow { background-image: linear-gradient(95deg, #fff6d6, #ffd166 45%, #cdbdff); } }
+:root[data-theme='dark'][data-season='newyear'] .mega-glow { background-image: linear-gradient(95deg, #fff6d6, #ffd166 45%, #cdbdff); }
+:root[data-season='newyear'] .season-accent { background-image: url(assets/seasons/newyear/hero-light.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light'])[data-season='newyear'] .season-accent { background-image: url(assets/seasons/newyear/hero-dark.svg); } }
+:root[data-theme='dark'][data-season='newyear'] .season-accent { background-image: url(assets/seasons/newyear/hero-dark.svg); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -29,6 +29,23 @@ describe('site pages', () => {
     }
   });
 
+  it.each(pages)('%s loads the seasons script before the styles and has the season chip', (p) => {
+    const html = read(p);
+    const at = html.search(/<script src="(\.\.\/|\/howlden\/)?seasons\.js"><\/script>/);
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(html.indexOf('site.css'));
+    expect(html).toContain('id="season-chip"');
+  });
+
+  it('ships the costumes, icons and hero accents for every season', () => {
+    for (const s of ['newyear', 'carnival', 'easter', 'valentine', 'junina', 'halloween', 'christmas']) {
+      for (const who of ['luna', 'fang', 'pip', 'nova', 'moss', 'ember']) expect(existsSync(join(docs, 'assets', 'seasons', s, `${who}.svg`))).toBe(true);
+      for (const t of ['light', 'dark']) expect(existsSync(join(docs, 'assets', 'seasons', s, `hero-${t}.svg`))).toBe(true);
+      expect(readdirSync(join(docs, 'assets', 'seasons', s, 'icons')).length).toBeGreaterThanOrEqual(6);
+      expect(read('index.html')).toContain(`id="s-${s}-`);
+    }
+  });
+
   it('shows the two window demo and the 30 second tour on the home page', () => {
     const html = read('index.html');
     expect(html).toContain('id="demo"');
