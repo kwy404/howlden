@@ -42,11 +42,7 @@ function readGuides(dir) {
 }
 
 // Reading order of the English guides.
-const ORDER = [
-  'chat-without-signing-up', 'voice-chat-in-browser-no-download', 'private-group-voice-call',
-  'peer-to-peer-chat-explained', 'screen-share-without-app', 'free-encrypted-group-chat', 'browser-voice-chat-for-gaming',
-  'how-webrtc-voice-works', 'safe-chat-for-kids-study-groups', 'webrtc-connection-failed-strict-nat', 'group-video-call-without-account',
-];
+const ORDER = ['chat-without-signing-up', 'voice-chat-in-browser-no-download', 'peer-to-peer-chat-explained', 'webrtc-connection-failed-strict-nat'];
 const en = readGuides(join(here, 'guides')).sort((a, b) => ORDER.indexOf(a.meta.slug) - ORDER.indexOf(b.meta.slug));
 const pt = readGuides(join(here, 'guides', 'pt'));
 for (const g of pt) {
@@ -60,7 +56,7 @@ for (const g of [...en, ...pt]) {
   const m = g.meta;
   const where = `guide ${m.slug}`;
   if (m.title.length > 65) problems.push(`${where}: title is ${m.title.length} characters`);
-  if (m.description.length < 120 || m.description.length > 165) problems.push(`${where}: description is ${m.description.length} characters`);
+  if (m.description.length < 60 || m.description.length > 160) problems.push(`${where}: description is ${m.description.length} characters`);
   if (words(g.body) < 800) problems.push(`${where}: only ${words(g.body)} words`);
   if (!SCENE_NAMES.includes(m.scene)) problems.push(`${where}: unknown scene ${m.scene}`);
   if (!ICON_NAMES.includes(m.icon)) problems.push(`${where}: unknown icon ${m.icon}`);
@@ -129,8 +125,8 @@ const qr = qrSvg(encodeQR(`${SITE}app/`, { ecl: 'M' }), { margin: 2, dark: '#1e1
 out['index.html'] = page(
   {
     kind: 'home', path: '', base: '', nav: '', og: 'og.png',
-    title: 'howlden: serverless group chat, voice and video, no sign up',
-    description: 'Free peer to peer group chat in your browser: text and voice channels, video and screen share. No account, no server of ours, end to end encrypted, invite only.',
+    title: 'howlden: group chat, voice and video in the browser',
+    description: 'Talk with up to 5 friends in the browser. Share six words to connect. No account, and no server of ours in the middle.',
     jsonld: homeJsonLd(guideList),
   },
   homeBody({ guides: guideList, qr }),
@@ -160,8 +156,8 @@ for (const g of [...en, ...pt]) {
 out['guides.html'] = page(
   {
     kind: 'index', path: 'guides.html', base: '', nav: 'guides', og: 'og/guides.png',
-    title: 'howlden guides: private chat, voice and video in the browser',
-    description: 'Guides on chat without signing up, voice chat in the browser, screen share without an app, encrypted group chat, WebRTC and fixing failed connections.',
+    title: 'Guides | howlden',
+    description: 'Getting started, voice and video calls, how the connection works, and what to do when it fails.',
     jsonld: indexJsonLd([...en, ...pt]),
   },
   indexBody(en, pt),
@@ -172,7 +168,7 @@ out['guides.html'] = page(
 const rootLinks = (html) => html.replace(/\b(href|src)="(?![a-z]+:|#|\/)([^"]*)"/g, (_, a, v) => `${a}="/howlden/${v.replace(/^\.\//, '')}"`);
 out['404.html'] = rootLinks(
   page(
-    { kind: 'notfound', path: '404.html', base: '', noindex: true, og: 'og.png', title: 'Page not found | howlden', description: 'This page could not be found. Luna lost the trail. Head back to the den, or open the app and start a private group chat.' },
+    { kind: 'notfound', path: '404.html', base: '', noindex: true, og: 'og.png', title: 'Page not found | howlden', description: 'This page could not be found. Head back to the den, or open the app.' },
     notFoundBody(),
     guideList,
   ),
@@ -182,8 +178,10 @@ out['404.html'] = rootLinks(
 
 const search = [
   { kind: 'Page', title: 'Open a den', sub: 'Start the app, no account needed', url: 'app/' },
+  { kind: 'Page', title: 'Watch two friends connect', sub: 'An animated demo of six word pairing', url: './#demo' },
+  { kind: 'Page', title: '30 second tour', sub: 'Six scenes, from opening the app to talking', url: './#tour' },
   { kind: 'Page', title: 'Live preview', sub: 'Try the app layout on the home page', url: './#preview' },
-  { kind: 'Page', title: 'How inviting works', sub: 'One link out, one reply code back', url: './#invite' },
+  { kind: 'Page', title: 'How inviting works', sub: 'Six words out, six words back', url: './#invite' },
   { kind: 'Page', title: 'Why it is private', sub: 'No server of ours, DTLS, relays, passphrase, fingerprint', url: './#private' },
   { kind: 'Page', title: 'Features', sub: 'Text, voice, video, screen share, files, reactions', url: './#chat' },
   { kind: 'Page', title: 'Server based or direct', sub: 'Two approaches compared', url: './#compare' },

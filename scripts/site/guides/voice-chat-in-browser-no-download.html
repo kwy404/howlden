@@ -1,33 +1,48 @@
 <!--meta
 {
   "slug": "voice-chat-in-browser-no-download",
-  "title": "Voice chat in the browser with no download | howlden",
-  "description": "Voice chat in the browser with no download: talk with friends from your laptop or phone, fix microphone permissions, stop echo and know the real limits.",
-  "h1": "Voice chat in the browser, no download",
-  "lede": "Your browser already knows how to carry a voice call. This guide shows how to start one with friends, get the microphone working, and make it sound good.",
-  "short": "Voice chat with no download",
+  "title": "Voice and video calls | howlden",
+  "description": "How to start a call in the browser, fix microphone permissions, share a camera or a screen, and keep the sound clean.",
+  "h1": "Voice and video calls",
+  "lede": "Your browser already knows how to carry a call. This guide shows how to start one with friends, get the microphone working, share a screen and make it sound good.",
+  "short": "Voice and video calls",
   "icon": "browser",
   "scene": "campfire-voice",
-  "keywords": ["voice chat in browser no download", "browser voice chat", "voice call without app", "online voice chat no install", "talk to friends in browser", "web voice chat"],
+  "related": [
+    "webrtc-connection-failed-strict-nat",
+    "peer-to-peer-chat-explained"
+  ],
   "faq": [
-    { "q": "Can I voice chat without downloading an app?", "a": "Yes. Modern browsers on desktop and phone include WebRTC, which can capture your microphone and send audio directly to other people. In howlden you just <a href=\"app/\">open a den</a> and join a voice channel." },
-    { "q": "Why can't my friends hear me in browser voice chat?", "a": "Usually the browser blocked microphone access, the operating system blocks the browser, or the wrong input device is selected. Check the site permissions next to the address bar first, then your system privacy settings." },
-    { "q": "Does browser voice chat work on a phone?", "a": "Yes, howlden runs in phone browsers too. Keep the page in front during a call, use earphones to avoid echo, and allow the microphone when asked." },
-    { "q": "How much data does a browser voice call use?", "a": "Audio is light compared with video. Video with several people takes much more upload bandwidth, so turn the camera off if your connection struggles." }
+    {
+      "q": "Do I need to install anything?",
+      "a": "No. Modern browsers on desktop and phone include WebRTC, which can capture your microphone and send audio directly to other people. You just <a href=\"app/\">open a den</a> and join a voice channel."
+    },
+    {
+      "q": "Why can't my friends hear me?",
+      "a": "Usually the browser blocked microphone access, the operating system blocks the browser, or the wrong input device is selected. Check the site permissions next to the address bar first, then your system privacy settings."
+    },
+    {
+      "q": "Does it work on a phone?",
+      "a": "Yes. Keep the page in front during a call, use earphones to avoid echo, and allow the microphone when asked. Sharing a screen from a phone browser is limited by the phone."
+    },
+    {
+      "q": "How much data does a call use?",
+      "a": "Audio is light. Video with several people takes much more upload bandwidth, so turn the camera off if your connection struggles."
+    }
   ]
 }
 -->
-<section id="already-in-your-browser"><h2>Your browser already has a voice chat engine</h2>
+<section id="already-in-your-browser"><h2>Your browser already has a call engine</h2>
 <p>For years, a voice call meant installing something: a desktop client, a plugin, an app from a store. That changed when browsers gained WebRTC, a web standard for real time audio, video and data. Today every modern browser on desktop and on phones can ask for your microphone, compress your voice, and send it straight to another browser, all inside a normal web page.</p>
 <p>howlden is built on exactly that. When you join a voice channel, the page asks the browser for your microphone, and the browser sends your audio over connections it encrypts end to end with DTLS and SRTP. That encryption is part of WebRTC itself, so it is on for every call and cannot be turned off. Nothing passes through a howlden server, because there is no howlden server: the site is static files, and the call goes from your device to your friends' devices.</p>
-<p>The upshot is simple. If you can open a web page, you can join a voice chat. If you like the idea of an icon on your home screen, howlden is also a PWA you can install from the browser menu, but that is optional, and calls work the same either way.</p>
+<p>The upshot is simple. If you can open a web page, you can join a call. If you like the idea of an icon on your home screen, howlden is also a PWA you can install from the browser menu, but that is optional, and calls work the same either way.</p>
 </section>
 <section id="first-call"><h2>Your first call, step by step</h2>
 <ol>
 <li><a href="app/">Open the app</a>, choose a display name and an avatar. No account or email is involved; both are kept in your browser.</li>
 <li>Create a den. It comes with text and voice channels and a member list, the familiar layout of server based chat apps.</li>
-<li>Create an invite and send the link (or show the QR code) to a friend through any messenger.</li>
-<li>Your friend opens it, and their browser produces a reply code. They send it back, you paste or scan it, and they are in the den.</li>
+<li>Click Invite and read the six words to a friend, or send them through any messenger.</li>
+<li>Your friend types the words in the app and reads six confirmation words back. You type them, and they are in the den.</li>
 <li>Both of you click a voice channel. Allow the microphone when the browser asks. Say hello and watch the ring light up around your avatar.</li>
 </ol>
 <p>Repeat the invite for each new friend, up to 5 people per den. howlden connects every newcomer to the rest of the den on its own.</p>
@@ -43,6 +58,10 @@
 </ul>
 <p>A quick self test: speak and watch your avatar. If the speaking ring lights up, your microphone is reaching howlden, and any remaining problem is on the network side.</p>
 </section>
+<section id="video-and-screen"><h2>Cameras and screen share</h2>
+<p>Video and screen share live inside voice channels. Once you are in one, the camera button turns your camera on, and the screen button lets you pick a window, a browser tab or the whole screen. The browser always asks first and shows its own indicator while you share, so nothing starts behind your back.</p>
+<p>Every stream goes straight to each friend in the den, sealed with SRTP like your voice. That is private, but it also means your device sends a copy of your video to every other member. In a full den, video asks a lot of a home upload; if the call starts to stutter, switch cameras off first and keep the screen share.</p>
+</section>
 <section id="sound-better"><h2>Making the call sound good</h2>
 <p>Browser audio can sound as clean as any installed app if you help it a little:</p>
 <ul>
@@ -52,23 +71,23 @@
 <li><strong>Leave the camera off unless you need it.</strong> Audio is light on bandwidth. Video, especially with several people, uses a lot of upload, and on a weak connection it is the first thing to cause stutter.</li>
 </ul>
 </section>
-<section id="on-a-phone"><h2>Voice chat from a phone browser</h2>
+<section id="on-a-phone"><h2>Calls from a phone browser</h2>
 <p>howlden runs on phones the same way it runs on laptops. A few habits help. Keep howlden in the foreground during a call, since phone browsers may pause pages that sit in the background. Plug in earphones, because a phone speaker sits right next to its microphone. And if you call often, use the browser's install or "Add to Home screen" option so howlden opens like an app. Once installed and loaded, the app shell opens even offline, though of course a call still needs a network.</p>
-<p>Mobile data is fine for voice. If one person is on a carrier network with a strict NAT and the other is behind a strict NAT too, the direct connection may fail. howlden spots this and explains it in plain words; the guide on <a href="webrtc-connection-failed-strict-nat.html">WebRTC connection failed and strict NAT</a> covers what to do, including adding your own TURN relay in settings.</p>
+<p>Mobile data is fine for voice. If one person is on a carrier network with a strict NAT and the other is behind a strict NAT too, the direct connection may fail. howlden spots this and explains it in plain words; the guide on <a href="webrtc-connection-failed-strict-nat.html">when a connection fails</a> covers what to do, including adding your own TURN relay in settings.</p>
 </section>
-<section id="limits"><h2>What a download free call cannot do</h2>
+<section id="limits"><h2>What a browser call cannot do</h2>
 <p>Being honest about the edges saves you a frustrating evening:</p>
 <table>
 <thead><tr><th>Situation</th><th>What happens</th></tr></thead>
 <tbody>
 <tr><td>More than 5 people</td><td>A den caps at 5, because each member sends audio to every other member directly.</td></tr>
-<tr><td>A friend joins late</td><td>They hear the call from the moment they connect. Nothing is recorded or stored for them.</td></tr>
+<tr><td>A friend joins late</td><td>They hear the call from the moment they connect. Nothing is stored on a server for them.</td></tr>
 <tr><td>Both sides behind strict NAT</td><td>A direct connection can fail, and you need a TURN relay that forwards the encrypted packets.</td></tr>
 <tr><td>Everyone turns on video</td><td>Upload bandwidth climbs fast. Audio alone stays light.</td></tr>
 </tbody>
 </table>
-<p>If you want to know what the browser is doing behind the scenes (microphone capture, connection setup, encryption), read <a href="how-webrtc-voice-works.html">how WebRTC voice chat works</a>. For a squad that mostly talks during games, <a href="browser-voice-chat-for-gaming.html">voice chat for gaming in the browser</a> has tips on keeping the call next to the game.</p>
+<p>If you want to know how the connection itself is set up, read <a href="peer-to-peer-chat-explained.html">how howlden works</a>.</p>
 </section>
 <section id="try-it"><h2>Start a call</h2>
-<p>Grab a pair of earphones, <a href="app/">open a den</a>, send one invite, and join the voice channel together. If the ring lights up when you speak, you are done: no installer, no account, just a browser tab and your friends around the campfire.</p>
+<p>Grab a pair of earphones, <a href="app/">open a den</a>, share six words, and join the voice channel together. If the ring lights up when you speak, you are done: no installer, no account, just a browser tab and your friends around the campfire.</p>
 </section>

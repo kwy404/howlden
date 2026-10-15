@@ -1,6 +1,7 @@
-// The landing page: "the den at night". Hero with a live preview of the app
-// UI, inviting in 3 steps, privacy, features, use cases, the approach
-// comparison, the mesh, the FAQ, guides and a closing campfire.
+// The landing page: "the den at night". A short hero with a two window demo
+// of a connection, a 30 second tour, a live preview of the app UI, features,
+// inviting in 3 steps, privacy, use cases, the approach comparison, the mesh,
+// the FAQ, guides and a closing campfire.
 import { SITE, art, esc, icon, pic } from './layout.mjs';
 
 // ---------- The live app preview ----------
@@ -89,15 +90,125 @@ function preview() {
 </div>`;
 }
 
+// ---------- The two window demo: a connection, step by step ----------
+// A scripted animation (site.js drives DM.step). Words are real entries of
+// the BIP39 list the app uses, so the demo shows what a visitor will see.
+
+const INVITE_WORDS = ['maple', 'canyon', 'frost', 'river', 'orbit', 'tiger'];
+const CONFIRM_WORDS = ['velvet', 'planet', 'cabin', 'echo', 'pilot', 'moon'];
+
+export const DEMO_STEPS = [
+  ['Invite', 'Luna clicks Invite. howlden shows her six words.'],
+  ['Share', 'She reads them to Nova on a call, or sends them in any messenger.'],
+  ['Type', 'Nova types the six words on her phone.'],
+  ['Find', 'The two browsers find each other. The short handshake is sealed, so the public relays only see ciphertext.'],
+  ['Confirm', 'Nova reads six confirmation words back and Luna types them, so nobody else can slip in.'],
+  ['Talk', 'Connected. Voice and chat now go straight between them, end to end encrypted.'],
+];
+
+function demo() {
+  const boxes = (words, key, cls = '') => words.map((w, i) => `<span class="dm-box${cls}" :class="{ fill: ${i} < DM.${key} }"><small>${i + 1}</small><b>${w}</b></span>`).join('');
+  const chips = (words) => words.map((w, i) => `<span class="dm-chip" style="--i:${i}"><small>${i + 1}</small>${w}</span>`).join('');
+  const tile = (id, name) => `<span class="dm-tile" :class="{ speaking: DM.speaking === '${id}' }"><img src="assets/art/avatars/${id}.svg" width="56" height="56" alt=""><i>${name}</i></span>`;
+  const steps = DEMO_STEPS.map(([label], i) => `<button type="button" class="dm-step" :class="{ on: DM.step === ${i + 1}, done: ${i + 1} < DM.step }" :aria-current="DM.step === ${i + 1} ? 'step' : 'false'" @click="demoGo(${i + 1})"><span class="dm-n">${i + 1}</span><span>${label}</span></button>`).join('');
+  return `<div class="dm" id="demo" data-step="0" :data-step="DM.step" role="group" aria-label="Animated demo: two friends connect with six words">
+  <div class="dm-stage">
+    <div class="dm-win" aria-hidden="true">
+      <p class="dm-bar"><span class="dots"><i></i><i></i><i></i></span><span>Luna, on her laptop</span></p>
+      <div class="dm-screen">
+        <div class="dm-pane dm-w0">
+          <p class="dm-den">${art('moon')}<b>Moonlight Pack</b></p>
+          <p class="dm-muted">You are the only one here. Invite someone to start talking.</p>
+          <span class="dm-cta">${art('invite')}Invite people</span>
+        </div>
+        <div class="dm-pane dm-w1">
+          <p class="dm-t">Read these six words to your friend</p>
+          <div class="dm-chips">${chips(INVITE_WORDS)}</div>
+          <p class="dm-muted dm-wait"><span class="dm-spin"></span><span v-text="3 < DM.step ? 'Nova found your den. Checking...' : 'Waiting for your friend. The words expire in 10 minutes.'">Waiting for your friend. The words expire in 10 minutes.</span></p>
+        </div>
+        <div class="dm-pane dm-w2">
+          <p class="dm-t">Type the six words Nova reads to you</p>
+          <div class="dm-boxes">${boxes(CONFIRM_WORDS, 'ctyped')}</div>
+        </div>
+        <div class="dm-pane dm-w3">
+          <p class="dm-den">${icon('speaker')}<b>Lounge</b><span class="dm-ok">${icon('lock')}Encrypted</span></p>
+          <div class="dm-tiles">${tile('luna', 'Luna')}${tile('nova', 'Nova')}</div>
+          <p class="dm-msg"><img src="assets/art/avatars/nova.svg" width="24" height="24" alt=""><span><b>Nova</b> I am in! Hi from the bus.</span></p>
+        </div>
+      </div>
+    </div>
+    <div class="dm-link" aria-hidden="true">
+      <span class="dm-wire"><i></i><i></i><i></i></span>
+      <span class="dm-say dm-say-out">${icon('speaker')}maple canyon frost...</span>
+      <span class="dm-say dm-say-back">${icon('speaker')}velvet planet cabin...</span>
+      <span class="dm-pill" v-text="demoLink(DM.step)"></span>
+    </div>
+    <div class="dm-phone" aria-hidden="true">
+      <span class="ph-notch"></span>
+      <p class="dm-bar dm-bar-ph"><span>Nova, on her phone</span></p>
+      <div class="dm-screen">
+        <div class="dm-pane dm-p0">
+          <p class="dm-t">Join a den</p>
+          <p class="dm-muted">Type the six words you were given.</p>
+          <div class="dm-boxes dm-boxes-ph">${boxes(INVITE_WORDS, 'typed')}</div>
+        </div>
+        <div class="dm-pane dm-p1">
+          <span class="dm-spin dm-spin-lg"></span>
+          <p class="dm-t">Finding the den</p>
+          <p class="dm-muted">${icon('lock')}Sealed handshake</p>
+        </div>
+        <div class="dm-pane dm-p2">
+          <p class="dm-t">Read these words to Luna</p>
+          <div class="dm-chips dm-chips-ph">${chips(CONFIRM_WORDS)}</div>
+        </div>
+        <div class="dm-pane dm-p3">
+          <p class="dm-den">${icon('speaker')}<b>Lounge</b></p>
+          <div class="dm-tiles dm-tiles-ph">${tile('nova', 'Nova')}${tile('luna', 'Luna')}</div>
+          <p class="dm-msg"><img src="assets/art/avatars/luna.svg" width="24" height="24" alt=""><span><b>Luna</b> Welcome to the den!</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dm-ctl">
+    <button type="button" class="dm-play" @click="demoToggle()" :aria-label="DM.playing ? 'Pause the demo' : 'Play the demo'" aria-label="Play the demo"><svg class="ic" v-show="!DM.playing" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic" v-show="DM.playing" aria-hidden="true"><use href="#i-pause"/></svg></button>
+    <div class="dm-steps" role="group" aria-label="Demo steps">${steps}</div>
+  </div>
+  <p class="dm-cap"><span v-text="demoCaption(DM.step)">Luna wants to call Nova. Press play to watch them connect.</span></p>
+  <p class="dm-note">An animation on this page. In the app, the words are new every time.</p>
+  <script type="application/json" id="demo-steps">${JSON.stringify(DEMO_STEPS.map(([, t]) => t))}</script>
+</div>`;
+}
+
+// ---------- The 30 second tour ----------
+
+export const TOUR = [
+  ['moonlit-den', 'Open the app', 'Pick a name and an avatar. No email, no password, no phone number.', '<span class="tr-chip"><img src="assets/art/avatars/luna.svg" width="32" height="32" alt=""><b>luna</b><s>Email</s><s>Password</s></span>'],
+  ['owl-invite', 'Share six words', 'Click Invite and read the six words out, or send them in any messenger.', `<span class="tr-chip tr-words">${INVITE_WORDS.map((w) => `<i>${w}</i>`).join('')}</span>`],
+  ['reply-code', 'Confirm and you are in', 'Your friend types the words, then reads six words back to you. That is the whole handshake.', `<span class="tr-chip">${icon('check')}<b>Nova joined Moonlight Pack</b></span>`],
+  ['study-group', 'Chat in channels', 'Text channels with replies, reactions and files that go straight from browser to browser.', `<span class="tr-chip">${art('campfire')}<b>4</b>${art('laugh')}<b>2</b>${art('heart')}<b>3</b></span>`],
+  ['gaming-squad', 'Talk, video, share a screen', 'Join a voice channel with one click. Turn on a camera or share a game while you talk.', `<span class="tr-chip tr-bar"><i>${icon('mic')}</i><i>${icon('video')}</i><i class="on">${icon('screen')}</i></span>`],
+  ['sealed-tunnel', 'Nothing in the middle', 'Up to 5 friends per den, end to end encrypted, and no server of ours ever sees a word.', `<span class="tr-chip">${icon('lock')}<b>Browser to browser</b></span>`],
+];
+
+function tour() {
+  const scenes = TOUR.map(([sc, t, d, chip], i) => `<figure class="tr-scene" :class="{ on: TR.i === ${i} }"${i ? ' aria-hidden="true"' : ''} :aria-hidden="TR.i === ${i} ? 'false' : 'true'">${pic('', sc, t)}<figcaption class="tr-cap"><span class="tr-n">${i + 1}<small>/${TOUR.length}</small></span><span class="tr-txt"><b>${t}</b><span>${d}</span></span></figcaption><span class="tr-over" aria-hidden="true">${chip}</span></figure>`).join('');
+  const chapters = TOUR.map(([, t], i) => `<li><button type="button" class="tr-ch" :class="{ on: TR.i === ${i}, done: ${i} < TR.i }" :aria-current="TR.i === ${i} ? 'step' : 'false'" @click="tourGo(${i})" @animationend="tourNext(${i})"><span class="tr-fill" aria-hidden="true"><i></i></span><span class="tr-cn">${i + 1}</span><span class="tr-ct">${t}</span></button></li>`).join('');
+  return `<div class="tour" id="tour-player" :class="{ playing: TR.playing }" role="group" aria-roledescription="slideshow" aria-label="A 30 second tour of howlden">
+  <div class="tr-stage">${scenes}</div>
+  <div class="tr-side">
+    <ol class="tr-list">${chapters}</ol>
+    <p class="tr-ctl"><button type="button" class="btn-big btn-night tr-play" @click="tourToggle()"><svg class="ic" v-show="!TR.playing" aria-hidden="true"><use href="#i-play"/></svg><svg class="ic" v-show="TR.playing" aria-hidden="true"><use href="#i-pause"/></svg><span v-text="tourLabel(TR.playing, TR.ended)">Play the tour</span></button></p>
+  </div>
+</div>`;
+}
+
 // ---------- Content ----------
 
 const TRUTHS = [
-  ['no-server', 'No server of ours', 'Messages, voice, video and files go browser to browser.'],
-  ['no-account', 'No email, no password, no phone', 'Nothing to sign up for, nothing to leak.'],
-  ['key', 'Your account lives on your device', 'A username, an avatar and a signing key made in your browser.'],
+  ['no-account', 'No sign up', 'No email, no password, no phone.'],
+  ['no-server', 'No server of ours', 'Voice, video, chat and files go browser to browser.'],
   ['lock', 'End to end encrypted', 'Every connection is sealed by WebRTC.'],
-  ['invite', 'Invite only', 'No public directory. Nobody gets in without you.'],
-  ['pack', 'Group calls or just one friend', 'A den for two or a pack of five.'],
+  ['invite', 'Invite only', 'Nobody gets in without you.'],
 ];
 
 const STEPS = [
@@ -116,10 +227,10 @@ const PRIVATE = [
 ];
 
 const USES = [
-  ['gaming-squad', 'Friends gaming', 'gamepad', 'Hop into voice before the match, share your screen for the strategy and keep the memes in a text channel. Nothing to install for the friend with the new laptop.', 'browser-voice-chat-for-gaming.html', 'Voice chat for gaming'],
-  ['study-group', 'Study groups', 'study', 'A channel per subject, a voice room for exam night, notes passed straight between classmates. No accounts for anyone.', 'safe-chat-for-kids-study-groups.html', 'A safe chat for study groups'],
-  ['family-call', 'Family calls', 'home', 'Grandpa opens a link and he is in. Video with the whole family, no app store, no password to forget.', 'group-video-call-without-account.html', 'Group video call, no account'],
-  ['team-tent', 'Private team chats', 'briefcase', 'A quick room for a small team with nothing in the middle: no workspace to sign up for, no data held by a provider.', 'private-group-voice-call.html', 'Private group voice calls'],
+  ['gaming-squad', 'Friends gaming', 'gamepad', 'Hop into voice before the match, share your screen for the strategy and keep the memes in a text channel. Nothing to install for the friend with the new laptop.'],
+  ['study-group', 'Study groups', 'study', 'A channel per subject, a voice room for exam night, notes passed straight between classmates. No accounts for anyone.'],
+  ['family-call', 'Family calls', 'home', 'Grandpa types six words and he is in. Video with the whole family, no app store, no password to forget.'],
+  ['team-tent', 'Small teams', 'briefcase', 'A quick room for a small team with nothing in the middle: no workspace to sign up for, no data held by a provider.'],
 ];
 
 const COMPARE = [
@@ -172,31 +283,6 @@ function shareMock() {
 </div>`;
 }
 
-function voiceMock() {
-  const ch = (name, people, live = '') => `<div class="mk-vc${people.length ? ' busy' : ''}"><p>${icon('speaker')}<b>${name}</b>${people.length ? `<span class="mk-count">${people.length}</span>` : ''}</p>${people.map(([id, n, st]) => `<p class="mk-vp${st === 'speaking' ? ' speaking' : ''}">${mav(id, 'av av-xs')}<span>${n}</span>${st === 'muted' ? icon('micoff', 'ic mk-muted') : ''}${st === 'live' ? '<em>Live</em>' : ''}</p>`).join('')}${live}</div>`;
-  return `<div class="mock mock-voice" aria-hidden="true">
-  <p class="mk-cat">Voice channels</p>
-  ${ch('Howl lounge', [['luna', 'Luna', 'speaking'], ['fang', 'Fang', ''], ['nova', 'Nova', 'live']])}
-  ${ch('Study burrow', [['pip', 'Pip', 'muted']])}
-  ${ch('Quiet cave', [])}
-  <div class="mk-join">${icon('speaker')}<span>One click to take a seat by the fire. One click to slip away.</span></div>
-</div>`;
-}
-
-function membersMock() {
-  const row = (id, name, status, label, color) => `<p class="mk-mem">${`<span class="mk-avw">${mav(id, 'av av-sm')}<i class="st st-${status}"></i></span>`}<span><b style="color:${color}">${name}</b><small>${label}</small></span></p>`;
-  return `<div class="mock mock-members" aria-hidden="true">
-  <p class="mk-cat">In the den, 4 of 5</p>
-  <div class="mk-cap"><i style="width:50%"></i></div>
-  ${row('luna', 'Luna', 'voice', 'In Howl lounge', '#b79dff')}
-  ${row('nova', 'Nova', 'live', 'Sharing a screen', '#ffb27a')}
-  ${row('fang', 'Fang', 'online', 'Online', '#9fb0e6')}
-  ${row('pip', 'Pip', 'idle', 'Away, back soon', '#e9e1ff')}
-  <p class="mk-cat">Offline</p>
-  <p class="mk-mem off"><span class="mk-avw"><img class="av av-sm" src="assets/art/avatars/fang.svg" width="40" height="40" alt="" loading="lazy"></span><span><b>Moss</b><small>Last seen yesterday</small></span></p>
-</div>`;
-}
-
 function profileMock() {
   return `<div class="mock mock-profile" aria-hidden="true">
   <div class="mk-banner"></div>
@@ -208,13 +294,11 @@ function profileMock() {
 </div>`;
 }
 
-const FLOAT = [
-  ['moon', 'f-moon'], ['lock', 'f-lock'], ['gamepad', 'f-pad'], ['paw', 'f-paw'], ['bubble', 'f-bubble'], ['headset', 'f-head'], ['flame', 'f-flame'], ['star', 'f-star1'], ['star', 'f-star2'],
-];
+const FLOAT = [['moon', 'f-moon'], ['bubble', 'f-bubble'], ['star', 'f-star1'], ['star', 'f-star2']];
 const floaters = (list) => list.map(([n, cls]) => `<img class="float ${cls}" src="assets/art/objects/${n}.svg" alt="" loading="lazy">`).join('');
 
 function panel({ id, flip = false, tone, media, kicker, title, text, extra = '' }) {
-  return `<section id="${id}" class="panel${flip ? ' flip' : ''}" aria-labelledby="${id}-t">
+  return `<section id="${id}" class="panel rv${flip ? ' flip' : ''}" aria-labelledby="${id}-t">
   <div class="panel-media tone-${tone}">${media}</div>
   <div class="panel-copy"><p class="kicker">${kicker}</p><h2 id="${id}-t" class="mega mega-md">${title}</h2><p>${text}</p>${extra}</div>
 </section>`;
@@ -226,10 +310,10 @@ export function homeBody({ guides, qr }) {
   const truths = TRUTHS.map(([ic, t, d]) => `<li>${art(ic, 'hi hi-md')}<span><b>${t}</b><small>${d}</small></span></li>`).join('');
   const steps = STEPS.map(([sc, t, d, ic, alt], i) => `<li class="howto-step">${pic('', sc, alt)}<div class="howto-b"><span class="howto-n">${i + 1}</span><h3>${art(ic)}${t}</h3><p>${d}</p></div></li>`).join('');
   const priv = PRIVATE.map(([ic, t, d]) => `<li>${art(ic, 'hi hi-lg')}<h3>${t}</h3><p>${d}</p></li>`).join('');
-  const uses = USES.map(([sc, t, ic, d, href, label]) => `<li class="use">${pic('', sc, t)}<div class="use-b"><h3>${art(ic)}${t}</h3><p>${d}</p><a href="${href}" class="more">${label}${icon('arrow')}</a></div></li>`).join('');
+  const uses = USES.map(([sc, t, ic, d]) => `<li class="use">${pic('', sc, t)}<div class="use-b"><h3>${art(ic)}${t}</h3><p>${d}</p></div></li>`).join('');
   const rows = COMPARE.map(([k, a, b]) => `<tr><th scope="row">${k}</th><td data-label="Server based">${esc(a)}</td><td data-label="howlden">${esc(b)}</td></tr>`).join('');
   const faq = FAQ.map(([q, a], i) => `<details class="faq-item"${i === 0 ? ' open' : ''}><summary><h3>${esc(q)}</h3>${icon('chevron', 'ic chev')}</summary><div class="faq-a"><p>${esc(a)}</p></div></details>`).join('');
-  const gl = guides.slice(0, 6).map((g) => `<li><a href="${g.slug}.html" class="guide-card">${art(g.icon, 'hi hi-lg')}<span><b>${esc(g.short)}</b><small>${esc(g.description)}</small></span></a></li>`).join('');
+  const gl = guides.slice(0, 4).map((g) => `<li><a href="${g.slug}.html" class="guide-card">${art(g.icon, 'hi hi-lg')}<span><b>${esc(g.short)}</b><small>${esc(g.description)}</small></span></a></li>`).join('');
   const words = ['Howl', 'Play', 'Study', 'Plan', 'Share screens', 'Gather the pack', 'No server', 'Invite only'];
   const band = words.map((w) => `<span>${w}</span><svg class="mq-mark" aria-hidden="true"><use href="#mark"/></svg>`).join('');
   return `
@@ -237,27 +321,20 @@ export function homeBody({ guides, qr }) {
   <div class="hx-sky" aria-hidden="true">${floaters(FLOAT)}</div>
   <div class="wrap hx-grid">
     <div class="hx-copy">
-      <h1 id="hero-title" class="mega">A den for your pack. <span class="mega-glow">No server in sight.</span></h1>
-      <p class="hx-lede">howlden is a den for you and your friends: text and voice channels, video and screen share, right in your browser. No email, no password, no phone. Invite your pack with a link or a QR code and everything flows straight between you, end to end encrypted.</p>
+      <h1 id="hero-title" class="mega">Call your pack. <span class="mega-glow">No server in sight.</span></h1>
+      <p class="hx-lede">Voice, video and chat for up to 5 friends, right in your browser. No sign up and nothing to install. Share six words and you are talking.</p>
+      <ol class="hx-steps" aria-label="Three steps">
+        <li><span>1</span>Open a den</li>
+        <li><span>2</span>Share six words</li>
+        <li><span>3</span>Talk</li>
+      </ol>
       <div class="hx-cta">
-        <a href="app/" class="btn-big btn-white">${art('den')}Open howlden in your browser</a>
-        <a href="#invite" class="btn-big btn-night">How it works</a>
+        <a href="app/" class="btn-big btn-white">${art('den')}Open howlden</a>
+        <a href="#tour" class="btn-big btn-night">${icon('play')}Watch the 30 second tour</a>
       </div>
-      <p class="hx-note">${icon('check')}Free and open source. Desktop and phone. A den for two, or a pack of up to 5.</p>
+      <p class="hx-note">${icon('check')}Free and open source. Desktop and phone. End to end encrypted.</p>
     </div>
-    <div class="hx-scene">
-      <div class="monitor">${preview()}</div>
-      <div class="phone" aria-hidden="true">
-        <div class="ph-notch"></div>
-        <p class="ph-head">${icon('speaker')}<b>Howl lounge</b></p>
-        <div class="ph-tiles">${['luna', 'fang', 'pip', 'nova'].map((id) => `<div class="ph-tile" :class="{ speaking: PV.speaking === '${id}' }"><img src="assets/art/avatars/${id}.svg" width="56" height="56" alt=""></div>`).join('')}</div>
-        <div class="ph-bar"><span>${icon('mic')}</span><span>${icon('video')}</span><span class="hang">${icon('phone')}</span></div>
-      </div>
-      <img class="char ch-luna" src="assets/art/characters/luna.svg" width="512" height="512" alt="Luna the wolf howling into her headset">
-      <img class="char ch-fang" src="assets/art/characters/fang.svg" width="260" height="410" alt="Fang with a game controller">
-      <img class="char ch-pip" src="assets/art/characters/pip.svg" width="260" height="410" alt="Pip reading a book">
-      <p class="preview-hint">${icon('arrow')}A live preview: click the channels, react, mute yourself or type a message.</p>
-    </div>
+    <div class="hx-demo rv">${demo()}</div>
   </div>
 </section>
 
@@ -265,11 +342,27 @@ export function homeBody({ guides, qr }) {
   <ul class="wrap truth-list">${truths}</ul>
 </section>
 
+<section id="tour" class="band" aria-labelledby="tour-title">
+  <div class="wrap">
+    <header class="sec-head rv"><p class="kicker">${icon('play')}30 seconds</p><h2 id="tour-title" class="mega mega-md">The whole tour, in six scenes</h2><p>From opening the app to talking with your friends. Press play, or pick a scene.</p></header>
+    <div class="rv">${tour()}</div>
+  </div>
+</section>
+
+<section id="look" class="band" aria-labelledby="look-title">
+  <div class="wrap">
+    <header class="sec-head rv"><p class="kicker">${art('den')}Live preview</p><h2 id="look-title" class="mega mega-md">Look around a den</h2><p>This is the real layout. Click the channels, react, mute yourself or type a message. It all stays on this page.</p></header>
+    <div class="pv-scene rv">
+      <div class="monitor">${preview()}</div>
+      <img class="char ch-luna" src="assets/art/characters/luna.svg" width="512" height="512" alt="Luna the wolf howling into her headset" loading="lazy">
+      <img class="char ch-fang" src="assets/art/characters/fang.svg" width="260" height="410" alt="Fang with a game controller" loading="lazy">
+    </div>
+  </div>
+</section>
+
 <div class="panels">
-${panel({ id: 'chat', tone: 'pink', media: chatMock(), kicker: `${art('text-channel')}Text channels`, title: 'Chat, react, howl', text: 'Text channels with bold, italic, spoilers, code and quotes. Reply to a friend, mention the whole pack, react with a howl or a campfire, drop a file that goes straight from your browser to theirs. It all feels like the chat app you know, minus the company in the middle.', extra: `<a href="chat-without-signing-up.html" class="more">Chat without signing up${icon('arrow')}</a>` })}
-${panel({ id: 'share', flip: true, tone: 'mint', media: shareMock(), kicker: `${art('screen-share')}Voice, video, screen share`, title: 'Show the pack your screen, no server watching', text: 'Share a game, a tab or your whole screen while the den talks it over. Turn on cameras, watch the ring light up around whoever speaks. Every stream travels directly between you, sealed with DTLS and SRTP.', extra: `<a href="screen-share-without-app.html" class="more">Screen share without an app${icon('arrow')}</a>` })}
-${panel({ id: 'voice', tone: 'fire', media: voiceMock(), kicker: `${art('voice-channel')}Voice channels`, title: 'Take a seat by the fire', text: 'Voice channels are campfires that never go out. See which wolves are already howling, click to sit down, click to leave. No ringing, no meeting links, no scheduling. Mute and deafen are one click away, and a call works just as well with one friend as with the whole pack.', extra: `<a href="voice-chat-in-browser-no-download.html" class="more">Voice chat with no download${icon('arrow')}</a>` })}
-${panel({ id: 'around', flip: true, tone: 'night', media: membersMock(), kicker: `${art('pack')}Members`, title: 'Know your whole pack at a glance', text: 'The member list shows which wolves are in the den, who is howling in voice, who is sharing a screen and who wandered off. A den holds up to 5, invite only, so every name on the list is someone you let in.', extra: `<a href="#mesh" class="more">Why a den holds 8${icon('arrow')}</a>` })}
+${panel({ id: 'chat', tone: 'pink', media: chatMock(), kicker: `${art('text-channel')}Text channels`, title: 'Chat, react, howl', text: 'Text channels with bold, italic, spoilers, code and quotes. Reply to a friend, mention the whole pack, react with a howl or a campfire, drop a file that goes straight from your browser to theirs. It all feels like the chat app you know, minus the company in the middle.', extra: `<a href="chat-without-signing-up.html" class="more">Getting started${icon('arrow')}</a>` })}
+${panel({ id: 'share', flip: true, tone: 'mint', media: shareMock(), kicker: `${art('screen-share')}Voice, video, screen share`, title: 'Talk, see and share, no server watching', text: 'Click a voice channel to sit down, click again to leave. Turn on cameras, share a game or a tab, and watch the ring light up around whoever speaks. Mute and deafen are one click away, and every stream travels directly between you, sealed with DTLS and SRTP.', extra: `<a href="voice-chat-in-browser-no-download.html" class="more">Voice and video calls${icon('arrow')}</a>` })}
 </div>
 
 <div class="marquee" aria-hidden="true"><div class="mq-track"><div class="mq-row">${band}</div><div class="mq-row">${band}</div></div></div>
@@ -280,15 +373,15 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
 
 <section id="invite" class="band" aria-labelledby="invite-title">
   <div class="wrap">
-    <header class="sec-head"><p class="kicker">${art('invite')}Invite only</p><h2 id="invite-title" class="mega mega-md">How inviting works</h2><p>There is no server to introduce you, so friends introduce themselves: one link out, one reply code back. That is the whole handshake.</p></header>
-    <ol class="howto">${steps}</ol>
-    <div class="qr-demo">
+    <header class="sec-head rv"><p class="kicker">${art('invite')}Invite only</p><h2 id="invite-title" class="mega mega-md">How inviting works</h2><p>There is no server to introduce you, so friends introduce themselves: six words out, six words back. That is the whole handshake.</p></header>
+    <ol class="howto rv">${steps}</ol>
+    <div class="qr-demo rv">
       <div class="qr-card"><div class="qr-svg">${qr}</div><p>${art('qr')}A real QR code drawn by howlden's own encoder. This one opens the app.</p></div>
       <div class="qr-copy">
         <h3>Link, QR code or paste</h3>
         <p>Invites and replies are compressed so they fit in a link and a QR code. Share them through any messenger you already trust, show the QR on your screen for someone in the room, or paste the code by hand. Your friend never sees anything technical.</p>
         <ul class="ticks"><li>${icon('check')}<span>The member who invited has to accept the reply, so a leaked link is not enough to get in.</span></li><li>${icon('check')}<span>Phones scan with the camera where the browser supports it, with paste as a fallback.</span></li><li>${icon('check')}<span>After the first link, the den connects the newcomer to everyone else by itself.</span></li></ul>
-        <a href="peer-to-peer-chat-explained.html" class="more">Peer to peer chat, explained${icon('arrow')}</a>
+        <a href="peer-to-peer-chat-explained.html" class="more">How howlden works${icon('arrow')}</a>
       </div>
     </div>
   </div>
@@ -297,8 +390,8 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
 <section id="private" class="band" aria-labelledby="private-title">
   <div class="wrap private-grid">
     <div class="private-copy">
-      <header class="sec-head left"><p class="kicker">${art('shield')}Why it is private</p><h2 id="private-title" class="mega mega-md">Nothing in the middle</h2><p>Most chat apps send every message through a company's servers. A howlden den is a small circle of browsers talking to each other. Here is exactly what that means, with no fine print.</p></header>
-      <ul class="private-list">${priv}</ul>
+      <header class="sec-head left rv"><p class="kicker">${art('shield')}Why it is private</p><h2 id="private-title" class="mega mega-md">Nothing in the middle</h2><p>Most chat apps send every message through a company's servers. A howlden den is a small circle of browsers talking to each other. Here is exactly what that means, with no fine print.</p></header>
+      <ul class="private-list rv">${priv}</ul>
       <p class="honest">${art('moon')}<span>Honest note: private is not the same as anonymous. Members of a den connect directly, so they can see each other's network address, and your security still depends on your device and your browser.</span></p>
     </div>
     <div class="private-art">
@@ -316,21 +409,21 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
 
 <section id="use-cases" class="band" aria-labelledby="use-title">
   <div class="wrap">
-    <header class="sec-head"><p class="kicker">${art('pack')}Use cases</p><h2 id="use-title" class="mega mega-md">A den for every pack</h2><p>Small groups of people who know each other are where howlden shines.</p></header>
-    <ul class="uses">${uses}</ul>
+    <header class="sec-head rv"><p class="kicker">${art('pack')}Use cases</p><h2 id="use-title" class="mega mega-md">A den for every pack</h2><p>Small groups of people who know each other are where howlden shines.</p></header>
+    <ul class="uses rv">${uses}</ul>
   </div>
 </section>
 
 <section id="compare" class="band" aria-labelledby="compare-title">
   <div class="wrap">
-    <header class="sec-head"><p class="kicker">${art('mesh')}Two approaches</p><h2 id="compare-title" class="mega mega-md">Server based or direct?</h2><p>Both approaches are good at different things. Server based apps are great for big communities, message history and reaching friends who are offline. A direct, peer to peer den is for small groups who want nothing in the middle.</p></header>
+    <header class="sec-head rv"><p class="kicker">${art('mesh')}Two approaches</p><h2 id="compare-title" class="mega mega-md">Server based or direct?</h2><p>Both approaches are good at different things. Server based apps are great for big communities, message history and reaching friends who are offline. A direct, peer to peer den is for small groups who want nothing in the middle.</p></header>
     <div class="tbl-wrap" tabindex="0" role="region" aria-label="Comparison of server based and direct chat">
       <table class="cmp">
         <thead><tr><th scope="col"><span class="sr-only">Topic</span></th><th scope="col">${art('no-server')}Server based chat apps</th><th scope="col" class="us">${art('den')}howlden (direct)</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="compare-note">Want the long version? Read <a href="peer-to-peer-chat-explained.html">peer to peer chat explained</a> or <a href="free-encrypted-group-chat.html">encrypted group chat for free</a>.</p>
+    <p class="compare-note">Want the long version? Read <a href="peer-to-peer-chat-explained.html">how howlden works</a>.</p>
   </div>
 </section>
 
@@ -338,26 +431,26 @@ ${panel({ id: 'account', tone: 'gold', media: profileMock(), kicker: `${art('key
   <div class="wrap mesh-grid">
     ${pic('', 'pack-mesh', 'Five wolves linked to each other like stars in a constellation')}
     <div>
-      <header class="sec-head left"><p class="kicker">${art('pack')}Up to 5</p><h2 id="mesh-title" class="mega mega-md">Why a den holds 5 wolves</h2></header>
+      <header class="sec-head left rv"><p class="kicker">${art('pack')}Up to 5</p><h2 id="mesh-title" class="mega mega-md">Why a den holds 5 wolves</h2></header>
       <p>In a den, everyone is linked to everyone. With 4 members that is 6 links, with 5 members it is 10. Each member sends their voice and video to each of the others, so upload bandwidth grows with the size of the pack. Audio is light; video with 5 cameras on asks a lot of a home connection.</p>
-      <p>Eight is where a mesh still feels good on ordinary connections. For bigger groups, a server based tool is the honest answer, and that is fine.</p>
-      <ul class="ticks"><li>${icon('check')}<span>Text, reactions and files are tiny and stay quick in a full den.</span></li><li>${icon('check')}<span>If two members cannot link directly, another member forwards their messages.</span></li><li>${icon('check')}<span>When both sides sit behind a strict NAT, a TURN relay can carry the encrypted traffic. <a href="webrtc-connection-failed-strict-nat.html">Fixing a failed connection</a>.</span></li></ul>
+      <p>Five is where a mesh still feels good on ordinary connections. For bigger groups, a server based tool is the honest answer, and that is fine.</p>
+      <ul class="ticks"><li>${icon('check')}<span>Text, reactions and files are tiny and stay quick in a full den.</span></li><li>${icon('check')}<span>If two members cannot link directly, another member forwards their messages.</span></li><li>${icon('check')}<span>When both sides sit behind a strict NAT, a TURN relay can carry the encrypted traffic. <a href="webrtc-connection-failed-strict-nat.html">When a connection fails</a>.</span></li></ul>
     </div>
   </div>
 </section>
 
 <section id="faq" class="band" aria-labelledby="faq-title">
   <div class="wrap faq-grid">
-    <header class="sec-head left"><p class="kicker">${art('moon')}FAQ</p><h2 id="faq-title" class="mega mega-md">Questions around the campfire</h2><p>Including the limits. A den is not the right tool for everything, and we would rather you know before you invite your pack.</p>${pic('', 'moonlit-den', 'A den glowing under the moon, no server tower in sight')}</header>
-    <div class="faq">${faq}</div>
+    <header class="sec-head left rv"><p class="kicker">${art('moon')}FAQ</p><h2 id="faq-title" class="mega mega-md">Questions around the campfire</h2><p>Including the limits. A den is not the right tool for everything, and we would rather you know before you invite your pack.</p>${pic('', 'moonlit-den', 'A den glowing under the moon, no server tower in sight')}</header>
+    <div class="faq rv">${faq}</div>
   </div>
 </section>
 
 <section id="guides" class="band" aria-labelledby="guides-title">
   <div class="wrap">
-    <header class="sec-head"><p class="kicker">${art('study')}Guides</p><h2 id="guides-title" class="mega mega-md">Guides from the den</h2><p>Plain language guides about private chat, voice and video in the browser.</p></header>
-    <ul class="guide-grid">${gl}</ul>
-    <p class="ctr-row"><a href="guides.html" class="btn-big btn-night">All ${guides.length} guides${icon('arrow')}</a> <a href="pt/chat-sem-cadastro.html" class="btn-big btn-night" hreflang="pt-BR" lang="pt-BR">${icon('globe')}Guias em português</a></p>
+    <header class="sec-head rv"><p class="kicker">${art('study')}Guides</p><h2 id="guides-title" class="mega mega-md">Guides from the den</h2><p>Four short guides, in plain words.</p></header>
+    <ul class="guide-grid rv">${gl}</ul>
+    <p class="ctr-row"><a href="guides.html" class="btn-big btn-night">All guides${icon('arrow')}</a> <a href="pt/chat-sem-cadastro.html" class="btn-big btn-night" hreflang="pt-BR" lang="pt-BR">${icon('globe')}Guias em português</a></p>
   </div>
 </section>
 

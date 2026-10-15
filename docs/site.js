@@ -3,9 +3,13 @@
 // this module publishes reactive stores and helpers on V.config.globals, then
 // calls V.start(). Pages declare behavior in HTML (v-data, v-model, @click,
 // v-for, v-show, v-copy-from, v-theme-toggle, v-hotkey).
-// The live preview on the home page is a pretend den: scripted messages,
-// a speaking ring that moves around the voice channel, reactions, mute and
-// deafen, and a composer that posts locally. Nothing leaves the page.
+// The home page has three animated parts, all scripted and local:
+//   the two window demo (DM): Luna and Nova connect with six words;
+//   the 30 second tour (TR): six scenes, driven by CSS progress bars;
+//   the live preview (PV): a pretend den with scripted messages, a speaking
+//   ring, reactions, mute and deafen, and a composer that posts locally.
+// Every part pauses when it is off screen or the tab is hidden, and nothing
+// plays by itself when the visitor prefers reduced motion. Nothing leaves the page.
 
 const V = window.V;
 const $ = (s, el = document) => el.querySelector(s);
@@ -217,6 +221,7 @@ function speak() {
   const order = ['fang', 'luna', 'nova', 'pip', 'luna', 'fang', 'nova'];
   let i = 0;
   setInterval(() => {
+    if (!pvVisible || document.hidden) return;
     let who = order[i++ % order.length];
     if (who === 'luna' && PV.muted) who = '';
     if (PV.deaf) who = who === 'luna' ? '' : who;
@@ -225,25 +230,210 @@ function speak() {
 }
 
 const preview = $('#preview');
+let pvVisible = true;
 if (preview) {
+  let started = false;
   const start = () => {
+    started = true;
     play();
     if (!reduced) speak();
   };
   if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) {
-        io.disconnect();
-        start();
-      }
-    });
-    io.observe(preview);
+    new IntersectionObserver((entries) => {
+      pvVisible = entries.some((e) => e.isIntersecting);
+      if (pvVisible && !started) start();
+    }).observe(preview);
   } else start();
+}
+
+// ---------- The two window demo: Luna and Nova connect ----------
+// Steps: 0 idle, 1 invite, 2 share, 3 type, 4 find, 5 confirm, 6 talk.
+
+const DM = V.reactive({ step: 0, typed: 0, ctyped: 0, playing: false, speaking: '' });
+const DEMO_MS = [1800, 2400, 2600, 3200, 2800, 3600, 7000];
+const LINK = ['', '', 'Read aloud or sent in a messenger', '', 'Sealed handshake through public relays', 'Six words back', 'Direct and end to end encrypted'];
+let demoText = [];
+try {
+  demoText = JSON.parse($('#demo-steps')?.textContent || '[]');
+} catch {
+  demoText = [];
+}
+let dmTimers = [];
+let dmVisible = false;
+let dmWanted = !reduced;
+const dmLater = (fn, ms) => dmTimers.push(setTimeout(fn, ms));
+function dmStop() {
+  dmTimers.forEach(clearTimeout);
+  dmTimers = [];
+}
+function dmType(key) {
+  if (reduced) {
+    DM[key] = 6;
+    return;
+  }
+  for (let i = 1; i <= 6; i++) dmLater(() => (DM[key] = i), 260 + i * 330);
+}
+function demoGo(step, fromTimer = false) {
+  dmStop();
+  if (!fromTimer) {
+    DM.playing = false;
+    dmWanted = false;
+  }
+  DM.step = step;
+  DM.typed = step > 3 ? 6 : 0;
+  DM.ctyped = step > 5 ? 6 : 0;
+  DM.speaking = '';
+  if (step === 3) dmType('typed');
+  if (step === 5) dmType('ctyped');
+  if (step === 6 && !reduced) {
+    let n = 0;
+    const talk = () => {
+      DM.speaking = ['nova', '', 'luna', '', 'nova', 'luna'][n++ % 6];
+      dmLater(talk, 900);
+    };
+    dmLater(talk, 500);
+  }
+  if (DM.playing) dmLater(() => demoGo((step + 1) % DEMO_MS.length, true), DEMO_MS[step]);
+}
+function demoPlay() {
+  DM.playing = true;
+  demoGo(DM.step === 6 ? 0 : DM.step, true);
+}
+function demoToggle() {
+  if (DM.playing) {
+    DM.playing = false;
+    dmWanted = false;
+    dmStop();
+  } else {
+    dmWanted = true;
+    demoPlay();
+  }
+}
+const demoEl = $('#demo');
+if (demoEl) {
+  // Reduced motion: no autoplay, start on the connected state.
+  if (reduced) demoGo(6);
+  const sync = () => {
+    const should = dmWanted && dmVisible && !document.hidden;
+    if (should && !DM.playing) demoPlay();
+    if (!should && DM.playing) {
+      DM.playing = false;
+      dmStop();
+    }
+  };
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+      dmVisible = entries.some((e) => e.isIntersecting);
+      sync();
+    }, { threshold: 0.25 }).observe(demoEl);
+  } else {
+    dmVisible = true;
+    sync();
+  }
+  document.addEventListener('visibilitychange', sync);
+}
+
+// ---------- The 30 second tour ----------
+// Six scenes of 5 seconds. The progress bar of the current chapter is a CSS
+// animation; when it ends, the next scene starts. With reduced motion there
+// is no animation, so the chapters are plain tabs.
+
+const TR = V.reactive({ i: 0, playing: false, ended: false });
+const tourEl = $('#tour-player');
+const TOUR_N = tourEl ? $$('.tr-scene', tourEl).length : 0;
+let trWanted = false;
+let trStarted = false;
+let trVisible = false;
+function tourGo(i) {
+  TR.i = i;
+  TR.ended = false;
+  // Restart the progress animation of this chapter even if it was current.
+  const fill = tourEl && $$('.tr-fill i', tourEl)[i];
+  if (fill) {
+    fill.style.animation = 'none';
+    void fill.offsetWidth;
+    fill.style.animation = '';
+  }
+}
+function tourNext(i) {
+  if (i !== TR.i || !TR.playing) return;
+  if (i + 1 < TOUR_N) TR.i = i + 1;
+  else {
+    TR.playing = false;
+    trWanted = false;
+    TR.ended = true;
+  }
+}
+function tourToggle() {
+  if (reduced) {
+    tourGo((TR.i + 1) % TOUR_N);
+    return;
+  }
+  if (TR.playing) {
+    TR.playing = false;
+    trWanted = false;
+  } else {
+    if (TR.ended) tourGo(0);
+    TR.playing = true;
+    trWanted = true;
+    trStarted = true;
+  }
+}
+if (tourEl && !reduced) {
+  const sync = () => {
+    if (trVisible && !trStarted) {
+      trStarted = true;
+      trWanted = true;
+    }
+    TR.playing = trWanted && trVisible && !document.hidden;
+  };
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+      trVisible = entries.some((e) => e.isIntersecting);
+      sync();
+    }, { threshold: 0.4 }).observe(tourEl);
+  }
+  document.addEventListener('visibilitychange', sync);
+}
+
+// ---------- Reveal on scroll ----------
+
+const reveal = $$('.rv');
+if (!reduced && reveal.length && 'IntersectionObserver' in window) {
+  document.documentElement.classList.add('motion');
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        en.target.classList.add('in');
+        io.unobserve(en.target);
+      }
+    },
+    { rootMargin: '0px 0px -8% 0px' },
+  );
+  for (const el of reveal) {
+    // Anything already on screen shows at once, without a fade.
+    if (el.getBoundingClientRect().top < innerHeight) el.classList.add('in');
+    else io.observe(el);
+  }
 }
 
 Object.assign(V.config.globals, {
   S,
   PV,
+  DM,
+  TR,
+  demoGo: (step) => demoGo(step),
+  demoToggle,
+  demoLink: (step) => LINK[step] || '',
+  demoCaption: (step) => (step ? `${step}. ${demoText[step - 1] || ''}` : 'Luna wants to call Nova. Watch them connect with six words.'),
+  tourGo: (i) => {
+    tourGo(i);
+    if (!TR.playing) TR.ended = false;
+  },
+  tourNext,
+  tourToggle,
+  tourLabel: (playing, ended) => (reduced ? 'Next scene' : playing ? 'Pause' : ended ? 'Watch again' : 'Play the tour'),
   hits: (q) => hits(q),
   go(q, sel) {
     const r = hits(q)[sel];

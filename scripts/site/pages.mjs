@@ -82,7 +82,6 @@ export function guideJsonLd(g) {
       image: `${SITE}og/${m.slug.replace('/', '-')}.png`,
       datePublished: UPDATED,
       dateModified: UPDATED,
-      keywords: m.keywords.join(', '),
       author: { '@type': 'Person', name: 'Alexandre Kohler', url: 'https://github.com/kwy404' },
       publisher: { '@type': 'Person', name: 'Alexandre Kohler', url: 'https://github.com/kwy404' },
       about: { '@type': 'WebApplication', name: 'howlden', url: SITE },
@@ -113,7 +112,7 @@ export function indexBody(en, pt) {
     <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="./">Home</a></li><li aria-current="page">Guides</li></ol></nav>
     <p class="kicker">${art('study')}Guides</p>
     <h1>Guides from the den</h1>
-    <p class="lede">Plain language guides about private group chat, voice and video in the browser: how peer to peer works, what end to end encryption covers, and what to do when a connection fails.</p>
+    <p class="lede">Four short guides: getting started, calls, how the connection works, and what to do when it fails.</p>
   </div>
 </section>
 <section class="band" aria-labelledby="g-en"><div class="wrap"><h2 id="g-en" class="sr-only">English guides</h2><ul class="guide-grid big">${en.map((g) => card(g, `${g.meta.slug}.html`)).join('')}</ul></div></section>

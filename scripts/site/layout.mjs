@@ -83,6 +83,8 @@ const UI = {
   external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.8l-12-7.5A1 1 0 0 0 7 4.5Z"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
 };
 
 /** An inline UI icon from the sprite. */
@@ -227,7 +229,7 @@ export function footer(p, guides) {
         <p class="foot-links"><a href="${b}app/" class="btn btn-primary btn-sm">${art('den')}${t.open}</a><a href="${GITHUB}">${icon('github')}${t.source}</a><a href="${GITHUB}/blob/main/CHANGELOG.md">${t.changelog}</a></p>
       </div>
       <nav aria-labelledby="f-site"><h2 id="f-site" class="foot-title">${t.site}</h2><ul>
-        <li><a href="${site}#preview">Live preview</a></li><li><a href="${site}#invite">How inviting works</a></li><li><a href="${site}#private">Why it is private</a></li><li><a href="${site}#chat">Features</a></li><li><a href="${site}#use-cases">Use cases</a></li><li><a href="${site}#compare">Server based or direct</a></li><li><a href="${site}#faq">FAQ</a></li><li><a href="${b}guides.html">All guides</a></li><li><a href="${b}pt/chat-sem-cadastro.html" hreflang="pt-BR">Em português</a></li>
+        <li><a href="${site}#tour">30 second tour</a></li><li><a href="${site}#preview">Live preview</a></li><li><a href="${site}#invite">How inviting works</a></li><li><a href="${site}#private">Why it is private</a></li><li><a href="${site}#chat">Features</a></li><li><a href="${site}#use-cases">Use cases</a></li><li><a href="${site}#compare">Server based or direct</a></li><li><a href="${site}#faq">FAQ</a></li><li><a href="${b}guides.html">All guides</a></li><li><a href="${b}pt/chat-sem-cadastro.html" hreflang="pt-BR">Em português</a></li>
       </ul></nav>
       <nav aria-labelledby="f-guides"><h2 id="f-guides" class="foot-title">${t.guides}</h2><ul>${g}</ul></nav>
       <nav aria-labelledby="f-more"><h2 id="f-more" class="foot-title">${t.more}</h2><ul class="foot-more">${more}</ul></nav>

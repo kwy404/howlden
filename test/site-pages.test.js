@@ -15,9 +15,29 @@ const pt = readdirSync(join(process.cwd(), 'scripts', 'site', 'guides', 'pt')).f
 const pages = ['index.html', 'guides.html', '404.html', ...en, ...pt.map((f) => `pt/${f}`)];
 
 describe('site pages', () => {
-  it('has at least 10 English guides and 2 Portuguese guides', () => {
-    expect(en.length).toBeGreaterThanOrEqual(10);
-    expect(pt.length).toBeGreaterThanOrEqual(2);
+  it('keeps a small set of guides: at most 4 in English and 2 in Portuguese', () => {
+    expect(en.length).toBeGreaterThanOrEqual(1);
+    expect(en.length).toBeLessThanOrEqual(4);
+    expect(pt.length).toBeLessThanOrEqual(2);
+  });
+
+  it('has no keyword lists in meta tags or JSON-LD', () => {
+    for (const p of pages) {
+      const html = read(p);
+      expect(html).not.toMatch(/<meta name="keywords"/);
+      expect(html).not.toMatch(/"keywords":/);
+    }
+  });
+
+  it('shows the two window demo and the 30 second tour on the home page', () => {
+    const html = read('index.html');
+    expect(html).toContain('id="demo"');
+    expect((html.match(/class="dm-step"/g) || []).length).toBe(6);
+    expect(html).toContain('id="tour"');
+    expect((html.match(/class="tr-scene"/g) || []).length).toBe(6);
+    expect(html).toContain('id="preview"');
+    const css = readFileSync(join(docs, 'site.css'), 'utf8');
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
   });
 
   it.each(pages)('%s has a title, a description, OG tags and the footer', (p) => {
@@ -26,8 +46,8 @@ describe('site pages', () => {
     const desc = attr(html, /<meta name="description" content="([^"]+)"/);
     expect(title.length).toBeGreaterThan(10);
     expect(title.length).toBeLessThanOrEqual(70);
-    expect(desc.length).toBeGreaterThanOrEqual(110);
-    expect(desc.length).toBeLessThanOrEqual(165);
+    expect(desc.length).toBeGreaterThanOrEqual(50);
+    expect(desc.length).toBeLessThanOrEqual(160);
     const og = attr(html, /<meta property="og:image" content="([^"]+)"/);
     expect(og.startsWith(SITE)).toBe(true);
     expect(existsSync(join(docs, og.slice(SITE.length)))).toBe(true);
