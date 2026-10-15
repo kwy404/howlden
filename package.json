@@ -2,20 +2,15 @@
   "name": "howlden",
   "version": "0.1.1",
   "private": true,
-  "description": "Serverless peer to peer group chat, voice and video in the browser. Create a den, share an invite link or QR code and talk over encrypted WebRTC with no accounts, no sign up and no server.",
+  "description": "Group chat, voice and video between browsers, with no account and no server of ours.",
   "keywords": [
-    "p2p chat",
-    "peer to peer chat",
-    "serverless chat",
-    "webrtc chat",
-    "webrtc voice chat",
-    "webrtc video call",
-    "voice chat in browser",
-    "screen share in browser",
-    "end to end encrypted chat",
-    "chat without sign up",
-    "pwa chat",
-    "qr code invite"
+    "p2p",
+    "webrtc",
+    "chat",
+    "voice chat",
+    "video call",
+    "end to end encryption",
+    "pwa"
   ],
   "homepage": "https://kwy404.github.io/howlden/",
   "bugs": {
