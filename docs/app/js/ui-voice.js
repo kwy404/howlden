@@ -7,7 +7,7 @@ import { icon, reactionIcon } from './icons.js';
 import { avatarImg, closePopover, popover, voiceMembers } from './ui-shell.js';
 import { confirmDialog } from './ui-modal.js';
 import { avatarTraits } from '../core/avatar.js';
-import { REACTIONS } from '../core/history.js';
+import { BASE_REACTIONS } from '../core/history.js';
 import { formatDuration } from '../core/call.js';
 
 export function createVoice(app) {
@@ -267,7 +267,7 @@ export function createVoice(app) {
       h(
         'div',
         { class: 'burst-bar', role: 'menu', 'aria-label': t('voice.react') },
-        REACTIONS.map((key) => h('button', { class: 'icon-btn', type: 'button', role: 'menuitem', 'aria-label': t(`chat.reaction.${key}`), onclick: () => s?.sendBurst(key) }, reactionIcon(key, { size: 28 }))),
+        BASE_REACTIONS.map((key) => h('button', { class: 'icon-btn', type: 'button', role: 'menuitem', 'aria-label': t(`chat.reaction.${key}`), onclick: () => s?.sendBurst(key) }, reactionIcon(key, { size: 28 }))),
       ),
       { placement: 'above', className: 'burst-pop' },
     );

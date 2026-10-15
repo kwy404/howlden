@@ -94,7 +94,7 @@ function build([tag, attrs, children]) {
 
 /** A sticker element. `play` runs its little animation once it is in the page. */
 export function stickerEl(key, { size = 128, label = '', play = false } = {}) {
-  const art = STICKER_ART[STICKERS.includes(key) ? key : 'wave'];
+  const art = (STICKERS.includes(key) && STICKER_ART[key]) || STICKER_ART.wave;
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', '0 0 96 96');
   svg.setAttribute('width', size);

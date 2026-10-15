@@ -8,6 +8,8 @@
 // 1. lists, autolinks and [text](https://url) for http and https only,
 // <@peerid> mentions, @everyone, and backslash escapes.
 
+import { highlight } from './highlight.js';
+
 const ESCAPABLE = new Set('\\`*_~|[]()<>#@-.!>'.split(''));
 const MAX_DEPTH = 8;
 
@@ -305,7 +307,15 @@ export function render(source, { document: doc = globalThis.document, resolveMen
         const pre = el('pre', 'md-pre');
         const c = el('code');
         if (n.lang) c.dataset.lang = n.lang;
-        c.textContent = n.value;
+        // Highlighted with one text node per token; never parsed as markup.
+        for (const tok of highlight(n.value, n.lang)) {
+          if (!tok.type) c.appendChild(doc.createTextNode(tok.value));
+          else {
+            const span = el('span', `hl-${tok.type}`);
+            span.textContent = tok.value;
+            c.appendChild(span);
+          }
+        }
         pre.appendChild(c);
         return pre;
       }

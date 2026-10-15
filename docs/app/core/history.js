@@ -4,23 +4,67 @@
 // Every message is a record keyed by a random id. Records merge like a small
 // state based CRDT, so any two copies can be combined in any order and end up
 // equal:
-// - text and editedAt: the later edit wins (ties broken by text);
+// - text and editedAt: the later edit wins (ties broken by text), and the
+//   earlier texts are kept as an edit history (the union of both copies);
 // - deleted: once deleted, always deleted (a tombstone with no content);
-// - reactions: per reaction and per member, the later toggle wins.
+// - reactions and poll votes: per key and per member, the later toggle wins;
+// - pinned: the later pin or unpin wins;
+// - sticker, poll question, thread, forward and /me never change.
 // A member who joins later sends a manifest of [id, version] pairs. The other
 // side answers with the records that are missing or older there, and asks for
 // the ones it lacks itself.
 
 export const MAX_TEXT = 4000;
 export const MAX_FILES = 10;
-export const REACTIONS = ['like', 'love', 'laugh', 'wow', 'sad', 'fire', 'howl', 'check'];
+export const MAX_HISTORY = 10;
+export const POLL_LIMITS = { question: 200, option: 80, min: 2, max: 10 };
+export const WAVE_POINTS = 48;
+
+// Seasonal extras: one reaction and one sticker (named after the season) that
+// can be picked only while the season is on. They render at any time.
+export const SEASONAL = {
+  newyear: 'firework',
+  carnival: 'mask',
+  easter: 'egg',
+  valentine: 'rose',
+  junina: 'bonfire',
+  halloween: 'pumpkin',
+  christmas: 'gift',
+};
+export const BASE_REACTIONS = ['like', 'love', 'laugh', 'wow', 'sad', 'fire', 'howl', 'check'];
+export const REACTIONS = [...BASE_REACTIONS, ...Object.values(SEASONAL)];
 // Stickers drawn for howlden. A sticker message carries one of these keys and
 // no text; the art lives in the app (docs/app/js/stickers.js).
-export const STICKERS = ['wave', 'howl', 'love', 'laugh', 'party', 'sleepy', 'thanks', 'cool'];
+export const BASE_STICKERS = ['wave', 'howl', 'love', 'laugh', 'party', 'sleepy', 'thanks', 'cool'];
+export const STICKERS = [...BASE_STICKERS, ...Object.keys(SEASONAL)];
 
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const num = (v) => (Number.isFinite(v) ? v : 0);
 const hex = (v) => typeof v === 'string' && /^[0-9a-f]{4,32}$/.test(v);
+const toggles = (raw, keys) => {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const key of keys) {
+    const users = raw[key];
+    if (!users || typeof users !== 'object') continue;
+    for (const [user, entry] of Object.entries(users)) {
+      if (!hex(user) || !Array.isArray(entry)) continue;
+      (out[key] ||= {})[user] = [num(entry[0]), entry[1] ? 1 : 0];
+    }
+  }
+  return out;
+};
+
+/** A poll question and its options, trimmed to the limits, or null. */
+export function cleanPoll(p) {
+  if (!p || typeof p !== 'object') return null;
+  const q = str(p.q, POLL_LIMITS.question).trim();
+  const options = (Array.isArray(p.options) ? p.options : []).map((o) => str(o, POLL_LIMITS.option).trim()).filter(Boolean).slice(0, POLL_LIMITS.max);
+  if (!q || options.length < POLL_LIMITS.min) return null;
+  return { q, options, multi: p.multi === true };
+}
+
+const optionKeys = (poll) => poll.options.map((_, i) => String(i));
 
 /** Validate and normalize a record that came from another peer. Returns null when unusable. */
 export function cleanRecord(rec) {
@@ -39,10 +83,25 @@ export function cleanRecord(rec) {
     reactions: {},
   };
   if (STICKERS.includes(rec.sticker)) out.sticker = rec.sticker;
+  if (hex(rec.thread) && rec.thread !== rec.id) out.thread = rec.thread;
+  if (rec.me === true) out.me = true;
+  if (rec.fwd && typeof rec.fwd === 'object') out.fwd = { name: str(rec.fwd.name, 64) || '?', from: str(rec.fwd.from, 64) };
+  if (Array.isArray(rec.pin) && num(rec.pin[0])) out.pin = [num(rec.pin[0]), rec.pin[1] ? 1 : 0];
+  const poll = cleanPoll(rec.poll);
+  if (poll) {
+    out.poll = poll;
+    out.votes = toggles(rec.votes, optionKeys(poll));
+  }
+  if (Array.isArray(rec.history)) {
+    out.history = rec.history
+      .filter((e) => Array.isArray(e) && num(e[0]) && typeof e[1] === 'string')
+      .map((e) => [num(e[0]), str(e[1], MAX_TEXT)])
+      .slice(-MAX_HISTORY);
+  }
   if (Array.isArray(rec.files)) {
     for (const f of rec.files.slice(0, MAX_FILES)) {
       if (!f || !hex(f.id)) continue;
-      out.files.push({
+      const file = {
         id: f.id,
         name: str(f.name, 200) || 'file',
         size: Math.max(0, num(f.size)),
@@ -50,35 +109,51 @@ export function cleanRecord(rec) {
         w: num(f.w) || undefined,
         h: num(f.h) || undefined,
         thumb: typeof f.thumb === 'string' && f.thumb.startsWith('data:image/') && f.thumb.length < 60000 ? f.thumb : undefined,
-      });
-    }
-  }
-  if (rec.reactions && typeof rec.reactions === 'object') {
-    for (const key of REACTIONS) {
-      const users = rec.reactions[key];
-      if (!users || typeof users !== 'object') continue;
-      for (const [user, entry] of Object.entries(users)) {
-        if (!hex(user) || !Array.isArray(entry)) continue;
-        (out.reactions[key] ||= {})[user] = [num(entry[0]), entry[1] ? 1 : 0];
+      };
+      // A voice message: its length in seconds and a small waveform (0 to 100).
+      if (f.voice === true) {
+        file.voice = true;
+        file.dur = Math.min(3600, Math.max(0, num(f.dur)));
+        file.wave = (Array.isArray(f.wave) ? f.wave : []).slice(0, WAVE_POINTS).map((v) => Math.max(0, Math.min(100, Math.round(num(v)))));
       }
+      out.files.push(file);
     }
   }
+  out.reactions = toggles(rec.reactions, REACTIONS);
   if (out.deleted) return tombstone(out);
   return out;
 }
 
-function tombstone({ sticker: _gone, ...rec }) {
+function tombstone({ sticker: _s, poll: _p, votes: _v, history: _h, fwd: _f, pin: _pin, me: _me, ...rec }) {
   return { ...rec, text: '', editedAt: 0, files: [], reply: null, reactions: {}, deleted: true, deletedAt: rec.deletedAt || rec.ts };
 }
 
 /** The highest timestamp in a record, used to compare two copies. */
 export function version(rec) {
-  let v = Math.max(num(rec.ts), num(rec.editedAt), num(rec.deletedAt));
-  for (const users of Object.values(rec.reactions || {})) {
-    for (const [at] of Object.values(users)) if (at > v) v = at;
+  let v = Math.max(num(rec.ts), num(rec.editedAt), num(rec.deletedAt), num(rec.pin?.[0]));
+  for (const group of [rec.reactions, rec.votes]) {
+    for (const users of Object.values(group || {})) {
+      for (const [at] of Object.values(users)) if (at > v) v = at;
+    }
   }
   return v;
 }
+
+const later = (x, y) => (!x ? y : !y ? x : x[0] > y[0] || (x[0] === y[0] && x[1] >= y[1]) ? x : y);
+
+function mergeToggles(a = {}, b = {}) {
+  const out = {};
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const ua = a[key] || {};
+    const ub = b[key] || {};
+    const merged = {};
+    for (const user of new Set([...Object.keys(ua), ...Object.keys(ub)])) merged[user] = later(ua[user], ub[user]);
+    out[key] = merged;
+  }
+  return out;
+}
+
+const first = (x, y) => (x === undefined ? y : y === undefined ? x : JSON.stringify(x) <= JSON.stringify(y) ? x : y);
 
 /** Merge two copies of the same record. Commutative, associative and idempotent. */
 export function mergeRecord(a, b) {
@@ -95,20 +170,21 @@ export function mergeRecord(a, b) {
   out.text = newer.text;
   out.editedAt = newer.editedAt || 0;
   out.files = base.files || [];
-  const sticker = [a.sticker, b.sticker].filter(Boolean).sort()[0];
-  if (sticker) out.sticker = sticker;
-  out.reactions = {};
-  for (const key of new Set([...Object.keys(a.reactions || {}), ...Object.keys(b.reactions || {})])) {
-    const ua = a.reactions?.[key] || {};
-    const ub = b.reactions?.[key] || {};
-    const merged = {};
-    for (const user of new Set([...Object.keys(ua), ...Object.keys(ub)])) {
-      const x = ua[user];
-      const y = ub[user];
-      merged[user] = !x ? y : !y ? x : x[0] > y[0] || (x[0] === y[0] && x[1] >= y[1]) ? x : y;
-    }
-    out.reactions[key] = merged;
+  for (const k of ['sticker', 'thread', 'me', 'fwd', 'poll']) {
+    const v = first(a[k], b[k]);
+    if (v === undefined) delete out[k];
+    else out[k] = v;
   }
+  const pin = later(a.pin, b.pin);
+  if (pin) out.pin = pin;
+  else delete out.pin;
+  out.reactions = mergeToggles(a.reactions, b.reactions);
+  if (out.poll) out.votes = mergeToggles(a.votes, b.votes);
+  else delete out.votes;
+  const seen = new Map();
+  for (const e of [...(a.history || []), ...(b.history || [])]) if (!seen.has(e[0]) || seen.get(e[0]) > e[1]) seen.set(e[0], e[1]);
+  if (seen.size) out.history = [...seen].sort((x, y) => x[0] - y[0] || (x[1] < y[1] ? -1 : 1)).slice(-MAX_HISTORY);
+  else delete out.history;
   return out;
 }
 
@@ -117,14 +193,10 @@ export function sameRecord(a, b) {
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
 
+const sortDeep = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])])) : v);
+
 function canonical(rec) {
-  if (!rec) return null;
-  const reactions = {};
-  for (const key of Object.keys(rec.reactions || {}).sort()) {
-    const users = rec.reactions[key];
-    reactions[key] = Object.fromEntries(Object.keys(users).sort().map((u) => [u, users[u]]));
-  }
-  return { ...rec, reactions };
+  return rec ? sortDeep(rec) : null;
 }
 
 /** Members who currently have a reaction switched on. */
@@ -134,20 +206,31 @@ export function reactors(rec, key) {
     .map(([u]) => u);
 }
 
-/** A new message record. */
-export function createRecord({ id, channel, author, text = '', ts, reply = null, files = [], sticker = null }) {
+/** A new message record. Pass sticker, poll, thread, fwd or me for the special kinds. */
+export function createRecord({ id, channel, author, text = '', ts, reply = null, files = [], sticker = null, poll = null, thread = null, fwd = null, me = false }) {
   const rec = { id, channel, author, ts, text: text.slice(0, MAX_TEXT), editedAt: 0, deleted: false, deletedAt: 0, reply, files, reactions: {} };
+  if (thread) rec.thread = thread;
+  if (fwd) rec.fwd = { name: String(fwd.name || '?').slice(0, 64), from: String(fwd.from || '').slice(0, 64) };
+  if (me) rec.me = true;
   if (sticker) {
     if (!STICKERS.includes(sticker)) throw new Error(`unknown sticker ${sticker}`);
     return { ...rec, text: '', files: [], sticker };
   }
+  if (poll) {
+    const clean = cleanPoll(poll);
+    if (!clean) throw new Error('a poll needs a question and at least two options');
+    return { ...rec, text: '', files: [], poll: clean, votes: {} };
+  }
   return rec;
 }
 
-/** Edit a record (author only). */
+/** Edit a record (author only). The previous text goes into its edit history. */
 export function editRecord(rec, text, at) {
-  if (rec.deleted || rec.sticker) return rec;
-  return { ...rec, text: String(text).slice(0, MAX_TEXT), editedAt: Math.max(at, num(rec.editedAt) + 1, rec.ts + 1) };
+  if (rec.deleted || rec.sticker || rec.poll) return rec;
+  const next = String(text).slice(0, MAX_TEXT);
+  if (next === rec.text) return rec;
+  const history = [...(rec.history || []), [num(rec.editedAt) || rec.ts, rec.text]].slice(-MAX_HISTORY);
+  return { ...rec, text: next, history, editedAt: Math.max(at, num(rec.editedAt) + 1, rec.ts + 1) };
 }
 
 /** Delete a record (author only). */
@@ -165,16 +248,52 @@ export function toggleReaction(rec, key, user, at) {
   return { ...rec, reactions: { ...rec.reactions, [key]: users } };
 }
 
+/** Pin or unpin a message for everyone in the channel. Anyone may. */
+export function setPinned(rec, on, at) {
+  if (rec.deleted) return rec;
+  return { ...rec, pin: [Math.max(at, num(rec.pin?.[0]) + 1), on ? 1 : 0] };
+}
+
+export const isPinned = (rec) => !rec.deleted && rec.pin?.[1] === 1;
+
+/** Vote for one option; in a single choice poll this also takes back any other vote. */
+export function votePoll(rec, option, user, at) {
+  if (!rec.poll || rec.deleted || !(option >= 0 && option < rec.poll.options.length)) return rec;
+  const votes = { ...(rec.votes || {}) };
+  const cur = (i) => votes[String(i)]?.[user];
+  const stamp = Math.max(at, ...rec.poll.options.map((_, i) => (cur(i)?.[0] || 0) + 1));
+  const on = !cur(option)?.[1];
+  rec.poll.options.forEach((_, i) => {
+    const key = String(i);
+    if (i === option) votes[key] = { ...votes[key], [user]: [stamp, on ? 1 : 0] };
+    else if (on && !rec.poll.multi && cur(i)?.[1]) votes[key] = { ...votes[key], [user]: [stamp, 0] };
+  });
+  return { ...rec, votes };
+}
+
+/** Poll results: voters per option, the total of people who voted, and my picks. */
+export function pollResults(rec, me) {
+  const per = (rec.poll?.options || []).map((_, i) =>
+    Object.entries(rec.votes?.[String(i)] || {})
+      .filter(([, e]) => e[1])
+      .map(([u]) => u),
+  );
+  const people = new Set(per.flat());
+  return { per, total: people.size, mine: per.map((list) => list.includes(me)) };
+}
+
 /**
  * Whether a change from `before` to `after` may come from `sender`. Anyone may
- * react or relay history, but only the author may change text or delete.
+ * react, vote, pin or relay history, but only the author may change text,
+ * the edit history or delete, and nobody may change what never changes.
  */
 export function allowedChange(before, after, sender) {
   if (!before) return true;
   if (after.author !== before.author || after.channel !== before.channel || after.ts !== before.ts) return false;
-  const textChanged = after.text !== before.text || num(after.editedAt) !== num(before.editedAt);
-  const stickerChanged = !after.deleted && (after.sticker || null) !== (before.sticker || null);
-  if ((textChanged || stickerChanged || (after.deleted && !before.deleted)) && sender !== before.author) return false;
+  const textChanged = after.text !== before.text || num(after.editedAt) !== num(before.editedAt) || JSON.stringify(after.history || []) !== JSON.stringify(before.history || []);
+  const fixed = (r) => JSON.stringify([r.sticker || null, r.poll || null, r.thread || null, r.fwd || null, !!r.me]);
+  const fixedChanged = !after.deleted && fixed(after) !== fixed(before);
+  if ((textChanged || fixedChanged || (after.deleted && !before.deleted)) && sender !== before.author) return false;
   return true;
 }
 

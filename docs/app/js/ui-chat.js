@@ -7,7 +7,7 @@ import { stickerEl } from './stickers.js';
 import { avatarImg, closePopover, colorOf, idBadge, memberCard, popover } from './ui-shell.js';
 import { confirmDialog, modal, toast } from './ui-modal.js';
 import { plainText, render as renderMarkdown } from '../core/markdown.js';
-import { REACTIONS, STICKERS, reactors } from '../core/history.js';
+import { BASE_REACTIONS, BASE_STICKERS, REACTIONS, reactors } from '../core/history.js';
 import { formatSize, MAX_FILE } from '../core/chunks.js';
 
 const GROUP_MS = 7 * 60 * 1000;
@@ -306,7 +306,7 @@ export function createChat(app) {
       h(
         'div',
         { class: 'reaction-picker', role: 'menu', 'aria-label': t('chat.react') },
-        REACTIONS.map((key) =>
+        BASE_REACTIONS.map((key) =>
           h(
             'button',
             {
@@ -335,7 +335,7 @@ export function createChat(app) {
       h(
         'div',
         { class: 'sticker-picker', role: 'menu', 'aria-label': t('chat.stickers') },
-        STICKERS.map((key) =>
+        BASE_STICKERS.map((key) =>
           h(
             'button',
             {

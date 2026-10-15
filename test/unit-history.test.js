@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HistorySync,
   MemoryStore,
+  SEASONAL,
   STICKERS,
   allowedChange,
   batchBySize,
@@ -10,13 +11,17 @@ import {
   deleteRecord,
   diffManifest,
   editRecord,
+  isPinned,
   manifest,
   mergeRecord,
+  pollResults,
   reactors,
   sameRecord,
+  setPinned,
   sortRecords,
   toggleReaction,
   version,
+  votePoll,
 } from '../src/history.js';
 import { Mesh } from '../src/mesh.js';
 import { FakeHub, settle } from './fake-transport.js';
@@ -234,5 +239,87 @@ describe('HistorySync over the mesh', () => {
     await sb.sync.handle(ANA, { type: 'sync-r', records: [{ id: 'zz' }, null, 5] });
     await sb.sync.handle(ANA, { type: 'sync-w', ids: 'nope' });
     expect(storeB.map.size).toBe(1000);
+  });
+});
+
+describe('richer records', () => {
+  const base = (extra = {}) => createRecord({ id: '0201', channel: 'general', author: ANA, ts: 1000, text: 'first', ...extra });
+
+  it('keeps an edit history that both copies agree on', () => {
+    const one = editRecord(base(), 'second', 1100);
+    const two = editRecord(one, 'third', 1200);
+    expect(two.history).toEqual([
+      [1000, 'first'],
+      [1100, 'second'],
+    ]);
+    expect(editRecord(two, 'third', 1300)).toBe(two);
+    const merged = mergeRecord(one, two);
+    expect(merged.text).toBe('third');
+    expect(merged.history).toHaveLength(2);
+    expect(sameRecord(mergeRecord(one, two), mergeRecord(two, one))).toBe(true);
+    let many = base();
+    for (let i = 0; i < 15; i++) many = editRecord(many, `v${i}`, 2000 + i);
+    expect(many.history).toHaveLength(10);
+    expect(allowedChange(one, two, BIA)).toBe(false);
+    expect(allowedChange(one, two, ANA)).toBe(true);
+    expect(cleanRecord(JSON.parse(JSON.stringify(two))).history).toEqual(two.history);
+  });
+
+  it('pins with the last word winning, and anyone may pin', () => {
+    const rec = base();
+    const pinned = setPinned(rec, true, 1500);
+    expect(isPinned(pinned)).toBe(true);
+    const unpinned = setPinned(pinned, false, 1400);
+    expect(unpinned.pin[0]).toBe(1501);
+    expect(isPinned(mergeRecord(pinned, unpinned))).toBe(false);
+    expect(isPinned(mergeRecord(unpinned, pinned))).toBe(false);
+    expect(allowedChange(rec, pinned, BIA)).toBe(true);
+    expect(version(pinned)).toBe(1500);
+    expect(isPinned(deleteRecord(pinned, 1600))).toBe(false);
+  });
+
+  it('runs polls with single and multiple choice', () => {
+    const poll = createRecord({ id: '0202', channel: 'general', author: ANA, ts: 1000, poll: { q: 'Pizza or tacos?', options: ['Pizza', 'Tacos', ' ', 'Both'] } });
+    expect(poll.poll).toEqual({ q: 'Pizza or tacos?', options: ['Pizza', 'Tacos', 'Both'], multi: false });
+    let p = votePoll(poll, 0, BIA, 1100);
+    p = votePoll(p, 1, BIA, 1200);
+    p = votePoll(p, 1, CAU, 1300);
+    expect(pollResults(p, BIA)).toEqual({ per: [[], [BIA, CAU], []], total: 2, mine: [false, true, false] });
+    p = votePoll(p, 1, BIA, 1400);
+    expect(pollResults(p, BIA).per[1]).toEqual([CAU]);
+    expect(votePoll(p, 9, BIA, 1500)).toBe(p);
+    const multi = createRecord({ id: '0203', channel: 'general', author: ANA, ts: 1000, poll: { q: 'Which days?', options: ['Fri', 'Sat'], multi: true } });
+    const both = votePoll(votePoll(multi, 0, BIA, 1100), 1, BIA, 1200);
+    expect(pollResults(both, BIA).mine).toEqual([true, true]);
+    expect(() => createRecord({ id: '0204', channel: 'general', author: ANA, ts: 1, poll: { q: 'x', options: ['only'] } })).toThrow();
+    const a = votePoll(poll, 0, BIA, 2000);
+    const b = votePoll(poll, 1, CAU, 2001);
+    expect(sameRecord(mergeRecord(a, b), mergeRecord(b, a))).toBe(true);
+    expect(pollResults(mergeRecord(a, b), BIA).total).toBe(2);
+    expect(allowedChange(poll, a, BIA)).toBe(true);
+    expect(allowedChange(poll, { ...poll, poll: { ...poll.poll, q: 'Changed' } }, BIA)).toBe(false);
+    expect(cleanRecord({ ...poll, poll: { q: 'x'.repeat(500), options: Array.from({ length: 20 }, (_, i) => `o${i}`) } }).poll.options).toHaveLength(10);
+    expect(editRecord(poll, 'text', 3000)).toBe(poll);
+  });
+
+  it('carries threads, forwards, /me and voice message metadata', () => {
+    const reply = createRecord({ id: '0205', channel: 'general', author: BIA, ts: 1100, text: 'in thread', thread: '0201', fwd: { name: 'Caio', from: 'Night owls' }, me: true });
+    const clean = cleanRecord(JSON.parse(JSON.stringify(reply)));
+    expect(clean).toMatchObject({ thread: '0201', fwd: { name: 'Caio', from: 'Night owls' }, me: true });
+    expect(cleanRecord({ ...reply, thread: reply.id }).thread).toBeUndefined();
+    expect(allowedChange(reply, { ...reply, thread: '0999' }, ANA)).toBe(false);
+    const gone = deleteRecord(reply, 1200);
+    expect(gone.thread).toBe('0201');
+    expect(gone.fwd).toBeUndefined();
+    const voice = cleanRecord({ ...msg('0206', 1), files: [{ id: 'ab12', name: 'voice.webm', size: 900, type: 'audio/webm', voice: true, dur: 3.5, wave: [...Array(80).keys()].map((i) => i * 3) }] });
+    expect(voice.files[0]).toMatchObject({ voice: true, dur: 3.5 });
+    expect(voice.files[0].wave).toHaveLength(48);
+    expect(Math.max(...voice.files[0].wave)).toBe(100);
+  });
+
+  it('accepts seasonal reactions and stickers at any time', () => {
+    expect(SEASONAL.halloween).toBe('pumpkin');
+    expect(reactors(toggleReaction(msg('0207', 1), 'pumpkin', BIA, 2), 'pumpkin')).toEqual([BIA]);
+    expect(createRecord({ id: '0208', channel: 'general', author: ANA, ts: 1, sticker: 'christmas' }).sticker).toBe('christmas');
   });
 });

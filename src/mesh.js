@@ -76,7 +76,7 @@ export class MeshError extends Error {
   }
 }
 
-const publicMember = (m) => ({ id: m.id, name: m.name, avatar: m.avatar, status: m.status || '', accent: m.accent || '', joinedAt: m.joinedAt, online: !!m.online });
+const publicMember = (m) => ({ id: m.id, name: m.name, avatar: m.avatar, status: m.status || '', statusUntil: m.statusUntil || 0, accent: m.accent || '', joinedAt: m.joinedAt, online: !!m.online });
 
 /** Avatars are a seed or a small data:image URL; anything else is dropped. */
 export function cleanAvatar(v) {
@@ -85,9 +85,16 @@ export function cleanAvatar(v) {
   return s.slice(0, 64);
 }
 
-/** Optional profile extras: a short status line and an accent color. */
+/** Optional profile extras: a short status line (with an optional end time) and an accent color. */
 export function cleanExtras(p) {
-  return { status: String(p?.status || '').slice(0, 128), accent: /^#[0-9a-f]{6}$/i.test(p?.accent || '') ? p.accent : '' };
+  const status = String(p?.status || '').slice(0, 128);
+  const until = Number(p?.statusUntil);
+  return { status, statusUntil: status && Number.isFinite(until) && until > 0 ? until : 0, accent: /^#[0-9a-f]{6}$/i.test(p?.accent || '') ? p.accent : '' };
+}
+
+/** A member's status line, or '' once it has expired. */
+export function activeStatus(m, now = Date.now()) {
+  return m?.status && !(m.statusUntil > 0 && m.statusUntil <= now) ? m.status : '';
 }
 
 export class Mesh extends Emitter {
@@ -238,10 +245,10 @@ export class Mesh extends Emitter {
   }
 
   /** Update my name, avatar, status or accent and tell everyone. */
-  setProfile({ name, avatar, status, accent }) {
+  setProfile({ name, avatar, status, statusUntil, accent }) {
     if (name) this.self.name = name;
     if (avatar) this.self.avatar = cleanAvatar(avatar);
-    Object.assign(this.self, cleanExtras({ status: status ?? this.self.status, accent: accent ?? this.self.accent }));
+    Object.assign(this.self, cleanExtras({ status: status ?? this.self.status, statusUntil: status === undefined ? this.self.statusUntil : statusUntil, accent: accent ?? this.self.accent }));
     for (const link of this.links.values()) this._send(link, { t: 'profile', peer: publicMember(this.self) });
     this.emit('members', this.memberList());
   }

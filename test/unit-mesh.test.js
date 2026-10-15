@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIRECT_MEMBERS, Emitter, MAX_MEMBERS, Mesh, cleanAvatar, cleanExtras, electRelay, forwardTargets } from '../src/mesh.js';
+import { DIRECT_MEMBERS, Emitter, MAX_MEMBERS, Mesh, activeStatus, cleanAvatar, cleanExtras, electRelay, forwardTargets } from '../src/mesh.js';
 import { invitePayload, packCode, readInvite, readReply, replyPayload, unpackCode } from '../src/invite.js';
 import { FakeHub, settle } from './fake-transport.js';
 
@@ -328,6 +328,13 @@ describe('mesh introduction', () => {
     expect(cleanAvatar('data:text/html;base64,AAAA')).toBe('');
     expect(cleanAvatar('data:image/svg+xml,<svg onload=x>')).toBe('');
     expect(cleanAvatar('seed'.repeat(30)).length).toBe(64);
-    expect(cleanExtras({ status: 's'.repeat(300), accent: 'red' })).toEqual({ status: 's'.repeat(128), accent: '' });
+    expect(cleanExtras({ status: 's'.repeat(300), accent: 'red' })).toEqual({ status: 's'.repeat(128), statusUntil: 0, accent: '' });
+    expect(cleanExtras({ status: 'brb', statusUntil: 5000 }).statusUntil).toBe(5000);
+    expect(cleanExtras({ status: '', statusUntil: 5000 }).statusUntil).toBe(0);
+    expect(cleanExtras({ status: 'brb', statusUntil: 'soon' }).statusUntil).toBe(0);
+    expect(activeStatus({ status: 'brb', statusUntil: 5000 }, 4999)).toBe('brb');
+    expect(activeStatus({ status: 'brb', statusUntil: 5000 }, 5000)).toBe('');
+    expect(activeStatus({ status: 'here', statusUntil: 0 }, 9e12)).toBe('here');
+    expect(activeStatus(null)).toBe('');
   });
 });
