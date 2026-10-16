@@ -131,7 +131,8 @@ async function joinWithWords(guest, words, { viaDialog = false, accept = true } 
     await guest.page.click('.rail-btn[aria-label="Join a den"]');
     await guest.page.waitForSelector('#join-word-0');
     await typeWords(guest.page, 'join-word', words);
-    if (await guest.page.locator('#join-word-5').count()) await guest.page.press('#join-word-5', 'Enter');
+    // The last full word may start the join by itself and close the dialog first.
+    if (await guest.page.locator('#join-word-5').count()) await guest.page.press('#join-word-5', 'Enter').catch(() => {});
   } else {
     await evalApp(guest, (w) => window.howlden.joinWithWords(w), words);
   }
