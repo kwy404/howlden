@@ -381,7 +381,7 @@ try {
     for (const label of ['Mark as read', 'Mute channel', 'Notifications', 'Copy an invite', 'Rename channel']) ok(st.items.includes(label), `channel menu has ${label}: ${st.items.join(', ')}`);
     await pickItem(ana, 'Mute channel');
     ok(await evalApp(ana, (c) => window.howlden.activeDen.isMuted(c), ch), 'a channel can be muted from its menu');
-    ok(await ana.page.locator(`.ch-row.muted[data-channel="${ch}"]`).count(), 'a muted channel looks muted');
+    ok(await ana.page.waitForSelector(`.ch-row.muted[data-channel="${ch}"]`, { timeout: 5000 }).then(() => true, () => false), 'a muted channel looks muted');
     await evalApp(ana, (c) => window.howlden.activeDen.setMuted(c, false), ch);
 
     await rightClick(ana, '.rail-item[data-den] .rail-btn');
