@@ -28,9 +28,23 @@ All notable changes to howlden are documented here. The format follows [Keep a C
 - Custom status with an end time (30 minutes, 1 hour, 4 hours, today or never); peers stop showing it once it expires.
 - The reaction picker shows your most used reactions first.
 - Special dates, with the shared seasons script of the site: a quiet accent in the app chrome, Luna in costume on the first screen, a seasonal sticker and a seasonal reaction offered only during the season (New Year, Carnival, Easter, Valentine's, Festa Junina or Midsummer, Halloween, Christmas), seasonal empty states, a "Halloween mode" style switch on the home screen, and softer seasonal message sounds at Christmas, New Year and Halloween.
+- One menu for the whole app, opened by right click, a long press on touch screens, or the Menu key and Shift+F10: on messages (quick reactions, reply, thread, edit, forward, pin, mark unread, save, remind, copy text, copy a link to the message, select, delete), people (profile, message, call, a volume slider, mute for me, hide video for me, copy name, add friend), channels (mark read, mute, notifications, copy an invite, rename, settings), dens in the rail, conversations, friends, links, images and files (open, save, copy), and call tiles (volume, mute, pin to the big view, full screen). It uses menu roles, arrow keys, Home and End, typeahead, submenus, Escape, and flips to stay inside the screen.
+- A quick switcher (Ctrl+K) to jump to any channel, conversation, friend or action by typing a few letters, with # and @ to narrow it.
+- A shortcuts sheet (Ctrl+/), Alt+arrows between channels (with Shift for unread ones), Escape back to the newest message, Shift+Escape to read a whole den, Ctrl+Shift+M, D, E and O in calls, and letters on a focused message (R, E, T, P, U, S, C, +, Delete).
+- A pop out call window that stays on top while you use other apps, where the browser supports it, with faces or video, who is speaking, mute, deafen, camera and hang up; other browsers get picture in picture.
+- Notification settings: all messages, only mentions and direct messages, or nothing, per den from its menu; muted channels; quiet hours every day; and an option to hide message text in notifications.
+- Read receipts as an option, off by default: people who both turn them on see "Seen by" under their last message. Nothing is stored.
+- Mute for me and hide video for me, per person and only on this device.
+- Mark unread, select several messages to copy, save or delete your own, a link to a message that opens it for den members who have it, and "Jump to present" with a count of new messages.
+- Image groups with a "+N" tile, a lightbox with arrows and copy, a live preview of formatted text, search results with the words marked and arrow keys, and drafts marked in the channel list.
+- An info panel next to the chat: the den or friend, a notifications switch, shared images and files, and the member list.
+- A quick status menu on your own card, and microphone, speaker and camera choices from the call controls and the user panel.
 
 ### Changed
 
+- A darker look: panels float on a near black background with one violet accent, messages sit in rounded bubbles (yours on the right; Settings can switch back to a flat list), hover actions on messages include your most used reactions, and categories in the channel list fold.
+- The call stage is black with large rounded tiles in a grid that fills the space, a name pill and a "..." button on each tile, a LIVE badge on screen shares, grouped controls with device menus, and pop out and full screen in the corner.
+- The voice connected card has quick buttons for camera, screen, live reactions and pop out.
 - Invites are six words and a QR code only. No link or URL text is shown anywhere, and sharing sends the words as text. The QR code still holds the words so a phone camera opens the app with them.
 - The invite link and reply link mode ("Zero third parties") is gone from the app and from Settings. Opening an invite link from an older version explains that six words are needed now.
 - With reduced motion, the new animations stay still; reactions over a call fade in place instead of flying.

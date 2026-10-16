@@ -37,6 +37,8 @@ Não precisa instalar nada. Funciona no Chrome, Edge, Firefox e Safari atuais, n
 - **Chat de texto** com formatação, respostas, menções, edição com histórico, reações e figurinhas da Luna que se animam ao chegar.
 - **Tópicos, mensagens fixadas, enquetes e mensagens de voz**, além de busca com filtros, galeria de arquivos por canal, encaminhar e comandos como /poll e /roll.
 - **Mensagens salvas e lembretes** guardados no seu aparelho, marcador de leitura e status que somem sozinhos.
+- **Um menu em tudo**: clique direito, toque longo ou Shift+F10 em uma mensagem, uma pessoa, um canal, um arquivo ou um quadro da chamada. Ctrl+K leva a qualquer lugar, Ctrl+/ mostra todos os atalhos.
+- **Volume e silêncio por pessoa**, uma janela de chamada destacada, níveis de notificação por toca, horário de silêncio e confirmação de leitura opcional.
 - **Voz, vídeo e tela** nos canais de voz, com mudo, ensurdecer e supressão de ruído.
 - **Ligar para um amigo** direto da tela inicial: um toque cria as seis palavras e abre o menu de compartilhar.
 - **Apertar para falar**, com um botão grande de Segure para falar no celular.

@@ -37,6 +37,8 @@ Nothing to install. It works in current Chrome, Edge, Firefox and Safari, on des
 - **Text chat** with formatting, replies, mentions, edits with history, reactions and stickers of Luna that animate when they arrive.
 - **Threads, pins, polls and voice messages**, plus search with filters, a file gallery per channel, forwarding and slash commands like /poll and /roll.
 - **Saved messages and reminders** kept on your device, read markers, and statuses that clear themselves.
+- **A menu on everything**: right click, long press or Shift+F10 on a message, a person, a channel, a file or a call tile. Ctrl+K jumps anywhere, Ctrl+/ lists every shortcut.
+- **Per person volume and mute**, a pop out call window, notification levels per den, quiet hours, and read receipts you can turn on.
 - **Voice, video and screen share** inside voice channels, with mute, deafen and noise suppression.
 - **Call a friend** from the home screen: one tap makes the six words and opens the share menu.
 - **Push to talk**, with a big Hold to talk button on phones.

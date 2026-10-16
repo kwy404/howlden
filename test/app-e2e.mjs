@@ -7,7 +7,10 @@
 // a friend" rings a new friend, stickers, live reactions, music mode, push
 // to talk and a local recording with its notice work in that call, a known
 // friend is called with only six words, a screen share fills the call view,
-// and accounts survive a PIN lock and a backup.
+// and accounts survive a PIN lock and a backup. The shared menu opens on right
+// click, long press and Shift+F10 on messages, people, channels and call
+// tiles, and the quick switcher, shortcuts sheet, read receipts, notification
+// levels, local mute and volume, mark unread and message links work.
 //
 // Usage: node test/app-e2e.mjs [path-to-chromium-browser]
 // Uses BROWSER, then common Edge and Chrome install paths.
@@ -170,6 +173,32 @@ async function wordsJoin(host, guest, open, opts) {
 
 const inviteButton = (p) => () => p.page.click('.main-head button[aria-label="Invite people"]');
 
+/** The open menu: its item labels, whether it fits on screen, and what has focus. */
+const menuState = (p) =>
+  p.page.evaluate(() => {
+    const m = document.querySelector('.ctx-menu:not(.ctx-submenu)');
+    if (!m) return null;
+    const r = m.getBoundingClientRect();
+    return {
+      role: m.getAttribute('role'),
+      items: [...m.querySelectorAll('[role^="menuitem"]')].map((x) => x.dataset.label),
+      inside: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+      focus: document.activeElement?.dataset?.label || document.activeElement?.getAttribute('aria-label') || '',
+      subs: document.querySelectorAll('.ctx-submenu').length,
+    };
+  });
+
+async function rightClick(p, selector) {
+  const box = await p.page.locator(selector).first().boundingBox();
+  await p.page.mouse.click(box.x + Math.min(40, box.width / 2), box.y + Math.min(14, box.height / 2), { button: 'right' });
+  await p.page.waitForSelector('.ctx-menu', { timeout: 5000 });
+}
+
+async function pickItem(p, label) {
+  await p.page.click(`.ctx-menu [role^="menuitem"][data-label="${label}"]`);
+  await p.page.waitForFunction(() => !document.querySelector('.ctx-menu'), null, { timeout: 5000 });
+}
+
 try {
   const people = {};
   for (const name of ['Ana', 'Bia', 'Caio', 'Dani', 'Edu', 'Fabi', 'Gabi']) people[name] = await person(name);
@@ -257,6 +286,144 @@ try {
   await waitFor(ana, () => !!document.querySelector('.msg.mentioned'));
   log('messages, markdown, reactions (which pop when they arrive) and mentions sync to every member');
 
+  // The shared menu on a message: right click, arrows, typeahead, a submenu, Escape
+  {
+    const helloId = await evalApp(caio, () => window.howlden.activeDen.timeline(window.howlden.channelId).find((r) => r.text.includes('Hello'))?.id);
+    await rightClick(caio, `.msg[data-id="${helloId}"] .msg-content`);
+    let st = await menuState(caio);
+    ok(st.role === 'menu' && st.inside, `the message menu is a menu inside the viewport ${JSON.stringify(st)}`);
+    for (const label of ['Reply', 'Start a thread', 'Forward', 'Pin for everyone', 'Mark unread', 'Copy text', 'Copy link to message', 'Select', 'Remind me']) ok(st.items.includes(label), `message menu has ${label}: ${st.items.join(', ')}`);
+    ok(!st.items.includes('Edit') && !st.items.includes('Delete'), 'no edit or delete on a message by someone else');
+    ok(st.focus === 'Reply', `the first item has focus (${st.focus})`);
+    await caio.page.keyboard.press('ArrowDown');
+    ok((await menuState(caio)).focus === 'Start a thread', 'the arrows move between items');
+    await caio.page.keyboard.press('r');
+    await caio.page.keyboard.press('e');
+    ok((await menuState(caio)).focus === 'Remind me', `typing letters jumps to the item (${(await menuState(caio)).focus})`);
+    await caio.page.keyboard.press('ArrowRight');
+    await caio.page.waitForSelector('.ctx-submenu [role="menuitem"]');
+    await caio.page.keyboard.press('ArrowLeft');
+    st = await menuState(caio);
+    ok(!st.subs && st.focus === 'Remind me', 'Left closes the submenu and returns to its item');
+    await caio.page.keyboard.press('Escape');
+    ok(!(await menuState(caio)), 'Escape closes the menu');
+
+    // Copy link to message, then follow it.
+    await rightClick(caio, `.msg[data-id="${helloId}"] .msg-content`);
+    await pickItem(caio, 'Copy link to message');
+    const link = await caio.page.evaluate(() => navigator.clipboard.readText());
+    ok(/#m=[\w-]+\.[\w-]+\.[\w-]+$/.test(link), `a link to the message is copied (${link})`);
+    ok(await evalApp(caio, (l) => !!window.howlden.parseMessageLink(l), link), 'the app reads its own message link');
+
+    // Shift+F10 on a focused message, and the Menu key path for keyboard users.
+    await caio.page.evaluate((id) => document.querySelector(`.msg[data-id="${id}"]`).focus(), helloId);
+    await caio.page.keyboard.press('Shift+F10');
+    await caio.page.waitForSelector('.ctx-menu');
+    ok((await menuState(caio)).focus, 'Shift+F10 opens the menu with focus on an item');
+    await caio.page.keyboard.press('Escape');
+
+    // Long press on a touch screen opens the same menu.
+    await caio.page.evaluate((id) => {
+      const el = document.querySelector(`.msg[data-id="${id}"] .msg-content`);
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', clientX: r.left + 20, clientY: r.top + 10, isPrimary: true }));
+    }, helloId);
+    await caio.page.waitForSelector('.ctx-menu', { timeout: 3000 });
+    await caio.page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' })));
+    ok((await menuState(caio)).items.includes('Reply'), 'a long press opens the message menu');
+    await caio.page.keyboard.press('Escape');
+
+    // Mark unread keeps the channel unread with a divider; Select picks messages.
+    await rightClick(bia, `.msg[data-id="${helloId}"] .msg-content`);
+    await pickItem(bia, 'Mark unread');
+    await waitFor(bia, () => window.howlden.activeDen.unread(window.howlden.channelId).count > 0 && !!document.querySelector('.day-divider.new'));
+    await bia.page.evaluate((id) => document.querySelector(`.msg[data-id="${id}"]`).focus(), helloId);
+    await bia.page.keyboard.press('s');
+    await bia.page.waitForSelector('.select-bar:not([hidden])');
+    ok(/1 selected/.test(await bia.page.locator('.select-bar').innerText()), 'S selects the focused message');
+    await bia.page.keyboard.press('Escape');
+    await bia.page.waitForSelector('.select-bar', { state: 'hidden' });
+    await bia.page.focus('.composer-input');
+    await bia.page.keyboard.press('Escape');
+    await waitFor(bia, () => window.howlden.activeDen.unread(window.howlden.channelId).count === 0);
+  }
+  log('message menu: right click, arrows, typeahead, a submenu, Escape, Shift+F10, long press, copy link, mark unread and select');
+
+  // People, channels and dens have their own menus
+  {
+    await rightClick(ana, `.members .member[data-member="${ids.Bia}"]`);
+    let st = await menuState(ana);
+    for (const label of ['Profile', 'Message', 'Voice call', 'Mute for me', 'Copy name']) ok(st.items.includes(label), `member menu has ${label}: ${st.items.join(', ')}`);
+    await ana.page.evaluate(() => {
+      const r = document.querySelector('.ctx-menu .menu-range input');
+      r.value = '40';
+      r.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    ok((await evalApp(ana, (id) => window.howlden.media.volumeOf(id), ids.Bia)) === 40, 'the volume slider in the menu sets the volume of that person');
+    await pickItem(ana, 'Mute for me');
+    ok(await evalApp(ana, (id) => window.howlden.media.isLocalMuted(id), ids.Bia), 'Mute for me mutes that person on this device');
+    await rightClick(ana, `.members .member[data-member="${ids.Bia}"]`);
+    st = await menuState(ana);
+    ok(st.items.includes('Mute for me'), 'the mute item is still there');
+    await pickItem(ana, 'Mute for me');
+    ok(!(await evalApp(ana, (id) => window.howlden.media.isLocalMuted(id), ids.Bia)), 'and unmutes');
+    await evalApp(ana, (id) => window.howlden.media.setVolume(id, 100), ids.Bia);
+
+    const ch = await evalApp(ana, () => window.howlden.channelId);
+    await rightClick(ana, `.ch-row[data-channel="${ch}"] .ch`);
+    st = await menuState(ana);
+    for (const label of ['Mark as read', 'Mute channel', 'Notifications', 'Copy an invite', 'Rename channel']) ok(st.items.includes(label), `channel menu has ${label}: ${st.items.join(', ')}`);
+    await pickItem(ana, 'Mute channel');
+    ok(await evalApp(ana, (c) => window.howlden.activeDen.isMuted(c), ch), 'a channel can be muted from its menu');
+    ok(await ana.page.locator(`.ch-row.muted[data-channel="${ch}"]`).count(), 'a muted channel looks muted');
+    await evalApp(ana, (c) => window.howlden.activeDen.setMuted(c, false), ch);
+
+    await rightClick(ana, '.rail-item[data-den] .rail-btn');
+    await ana.page.click('.ctx-menu [data-label="Notifications"]');
+    await ana.page.waitForSelector('.ctx-submenu [role="menuitemradio"]');
+    await ana.page.click('.ctx-submenu [data-label="Nothing"]');
+    ok((await evalApp(ana, () => window.howlden.activeDen.notifyLevel)) === 'none', 'a den can be set to notify about nothing');
+    await evalApp(ana, () => window.howlden.activeDen.setLocal('notify', 'default'));
+  }
+  log('member menu sets volume and mutes locally, channel menu mutes a channel, den menu sets notifications');
+
+  // Quick switcher and the shortcuts sheet
+  {
+    const links = await evalApp(ana, () => window.howlden.activeDen.den.channels.find((c) => c.kind === 'text' && c.id !== window.howlden.channelId)?.id);
+    const home = await evalApp(ana, () => window.howlden.channelId);
+    await ana.page.keyboard.press('Control+k');
+    await ana.page.waitForSelector('.switcher .switcher-input');
+    await ana.page.keyboard.type('link');
+    await ana.page.waitForSelector('.switcher-item.active');
+    await ana.page.keyboard.press('Enter');
+    await waitFor(ana, (id) => window.howlden.channelId === id && !document.querySelector('.switcher'), links);
+    await ana.page.keyboard.press('Control+k');
+    await ana.page.waitForSelector('.switcher .switcher-input');
+    await ana.page.keyboard.type('#gener');
+    await ana.page.keyboard.press('Enter');
+    await waitFor(ana, (id) => window.howlden.channelId === id, home);
+    await ana.page.keyboard.press('Control+/');
+    await ana.page.waitForSelector('.keys-modal .keys-row');
+    ok((await ana.page.locator('.keys-modal .keys-row').count()) > 20, 'the shortcuts sheet lists the shortcuts');
+    await ana.page.keyboard.press('Escape');
+    await ana.page.keyboard.press('Alt+ArrowDown');
+    await waitFor(ana, (id) => window.howlden.channelId === id, links);
+    await ana.page.keyboard.press('Alt+ArrowUp');
+    await waitFor(ana, (id) => window.howlden.channelId === id, home);
+  }
+  log('Ctrl+K jumps to a channel by a few letters, Ctrl+/ shows the shortcuts, Alt+arrows move between channels');
+
+  // Read receipts, only between people who turned them on
+  {
+    for (const p of [ana, bia]) await evalApp(p, () => ((window.howlden.settings.readReceipts = true), window.howlden.activeDen.shareReads()));
+    await ana.page.fill('.composer-input', 'did you read this?');
+    await ana.page.press('.composer-input', 'Enter');
+    await waitFor(ana, () => !document.querySelector('.seen-by')?.hidden && /Seen by/.test(document.querySelector('.seen-by')?.textContent || ''), null, 20000);
+    ok(!(await caio.page.locator('.seen-by:not([hidden])').count()), 'someone with receipts off sees none');
+    for (const p of [ana, bia]) await evalApp(p, () => (window.howlden.settings.readReceipts = false));
+  }
+  log('read receipts: Ana sees "Seen by" from Bia once both turned them on');
+
   // Richer chat between five people: polls, threads, pins, edit history, voice messages and search
   {
     await ana.page.fill('.composer-input', '/poll Lunch? | Pizza | Tacos');
@@ -338,6 +505,21 @@ try {
   }
   log(`voice with 5 people, Strong noise suppression on: audio flows on all 10 pairs (bytesReceived grew ${Math.min(...grew)} to ${Math.max(...grew)} bytes in 1.5 s)`);
   ok((await evalApp(ana, () => window.howlden.sounds.played || 0)) > 0, 'interface sounds played after the first interaction');
+  // A call tile has the per person menu: volume, mute, pin and full screen.
+  {
+    const bTile = `.stage .tile[data-member="${ids.Bia}"]`;
+    await rightClick(ana, bTile);
+    const st = await menuState(ana);
+    for (const label of ['Pin to the big view', 'Full screen', 'Mute for me', 'Profile']) ok(st.items.includes(label), `call tile menu has ${label}: ${st.items.join(', ')}`);
+    ok(await ana.page.locator('.ctx-menu .menu-range input').count(), 'the call tile menu has a volume slider');
+    await pickItem(ana, 'Pin to the big view');
+    await ana.page.waitForSelector(`${bTile}.is-focus`);
+    await ana.page.click(`${bTile} .tile-menu`);
+    await pickItem(ana, 'Unpin');
+    ok(!(await ana.page.locator('.stage .tile.is-focus').count()), 'the tile menu pins and unpins a tile');
+    ok((await ana.page.locator('.stage-controls .ctl-group').count()) === 2 && (await ana.page.locator('.stage-corner button[aria-label="Pop out"]').count()) === 1, 'grouped call controls and a pop out button');
+  }
+  log('call tiles: right click and the ... button open the per person menu; pin and unpin work');
   for (const p of five) await evalApp(p, () => window.howlden.media.leave());
 
   // Identity and friends
