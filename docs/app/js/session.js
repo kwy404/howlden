@@ -56,6 +56,9 @@ export class DenSession extends Emitter {
     this.queue = Promise.resolve();
     this.lastTyping = 0;
     this.bursts = new RateLimit({ max: 6, windowMs: 2000 });
+    // Read receipts from peers who chose to share them: peerId -> { channelId: ts }.
+    this.reads = new Map();
+    this._shareReadsSoon = debounce(() => this.shareReads(), 1200);
     this.sync = new HistorySync({
       store: {
         all: async () => this.messages,
@@ -188,6 +191,7 @@ export class DenSession extends Emitter {
       this.voice.delete(peerId);
       this.verified.delete(peerId);
       this.ids.delete(peerId);
+      this.reads.delete(peerId);
       app.media.detach(this, peerId);
       this.emit('voice');
       this.emit('typing');
@@ -230,6 +234,7 @@ export class DenSession extends Emitter {
     this.sendTo(peerId, { type: 'den', den: denConfig(this.den) });
     const mine = this.app.media.stateFor(this);
     if (mine) this.sendTo(peerId, { type: 'voice', ...mine });
+    if (this.app.settings.readReceipts) this.sendTo(peerId, { type: 'read', reads: this._readMap() });
     this.emit('status');
     this.emit('link-open', peerId);
   }
@@ -448,6 +453,16 @@ export class DenSession extends Emitter {
         if (msg.ok === false) this.emit('notice', { kind: 'refused', reason: 'words' });
         else this.emit('pair', { from, ok: true });
         return;
+      case 'read': {
+        // Read receipts: only sent by people who turned them on. Kept in memory only.
+        if (!msg.reads || typeof msg.reads !== 'object') return;
+        const known = new Set(this.den.channels.map((c) => c.id));
+        const map = { ...this.reads.get(from) };
+        for (const [ch, ts] of Object.entries(msg.reads).slice(0, 64)) if (known.has(ch) && Number.isFinite(ts)) map[ch] = Math.max(map[ch] || 0, ts);
+        this.reads.set(from, map);
+        this.emit('reads', from);
+        return;
+      }
       case 'call-decline':
         this.emit('call-declined', from);
         return;
@@ -689,6 +704,58 @@ export class DenSession extends Emitter {
     this.den.lastRead = { ...this.den.lastRead, [channelId]: ts };
     this.save();
     this.emit('unread');
+    if (this.app.settings.readReceipts) this._shareReadsSoon();
+  }
+
+  /** Mark every text channel of this den as read. */
+  markAllRead() {
+    for (const c of this.den.channels) if (c.kind === 'text' && !c.deleted) this.markRead(c.id);
+  }
+
+  /** Make a channel unread again from a message on (the "Mark unread" action). */
+  markUnread(channelId, ts) {
+    this.den.lastRead = { ...this.den.lastRead, [channelId]: Math.max(0, ts - 1) };
+    this.save();
+    this.emit('unread');
+  }
+
+  _readMap() {
+    const out = {};
+    for (const c of this.den.channels) if (c.kind === 'text' && !c.deleted && this.den.lastRead?.[c.id]) out[c.id] = this.den.lastRead[c.id];
+    return out;
+  }
+
+  /** Tell everyone how far I have read, when read receipts are on. */
+  shareReads() {
+    if (!this.app.settings.readReceipts || !this.mesh || this.mesh.closed) return;
+    this.send({ type: 'read', reads: this._readMap() });
+  }
+
+  /** Peers who have read a channel up to ts (only shown when my own receipts are on). */
+  seenBy(channelId, ts) {
+    if (!this.app.settings.readReceipts) return [];
+    const out = [];
+    for (const [peer, map] of this.reads) if ((map[channelId] || 0) >= ts && this.mesh?.links.has(peer)) out.push(peer);
+    return out;
+  }
+
+  // Notification settings on this device: per den level and muted channels.
+
+  /** 'default', 'all', 'mentions' or 'none' for this den. */
+  get notifyLevel() {
+    return this.den.notify || 'default';
+  }
+
+  isMuted(channelId) {
+    return !!this.den.mutedChannels?.[channelId];
+  }
+
+  setMuted(channelId, on) {
+    const muted = { ...this.den.mutedChannels };
+    if (on) muted[channelId] = true;
+    else delete muted[channelId];
+    this.setLocal('mutedChannels', muted);
+    this.emit('unread');
   }
 
   unread(channelId) {
@@ -708,10 +775,11 @@ export class DenSession extends Emitter {
     let mention = 0;
     for (const c of visibleChannels(this.den, 'text')) {
       const u = this.unread(c.id);
-      count += u.count;
+      if (!this.isMuted(c.id)) count += u.count;
       mention += u.mention;
     }
-    return { count, mention };
+    // A den set to notify about nothing keeps its mention badge but no unread dot.
+    return { count: this.notifyLevel === 'none' ? 0 : count, mention };
   }
 
   mentionsMe(rec) {

@@ -85,7 +85,7 @@ export class Sounds {
     const s = this.app.settings;
     if (!this.unlocked || this.volume <= 0) return false;
     if (s.sounds?.[name === 'undeafen' ? 'deafen' : name] === false) return false;
-    if (s.dnd && !OWN_ACTIONS.has(name)) return false;
+    if ((s.dnd || this.app.quietNow?.()) && !OWN_ACTIONS.has(name)) return false;
     return true;
   }
 

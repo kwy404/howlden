@@ -190,6 +190,7 @@ export class MediaManager extends Emitter {
     const { session } = this.current;
     this.current = null;
     this.music = false;
+    this.hiddenVideo?.clear();
     this._closePipe(this.pipe);
     for (const s of [this.camera, this.screen]) this._stop(s);
     this.pipe = null;
@@ -259,7 +260,7 @@ export class MediaManager extends Emitter {
     const el = document.createElement('audio');
     el.autoplay = true;
     el.srcObject = stream;
-    el.muted = this.deafened;
+    el.muted = this.deafened || this.isLocalMuted(entry.peerId);
     el.volume = this.volumeOf(entry.peerId) / 100;
     if (this.settings.outputId && el.setSinkId) el.setSinkId(this.settings.outputId).catch(() => {});
     this.sink.append(el);
@@ -303,6 +304,33 @@ export class MediaManager extends Emitter {
       if (entry.peerId !== peerId) continue;
       for (const el of entry.audio.values()) el.volume = value / 100;
     }
+  }
+
+  /** Muted on this device only: the others still hear this person. */
+  isLocalMuted(peerId) {
+    return !!this.settings.localMuted?.[peerId];
+  }
+
+  setLocalMute(peerId, on) {
+    const map = { ...this.settings.localMuted };
+    if (on) map[peerId] = true;
+    else delete map[peerId];
+    this.settings.localMuted = map;
+    this.app.saveSettings();
+    this._applyDeafen();
+    this.emit('change');
+  }
+
+  /** Video hidden on this device only, until the call ends. */
+  isVideoHidden(peerId) {
+    return !!this.hiddenVideo?.has(peerId);
+  }
+
+  setVideoHidden(peerId, on) {
+    this.hiddenVideo = this.hiddenVideo || new Set();
+    if (on) this.hiddenVideo.add(peerId);
+    else this.hiddenVideo.delete(peerId);
+    this.emit('video');
   }
 
   async setOutput(deviceId) {
@@ -468,7 +496,7 @@ export class MediaManager extends Emitter {
   }
 
   _applyDeafen() {
-    for (const entry of this.remote.values()) for (const el of entry.audio.values()) el.muted = this.deafened;
+    for (const entry of this.remote.values()) for (const el of entry.audio.values()) el.muted = this.deafened || this.isLocalMuted(entry.peerId);
   }
 
   /** Whether my microphone is sending right now. */
