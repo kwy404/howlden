@@ -189,7 +189,11 @@ const menuState = (p) =>
   });
 
 async function rightClick(p, selector) {
-  const box = await p.page.locator(selector).first().boundingBox();
+  const target = p.page.locator(selector).first();
+  await target.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+  await target.scrollIntoViewIfNeeded().catch(() => {});
+  const box = await target.boundingBox();
+  if (!box) throw new Error(`rightClick: ${selector} is not visible`);
   await p.page.mouse.click(box.x + Math.min(40, box.width / 2), box.y + Math.min(14, box.height / 2), { button: 'right' });
   await p.page.waitForSelector('.ctx-menu', { timeout: 5000 });
 }
@@ -351,6 +355,8 @@ try {
 
   // People, channels and dens have their own menus
   {
+    // The member list may be closed after earlier steps; the menu test needs it open.
+    await evalApp(ana, () => { if (!window.howlden.showMembers) window.howlden.toggleMembers(); });
     await rightClick(ana, `.members .member[data-member="${ids.Bia}"]`);
     let st = await menuState(ana);
     for (const label of ['Profile', 'Message', 'Voice call', 'Mute for me', 'Copy name']) ok(st.items.includes(label), `member menu has ${label}: ${st.items.join(', ')}`);
