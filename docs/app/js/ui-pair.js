@@ -42,16 +42,11 @@ export function wordInputs(t, { idPrefix, onReady, auto = false }) {
     inputs.push(input);
     hints.push(hint);
     input.addEventListener('paste', (e) => {
-      const parts = splitPhrase(e.clipboardData?.getData('text') ?? '');
-      if (parts.length < 2) return;
-      e.preventDefault();
-      const start = parts.length >= WORD_COUNT ? 0 : i;
-      parts.slice(0, WORD_COUNT - start).forEach((p, k) => (inputs[start + k].value = p));
-      update();
-      (inputs.find((x) => !resolveWord(x.value)) ?? inputs[WORD_COUNT - 1]).focus();
-      if (auto) ready(true);
+      if (spread(i, e.clipboardData?.getData('text') ?? '')) e.preventDefault();
     });
     input.addEventListener('input', (e) => {
+      // Phone keyboards often insert clipboard text without a paste event.
+      if (/[^A-Za-zÀ-ɏ]/.test(input.value.trim()) && spread(i, input.value)) return;
       update();
       if (e.inputType && !e.inputType.startsWith('insert')) return;
       const raw = normalizeWord(input.value);
@@ -77,6 +72,24 @@ export function wordInputs(t, { idPrefix, onReady, auto = false }) {
       if (r && r.how !== 'exact') input.value = r.word;
       update();
     });
+  }
+
+  // Puts a pasted phrase, invite text or link into the boxes, one word per box, starting at
+  // the first box for a whole phrase. Returns false when the text holds a single word.
+  function spread(i, text) {
+    let parts = wordsFromLink(text) || splitPhrase(text);
+    if (parts.length < 2) return false;
+    if (parts.length > WORD_COUNT) {
+      const known = parts.filter((p) => resolveWord(p)?.how === 'exact');
+      if (known.length >= WORD_COUNT) parts = known.slice(-WORD_COUNT);
+    }
+    const start = parts.length >= WORD_COUNT ? 0 : i;
+    inputs[i].value = '';
+    parts.slice(0, WORD_COUNT - start).forEach((p, k) => (inputs[start + k].value = p));
+    update();
+    (inputs.find((x) => !resolveWord(x.value)) ?? inputs[WORD_COUNT - 1]).focus();
+    if (auto) ready(true);
+    return true;
   }
 
   function update() {

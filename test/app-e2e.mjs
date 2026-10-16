@@ -150,7 +150,10 @@ async function confirmWordsOf(guest) {
 
 async function hostConfirms(host, words) {
   await host.page.waitForSelector('#confirm-word-0', { timeout: 30000 });
-  await typeWords(host.page, 'confirm-word', words);
+  // The whole phrase lands in the first box, as a phone keyboard paste does, and spreads out.
+  await host.page.fill('#confirm-word-0', words.join(' '));
+  const boxes = await host.page.evaluate(() => [...document.querySelectorAll('[id^="confirm-word-"].word-field')].map((x) => x.value).join(' '));
+  ok(boxes === words.join(' '), 'a phrase put in one box fills one word per box');
   await host.page.click('.confirm-step .btn');
 }
 

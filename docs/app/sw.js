@@ -1,7 +1,7 @@
 // howlden service worker: keeps the app shell available offline and opens
 // the right channel when a mention notification is clicked.
 
-const CACHE = 'howlden-app-v4';
+const CACHE = 'howlden-app-v5';
 const SHELL = [
   './',
   'index.html',
