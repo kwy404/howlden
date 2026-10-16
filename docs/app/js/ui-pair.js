@@ -151,7 +151,7 @@ async function makeInvite(app, { session, friend }) {
  * Invite modal: the inviter shows six words and a QR code (which holds the
  * same words); the friend types or scans them and nothing has to be sent back.
  */
-export async function inviteModal(app, { session, friend = false, autoShare = false, title, call = false }) {
+export async function inviteModal(app, { session, friend = false, autoShare = false, title, call = false, copy = false }) {
   const t = app.t;
   const status = h('div', { class: 'invite-status', 'aria-live': 'polite' }, h('span', { class: 'spinner spinner-xs' }), t('pair.making'));
   const body = h('div', { class: 'hl-stack' }, status);
@@ -385,6 +385,7 @@ export async function inviteModal(app, { session, friend = false, autoShare = fa
   );
   setStatus('', h('span', { class: 'dot alone' }), t(call ? 'pair.waitingCall' : 'pair.waiting'));
   if (autoShare) await shareWords(true);
+  else if (copy && (await copyText(shareText))) toast(t('notice.copiedWords'), 'ok');
 }
 
 // Joining

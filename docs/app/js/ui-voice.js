@@ -4,8 +4,10 @@
 
 import { h, replace } from './dom.js';
 import { icon, reactionIcon } from './icons.js';
-import { avatarImg, closePopover, popover, voiceMembers } from './ui-shell.js';
-import { confirmDialog } from './ui-modal.js';
+import { avatarImg, deviceMenu, popover, voiceMembers } from './ui-shell.js';
+import { confirmDialog, toast } from './ui-modal.js';
+import { contextMenu, openMenu } from './menu.js';
+import { memberItems } from './ui-context.js';
 import { avatarTraits } from '../core/avatar.js';
 import { BASE_REACTIONS } from '../core/history.js';
 import { formatDuration } from '../core/call.js';
@@ -18,12 +20,13 @@ export function createVoice(app) {
   const strip = h('div', { class: 'stage-strip', role: 'list' });
   const empty = h('div', { class: 'stage-empty' });
   const controls = h('div', { class: 'stage-controls' });
+  const corner = h('div', { class: 'stage-corner' });
   const notice = h('div', { class: 'stage-notice', role: 'status', hidden: true });
   const bursts = h('div', { class: 'stage-bursts', 'aria-hidden': 'true' });
   // The talk button lives outside the controls so a refresh never drops a press in progress.
   const pttBtn = h('button', { class: 'ptt-btn', type: 'button', 'aria-pressed': 'false' }, icon('ptt', { size: 24 }), h('span', { class: 'ptt-label' }));
   const pttWrap = h('div', { class: 'ptt-wrap', hidden: true }, pttBtn);
-  const el = h('section', { class: 'stage', 'aria-label': 'Voice' }, notice, grid, empty, bursts, pttWrap, controls);
+  const el = h('section', { class: 'stage', 'aria-label': 'Voice' }, notice, grid, empty, bursts, pttWrap, controls, corner);
   let recTimer = null;
   const tiles = new Map();
   // focus: the tile in the big view. manual: what the user picked ('grid' or a key),
@@ -59,16 +62,20 @@ export function createVoice(app) {
   function makeTile(key) {
     const video = h('video', { autoplay: true, playsinline: true, muted: true, hidden: true });
     const focusBtn = h('button', { class: 'icon-btn tile-btn tile-focus', type: 'button' }, icon('focus', { size: 18 }));
-    const fullBtn = h('button', { class: 'icon-btn tile-btn tile-full', type: 'button', 'aria-label': t('voice.fullscreen'), 'data-tip': t('voice.fullscreen') }, icon('expand', { size: 18 }));
-    const pipBtn = h('button', { class: 'icon-btn tile-btn tile-pip', type: 'button', 'aria-label': t('voice.pip'), 'data-tip': t('voice.pip') }, icon('screen', { size: 18 }));
+    const fullBtn = h('button', { class: 'icon-btn tile-btn tile-full', type: 'button', 'aria-label': t('voice.fullscreen'), 'data-tip': t('voice.fullscreen') }, icon('fullscreen', { size: 18 }));
+    const pipBtn = h('button', { class: 'icon-btn tile-btn tile-pip', type: 'button', 'aria-label': t('voice.pip'), 'data-tip': t('voice.pip') }, icon('popout', { size: 18 }));
+    const menuBtn = h('button', { class: 'icon-btn tile-menu', type: 'button', 'aria-haspopup': 'menu', 'aria-label': t('voice.ctx.options'), 'data-tip': t('voice.ctx.options') }, icon('dots', { size: 18 }));
     const tile = h(
       'div',
       { class: 'tile', tabindex: '0', role: 'group', dataset: { key } },
       video,
       h('div', { class: 'tile-avatar' }),
       h('div', { class: 'tile-label' }),
+      h('span', { class: 'tile-live', hidden: true }, 'LIVE'),
       h('div', { class: 'tile-tools' }, pipBtn, fullBtn, focusBtn),
+      menuBtn,
     );
+    menuBtn.addEventListener('click', () => openMenu(tileItems(tile), { anchor: menuBtn, placement: 'above', label: tile.getAttribute('aria-label') || '' }));
     const toggle = () => {
       const focused = state.focus === key;
       state.manual = focused ? 'grid' : key;
@@ -113,23 +120,30 @@ export function createVoice(app) {
       tile.style.setProperty('--den-hue', avatarTraits(p.avatar || p.id).hue);
       tile.classList.toggle('speaking', app.media.isSpeaking(p.id) && inHere);
       replace(tile.querySelector('.tile-avatar'), avatarImg(p.avatar || p.id, { size: 80 }));
+      const localMuted = !self && app.media.isLocalMuted(p.id);
+      const hidden = !self && app.media.isVideoHidden(p.id);
       replace(
         tile.querySelector('.tile-label'),
         p.rec ? h('span', { class: 'rec-dot', title: t('voice.rec.tag') }) : null,
         p.deafened ? icon('headphones-off', { size: 16, cls: 'red' }) : p.muted ? icon('mic-off', { size: 16, cls: 'red' }) : null,
-        h('span', null, p.name),
+        localMuted ? icon('volume-off', { size: 16, cls: 'red', label: t('members.ctx.mutedHere') }) : null,
+        h('span', null, self ? `${p.name} (${t('members.you')})` : p.name),
         p.music ? h('span', { class: 'music-tag' }, icon('music', { size: 12 }), t('voice.music.tag')) : null,
       );
+      tile.dataset.member = self ? app.profile.id : p.id;
+      tile.classList.toggle('video-hidden', hidden && !!cam);
       tile.setAttribute('aria-label', `${p.name}${p.muted ? `, ${t('voice.muted')}` : ''}`);
       tile.querySelector('.tile-focus').setAttribute('aria-label', state.focus === key ? t('voice.grid') : t('voice.focus'));
-      setVideo(tile, inHere || self ? cam : null, self);
+      setVideo(tile, (inHere || self) && !hidden ? cam : null, self);
       want.push(key);
       const screen = self ? app.media.screen : p.screen ? app.media.remoteVideo(s, p.id, 'screen') : null;
       if (screen && (inHere || self)) {
         const skey = `${p.id}:screen`;
         const st = tileFor(skey, () => makeTile(skey));
         st.classList.add('screen-tile');
-        replace(st.querySelector('.tile-label'), h('span', { class: 'live-tag' }, 'LIVE'), h('span', null, t('voice.screenOf', { name: p.name })));
+        st.dataset.member = self ? app.profile.id : p.id;
+        st.querySelector('.tile-live').hidden = false;
+        replace(st.querySelector('.tile-label'), icon('screen', { size: 14 }), h('span', null, t('voice.screenOf', { name: p.name })));
         st.setAttribute('aria-label', t('voice.screenOf', { name: p.name }));
         setVideo(st, screen, false);
         want.push(skey);
@@ -176,6 +190,8 @@ export function createVoice(app) {
       });
     }
 
+    layout();
+    renderPip();
     empty.hidden = people.length > 0;
     const c = s.den.channels.find((x) => x.id === state.channel);
     replace(empty, season() ? h('div', { class: 'empty-art' }, stickerEl(season(), { size: 120 })) : h('img', { class: 'empty-art', src: '../assets/art/characters/fang.svg', alt: '', width: 120, height: 120 }), h('h2', null, s.isDirect ? s.den.name : c?.name || ''), h('p', null, t('voice.emptyHint')));
@@ -183,23 +199,216 @@ export function createVoice(app) {
     renderNotice(people);
     const m = app.media;
     if (!inHere) {
+      if (pip && !app.media.current) pip.close();
       pttWrap.hidden = true;
+      replace(corner);
       replace(controls, h('button', { class: 'btn btn-success btn-lg', type: 'button', onclick: () => app.joinVoice(s, state.channel) }, icon('speaker', { size: 20 }), t('voice.join')));
       return;
     }
     renderPtt();
-    const ctl = (label, ico, onclick, cls = '', extra = {}) => h('button', { class: `round-btn ${cls}`, type: 'button', 'aria-label': label, 'data-tip': label, onclick, ...extra }, icon(ico, { size: 24 }));
+    const ctl = (label, ico, onclick, cls = '', extra = {}) => h('button', { class: `round-btn ${cls}`, type: 'button', 'aria-label': label, 'data-tip': label, onclick, ...extra }, icon(ico, { size: 22 }));
+    const chev = (label, onclick) => h('button', { class: 'round-btn chev', type: 'button', 'aria-label': label, 'data-tip': label, 'aria-haspopup': 'menu', onclick }, icon('chevron-up', { size: 14 }));
     const muted = m.muted || m.deafened;
     replace(
       controls,
-      ctl(t(m.camera ? 'voice.cameraOff' : 'voice.camera'), m.camera ? 'camera' : 'camera-off', () => m.toggleCamera(), m.camera ? 'on' : '', { 'aria-pressed': String(!!m.camera) }),
-      ctl(t(m.screen ? 'voice.screenOff' : 'voice.screen'), m.screen ? 'screen-off' : 'screen', () => m.toggleScreen(), m.screen ? 'on' : '', { 'aria-pressed': String(!!m.screen) }),
-      ctl(t(muted ? 'voice.unmute' : 'voice.mute'), muted ? 'mic-off' : 'mic', () => m.toggleMute(), muted ? 'off' : '', { 'aria-pressed': String(muted) }),
-      ctl(t(m.deafened ? 'voice.undeafen' : 'voice.deafen'), m.deafened ? 'headphones-off' : 'headphones', () => m.toggleDeafen(), m.deafened ? 'off' : '', { 'aria-pressed': String(m.deafened) }),
-      ctl(t('voice.react'), 'react', (e) => reactBar(e.currentTarget), 'react-btn', { 'aria-haspopup': 'menu' }),
-      ctl(t('voice.more'), 'dots', (e) => moreMenu(e.currentTarget), `more-btn${m.music || m.recording ? ' lit' : ''}`, { 'aria-haspopup': 'menu' }),
-      ctl(t('voice.disconnect'), 'hangup', () => m.leave(), 'danger'),
+      h(
+        'div',
+        { class: 'ctl-group' },
+        h('span', { class: `ctl-split${muted ? ' off' : ''}` }, ctl(t(muted ? 'voice.unmute' : 'voice.mute'), muted ? 'mic-off' : 'mic', () => m.toggleMute(), muted ? 'off' : '', { 'aria-pressed': String(muted) }), chev(t('voice.ctx.devices'), (e) => deviceMenu(app, e.currentTarget, 'mic'))),
+        h('span', { class: `ctl-split${m.camera ? ' on' : ''}` }, ctl(t(m.camera ? 'voice.cameraOff' : 'voice.camera'), m.camera ? 'camera' : 'camera-off', () => m.toggleCamera(), m.camera ? 'on' : '', { 'aria-pressed': String(!!m.camera) }), chev(t('voice.ctx.cameras'), (e) => deviceMenu(app, e.currentTarget, 'camera'))),
+      ),
+      h(
+        'div',
+        { class: 'ctl-group' },
+        ctl(t(m.screen ? 'voice.screenOff' : 'voice.screen'), m.screen ? 'screen-off' : 'screen', () => m.toggleScreen(), m.screen ? 'on' : '', { 'aria-pressed': String(!!m.screen) }),
+        ctl(t(m.deafened ? 'voice.undeafen' : 'voice.deafen'), m.deafened ? 'headphones-off' : 'headphones', () => m.toggleDeafen(), m.deafened ? 'off' : '', { 'aria-pressed': String(m.deafened) }),
+        ctl(t('voice.react'), 'react', (e) => reactBar(e.currentTarget), 'react-btn', { 'aria-haspopup': 'menu' }),
+        ctl(t('voice.more'), 'dots', (e) => moreMenu(e.currentTarget), `more-btn${m.music || m.recording ? ' lit' : ''}`, { 'aria-haspopup': 'menu' }),
+      ),
+      ctl(t('voice.disconnect'), 'hangup', () => m.leave(), 'danger hang'),
     );
+    replace(
+      corner,
+      h('button', { class: `icon-btn corner-btn${pip ? ' on' : ''}`, type: 'button', 'aria-label': t('voice.popout'), 'data-tip': t('voice.popout'), 'aria-pressed': String(!!pip), onclick: () => popOut() }, icon('popout', { size: 20 })),
+      h('button', { class: 'icon-btn corner-btn', type: 'button', 'aria-label': t('voice.stageFull'), 'data-tip': t('voice.stageFull'), onclick: () => stageFullscreen() }, icon('fullscreen', { size: 20 })),
+    );
+  }
+
+  /** The grid picks the column count that gives every tile the most room at 16:9. */
+  function layout() {
+    if (grid.classList.contains('focused')) {
+      grid.style.removeProperty('--tile-w');
+      return;
+    }
+    const n = grid.children.length;
+    const cs = getComputedStyle(grid);
+    const W = grid.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 1;
+    const H = grid.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 1;
+    if (!n || !W || !H) return;
+    const gap = 12;
+    let best = 0;
+    for (let cols = 1; cols <= n; cols++) {
+      const rows = Math.ceil(n / cols);
+      const w = Math.min((W - (cols - 1) * gap) / cols, ((H - (rows - 1) * gap) / rows) * (16 / 9));
+      if (w > best) best = w;
+    }
+    grid.style.setProperty('--tile-w', `${Math.floor(best)}px`);
+  }
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => layout()).observe(grid);
+
+  function stageFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
+  }
+
+  // The menu on a tile: per person volume, mute here, pin, full screen, and the person's own items.
+  function tileItems(tile) {
+    const key = tile.dataset.key;
+    const s = state.session;
+    const id = key.split(':')[0];
+    const self = id === app.profile.id;
+    const video = tile.querySelector('video');
+    const m = s?.member(id) || { id, name: t('chat.unknown') };
+    const stage = [
+      { label: t(state.focus === key ? 'voice.ctx.unpin' : 'voice.ctx.pin'), icon: 'pin', run: () => ((state.manual = state.focus === key ? 'grid' : key), refresh()) },
+      { label: t('voice.fullscreen'), icon: 'fullscreen', run: () => (tile.requestFullscreen || tile.webkitRequestFullscreen)?.call(tile)?.catch?.(() => {}) },
+      tile.classList.contains('has-video') && document.pictureInPictureEnabled ? { label: t('voice.pip'), icon: 'popout', run: () => video.requestPictureInPicture().catch(() => {}) } : null,
+    ];
+    if (self) return [{ heading: t('voice.you') }, ...stage, '-', { label: t(app.media.camera ? 'voice.cameraOff' : 'voice.camera'), icon: 'camera', run: () => app.media.toggleCamera() }, { label: t('voice.ctx.voiceSettings'), icon: 'gear', run: () => app.openSettings('voice') }];
+    return [...stage, '-', ...memberItems(app, s, { ...m, id, online: true }, tile)];
+  }
+  contextMenu('.stage .tile[data-key]', (tile) => tileItems(tile), { label: (tile) => tile.getAttribute('aria-label') || '' });
+
+  // Pop out: a small always on top call window where the browser can make one,
+  // otherwise the video of the focused tile in picture in picture.
+  let pip = null;
+  async function popOut() {
+    if (pip) {
+      pip.close();
+      return;
+    }
+    const dpip = window.documentPictureInPicture;
+    if (dpip?.requestWindow) {
+      try {
+        const win = await dpip.requestWindow({ width: 380, height: 260 });
+        for (const link of document.querySelectorAll('link[rel="stylesheet"]')) win.document.head.append(Object.assign(win.document.createElement('link'), { rel: 'stylesheet', href: link.href }));
+        win.document.documentElement.dataset.theme = document.documentElement.dataset.theme;
+        win.document.title = 'howlden';
+        const root = win.document.createElement('div');
+        root.className = 'pip-root';
+        win.document.body.append(root);
+        win.document.body.className = 'pip-body';
+        pip = { win, root, close: () => win.close() };
+        win.addEventListener('pagehide', () => {
+          pip = null;
+          refresh();
+          app.render();
+        });
+        renderPip();
+        refresh();
+        app.render();
+        return;
+      } catch {
+        // fall through to video picture in picture
+      }
+    }
+    const v = [...el.querySelectorAll('.tile.has-video video')].sort((a, b) => (b.closest('.is-focus') ? 1 : 0) - (a.closest('.is-focus') ? 1 : 0))[0];
+    if (v && document.pictureInPictureEnabled) {
+      try {
+        await v.requestPictureInPicture();
+        return;
+      } catch {
+        // refused
+      }
+    }
+    toast(t('voice.popoutNone'), 'info', 5000);
+  }
+
+  /** Draw the pop out window: faces or video, who speaks, and the main buttons. Tiles are reused. */
+  function renderPip() {
+    if (!pip) return;
+    const s = state.session;
+    const doc = pip.win.document;
+    const m = app.media;
+    const people = s ? voiceMembers(app, s, state.channel).slice(0, 6) : [];
+    const mk = (tag, cls) => {
+      const n = doc.createElement(tag);
+      if (cls) n.className = cls;
+      return n;
+    };
+    const imp = (node) => doc.importNode(node, true);
+    pip.tiles = pip.tiles || new Map();
+    const grid = pip.grid || (pip.grid = mk('div', 'pip-grid'));
+    const seen = new Set();
+    for (const p of people) {
+      const self = !!p.self;
+      const id = self ? app.profile.id : p.id;
+      seen.add(id);
+      let entry = pip.tiles.get(id);
+      if (!entry) {
+        const tile = mk('div', 'pip-tile');
+        const video = mk('video', self ? 'mirror' : '');
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        const face = mk('span', 'pip-face');
+        const name = mk('span', 'pip-name');
+        tile.append(video, face, name);
+        entry = { tile, video, face, name, avatar: '' };
+        pip.tiles.set(id, entry);
+      }
+      const cam = self ? m.camera : m.remoteVideo(s, p.id, 'camera');
+      const show = cam && !(!self && m.isVideoHidden(p.id)) ? cam : null;
+      if (entry.video.srcObject !== show) {
+        entry.video.srcObject = show;
+        if (show) entry.video.play().catch(() => {});
+      }
+      entry.video.hidden = !show;
+      entry.face.hidden = !!show;
+      const seed = p.avatar || id;
+      if (entry.avatar !== seed) {
+        entry.avatar = seed;
+        entry.face.replaceChildren(imp(avatarImg(seed, { size: 48 })));
+      }
+      entry.name.replaceChildren(...(p.muted || p.deafened ? [imp(icon('mic-off', { size: 12 }))] : []), doc.createTextNode(p.name));
+      entry.tile.dataset.id = id;
+      grid.append(entry.tile);
+    }
+    for (const [id, entry] of pip.tiles) {
+      if (seen.has(id)) continue;
+      entry.video.srcObject = null;
+      entry.tile.remove();
+      pip.tiles.delete(id);
+    }
+    grid.className = `pip-grid n${people.length}`;
+    const btn = (label, ico, run, cls = '') => {
+      const b = mk('button', `pip-btn ${cls}`);
+      b.type = 'button';
+      b.title = label;
+      b.setAttribute('aria-label', label);
+      b.append(imp(icon(ico, { size: 18 })));
+      b.addEventListener('click', run);
+      return b;
+    };
+    const muted = m.muted || m.deafened;
+    const bar = mk('div', 'pip-bar');
+    bar.append(
+      btn(t(muted ? 'voice.unmute' : 'voice.mute'), muted ? 'mic-off' : 'mic', () => m.toggleMute(), muted ? 'off' : ''),
+      btn(t(m.deafened ? 'voice.undeafen' : 'voice.deafen'), m.deafened ? 'headphones-off' : 'headphones', () => m.toggleDeafen(), m.deafened ? 'off' : ''),
+      btn(t(m.camera ? 'voice.cameraOff' : 'voice.camera'), m.camera ? 'camera' : 'camera-off', () => m.toggleCamera(), m.camera ? 'on' : ''),
+      btn(t('voice.backToTab'), 'popout', () => (window.focus(), pip?.close())),
+      btn(t('voice.disconnect'), 'hangup', () => (m.leave(), pip?.close()), 'danger'),
+    );
+    if (grid.parentNode !== pip.root) pip.root.replaceChildren(grid);
+    pip.bar?.remove();
+    pip.bar = bar;
+    pip.root.append(bar);
+    pipSpeaking();
+  }
+
+  function pipSpeaking() {
+    if (!pip?.tiles) return;
+    for (const [id, entry] of pip.tiles) entry.tile.classList.toggle('speaking', app.media.isSpeaking(id));
   }
 
   // Recording notice: shown to everyone in the channel, joined or not.
@@ -262,8 +471,8 @@ export function createVoice(app) {
 
   // Live reactions over the call
 
-  function reactBar(anchor) {
-    const s = state.session;
+  function reactBar(anchor, session = null) {
+    const s = session || state.session;
     popover(
       anchor,
       h(
@@ -300,24 +509,18 @@ export function createVoice(app) {
   function moreMenu(anchor) {
     const m = app.media;
     const ptt = app.settings.inputMode === 'ptt';
-    const item = (label, hint, ico, onclick, checked) =>
-      h(
-        'button',
-        { class: 'hl-menu-item call-item', type: 'button', role: checked == null ? 'menuitem' : 'menuitemcheckbox', 'aria-checked': checked == null ? null : String(checked), onclick: () => (closePopover(), onclick()) },
-        icon(ico, { size: 18 }),
-        h('span', { class: 'call-item-text' }, h('span', null, label), hint ? h('small', null, hint) : null),
-        checked == null ? null : h('span', { class: `mini-switch${checked ? ' on' : ''}`, 'aria-hidden': 'true' }),
-      );
-    popover(
-      anchor,
-      h(
-        'div',
-        { class: 'hl-menu call-menu', role: 'menu', 'aria-label': t('voice.more') },
-        item(t('voice.ptt.title'), t('voice.ptt.hint'), 'ptt', () => m.setInputMode(ptt ? 'voice' : 'ptt'), ptt),
-        item(t('voice.music.title'), t('voice.music.hint'), 'music', () => m.setMusic(!m.music), m.music),
-        m.canRecord ? item(t(m.recording ? 'voice.rec.stop' : 'voice.rec.start'), m.recording ? null : t('voice.rec.hint'), 'record', () => (m.recording ? m.stopRecording() : startRecording())) : null,
-      ),
-      { placement: 'above' },
+    openMenu(
+      [
+        { label: t('voice.ptt.title'), hint: t('voice.ptt.hint'), icon: 'ptt', checked: ptt, run: () => m.setInputMode(ptt ? 'voice' : 'ptt') },
+        { label: t('voice.music.title'), hint: t('voice.music.hint'), icon: 'music', checked: m.music, run: () => m.setMusic(!m.music) },
+        m.canRecord ? { label: t(m.recording ? 'voice.rec.stop' : 'voice.rec.start'), hint: m.recording ? null : t('voice.rec.hint'), icon: 'record', run: () => (m.recording ? m.stopRecording() : startRecording()) } : null,
+        '-',
+        { label: t('voice.popout'), icon: 'popout', keys: 'Ctrl+Shift+O', run: () => popOut() },
+        { label: t('voice.stageFull'), icon: 'fullscreen', run: () => stageFullscreen() },
+        state.focus ? { label: t('voice.grid'), icon: 'grid', run: () => ((state.manual = 'grid'), refresh()) } : null,
+        { label: t('voice.ctx.voiceSettings'), icon: 'gear', run: () => app.openSettings('voice') },
+      ],
+      { anchor, placement: 'above', label: t('voice.more'), className: 'call-menu' },
     );
   }
 
@@ -325,6 +528,13 @@ export function createVoice(app) {
     const ok = await confirmDialog(t, { title: t('voice.rec.confirmTitle'), text: t('voice.rec.confirmText'), ok: t('voice.rec.start') });
     if (ok) app.media.startRecording();
   }
+
+  app.popOutCall = () => popOut();
+  app.callPopped = () => !!pip;
+  app.burstBar = (anchor, session) => {
+    if (state.session !== session) state.session = state.session || session;
+    reactBar(anchor, session);
+  };
 
   return {
     el,
@@ -337,6 +547,7 @@ export function createVoice(app) {
     refresh,
     burst,
     speaking() {
+      if (pip) pipSpeaking();
       if (!state.session) return;
       for (const [key, tile] of tiles) {
         const id = key.split(':')[0];

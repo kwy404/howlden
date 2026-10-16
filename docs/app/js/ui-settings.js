@@ -441,12 +441,40 @@ export function openSettings(app, section = 'profile') {
         'div',
         { class: 'hl-stack' },
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.security')), h('ul', { class: 'check-list' }, ['security1', 'security2', 'security3', 'security4', 'security5', 'security6'].map((k) => h('li', null, icon('check', { size: 16 }), t(`settings.${k}`))))),
+        h('section', { class: 'set-sec' }, h('h2', null, t('settings.receipts')), toggleRow(t('settings.receiptsToggle'), !!app.settings.readReceipts, (v) => {
+          app.settings.readReceipts = v;
+          app.saveSettings();
+          for (const sess of app.sessions.values()) if (v) sess.shareReads();
+          app.render();
+        }, t('settings.receiptsHint'))),
         h('section', { class: 'set-sec' }, h('h2', null, t('settings.fingerprints')), h('p', { class: 'muted' }, t('settings.fingerprintsHint')), rows),
       );
     },
 
     notifications() {
       const s = app.settings;
+      // Quiet hours: like Do not disturb between two times, every day.
+      const quietHours = () => {
+        const q = { on: false, from: '22:00', to: '08:00', ...s.quiet };
+        const save = () => ((s.quiet = { ...q }), app.saveSettings(), app.render());
+        const time = (key, label) => h('label', { class: 'hl-field quiet-time' }, h('span', { class: 'field-label' }, label), h('input', { class: 'input field-input', type: 'time', value: q[key], disabled: !q.on, onchange: (e) => ((q[key] = e.target.value || q[key]), save()) }));
+        const times = h('div', { class: 'grid-2 quiet-times' }, time('from', t('settings.quietFrom')), time('to', t('settings.quietTo')));
+        return h(
+          'section',
+          { class: 'set-sec' },
+          toggleRow(
+            t('settings.quiet'),
+            q.on,
+            (v) => {
+              q.on = v;
+              times.querySelectorAll('input').forEach((x) => (x.disabled = !v));
+              save();
+            },
+            t('settings.quietHint'),
+          ),
+          times,
+        );
+      };
       const note = h('p', { class: 'field-hint' });
       if (typeof Notification !== 'undefined' && Notification.permission === 'denied') note.textContent = t('settings.notifyDenied');
       return h(
@@ -469,7 +497,16 @@ export function openSettings(app, section = 'profile') {
           t('settings.notifyHint'),
         ),
         note,
+        h(
+          'fieldset',
+          { class: 'stack-sm' },
+          h('legend', { class: 'field-label' }, t('settings.notifyLevel.title')),
+          h('p', { class: 'field-hint' }, t('settings.notifyLevel.hint')),
+          ['all', 'mentions', 'none'].map((key) => h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'notify-level', checked: (s.notifyLevel || 'mentions') === key, onchange: () => ((s.notifyLevel = key), app.saveSettings()) }), t(`settings.notifyLevel.${key}`))),
+        ),
+        toggleRow(t('settings.notifyPreview'), s.notifyPreview !== false, (v) => ((s.notifyPreview = v), app.saveSettings()), t('settings.notifyPreviewHint')),
         toggleRow(t('sound.dnd'), !!s.dnd, (v) => ((s.dnd = v), app.saveSettings(), app.render()), t('sound.dndHint')),
+        quietHours(),
         h(
           'section',
           { class: 'set-sec' },
@@ -506,7 +543,9 @@ export function openSettings(app, section = 'profile') {
         'div',
         { class: 'hl-stack' },
         h('fieldset', { class: 'stack-sm' }, h('legend', { class: 'field-label' }, t('settings.theme')), ['dark', 'light', 'system'].map((key) => h('label', { class: 'radio-row' }, h('input', { class: 'radio', type: 'radio', name: 'theme', checked: s.theme === key, onchange: () => ((s.theme = key), app.saveSettings(), app.applyTheme()) }), icon(key === 'dark' ? 'moon' : key === 'light' ? 'sun' : 'palette', { size: 18 }), t(`settings.${key}`)))),
+        toggleRow(t('settings.bubbles'), s.bubbles !== false, (v) => ((s.bubbles = v), app.saveSettings(), app.applyTheme()), t('settings.bubblesHint')),
         toggleRow(t('settings.compact'), s.compact, (v) => ((s.compact = v), app.saveSettings(), app.applyTheme())),
+        h('section', { class: 'set-sec' }, h('h2', null, t('app.keys.title')), h('p', { class: 'muted' }, t('settings.keysHint')), h('div', null, h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => app.shortcuts?.() }, icon('keyboard', { size: 16 }), t('app.keys.open')))),
       );
     },
 

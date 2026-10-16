@@ -9,6 +9,9 @@ import { renderHomeSide } from './ui-home.js';
 import { DM_TEXT } from './session.js';
 import { visibleChannels } from '../core/denstate.js';
 import { activeStatus } from '../core/mesh.js';
+import { openMenu } from './menu.js';
+import { notifyItems } from './ui-context.js';
+import { promptDialog } from './ui-modal.js';
 
 /** Display color for a member: their accent, or a color from their avatar. */
 export const colorOf = (m, id = '') => m?.accent || nameColor(m?.avatar || id || m?.id || '');
@@ -114,37 +117,12 @@ export function popover(anchor, content, { placement = 'below', className = '' }
   return el;
 }
 
-function menu(items) {
-  return h(
-    'div',
-    { class: 'hl-menu', role: 'menu' },
-    items.filter(Boolean).map((it) =>
-      it === '-'
-        ? h('div', { class: 'menu-sep', role: 'separator' })
-        : h(
-            'button',
-            {
-              class: `hl-menu-item${it.danger ? ' danger' : ''}${it.brand ? ' brand' : ''}`,
-              type: 'button',
-              role: 'menuitem',
-              onclick: () => {
-                closePopover();
-                it.run();
-              },
-            },
-            h('span', null, it.label),
-            it.icon ? icon(it.icon, { size: 18 }) : null,
-          ),
-    ),
-  );
-}
-
 // Rail
 
-function railItem({ label, active, unread, mention, content, cls = '', onclick, offline, hue }) {
+function railItem({ label, active, unread, mention, content, cls = '', onclick, offline, hue, den }) {
   return h(
     'div',
-    { class: `rail-item${active ? ' active' : ''}${unread ? ' unread' : ''}${offline ? ' offline' : ''} ${cls}`, style: hue != null ? { '--den-hue': hue } : null },
+    { class: `rail-item${active ? ' active' : ''}${unread ? ' unread' : ''}${offline ? ' offline' : ''} ${cls}`, style: hue != null ? { '--den-hue': hue } : null, dataset: den ? { den } : null },
     h('span', { class: 'rail-pill', 'aria-hidden': 'true' }),
     h('button', { class: 'rail-btn', type: 'button', 'aria-label': label + (mention ? `, ${mention}` : ''), 'data-tip': label, 'aria-current': active ? 'page' : null, onclick }, content),
     mention ? h('span', { class: 'rail-badge', 'aria-hidden': 'true' }, mention > 99 ? '99+' : String(mention)) : null,
@@ -169,6 +147,7 @@ export function renderRail(app, el) {
         mention: u.mention,
         offline: s.status === 'offline',
         hue: avatarTraits(s.id).hue,
+        den: s.id,
         content: h('span', { class: 'den-initials' }, initials(s.den.name)),
         onclick: () => app.openDen(s.id),
       });
@@ -207,15 +186,28 @@ export function renderSide(app, el) {
     }
     const nav = h('nav', { class: 'channels', 'aria-label': s.den.name });
     for (const kind of ['text', 'voice']) {
+      const collapsed = !!s.den.collapsed?.[kind];
+      const listId = `cat-${s.id}-${kind}`;
       nav.append(
         h(
           'div',
-          { class: 'cat' },
-          h('span', { class: 'cat-label' }, t(kind === 'text' ? 'den.textChannels' : 'den.voiceChannels')),
+          { class: `cat${collapsed ? ' collapsed' : ''}` },
+          h(
+            'button',
+            { class: 'cat-toggle', type: 'button', 'aria-expanded': String(!collapsed), 'aria-controls': listId, onclick: () => (s.setLocal('collapsed', { ...s.den.collapsed, [kind]: !collapsed }), app.render()) },
+            icon('chevron-down', { size: 12, cls: 'cat-chev' }),
+            h('span', { class: 'cat-label' }, t(kind === 'text' ? 'den.textChannels' : 'den.voiceChannels')),
+          ),
           h('button', { class: 'icon-btn cat-add', type: 'button', 'aria-label': t(kind === 'text' ? 'den.addText' : 'den.addVoice'), 'data-tip': t(kind === 'text' ? 'den.addText' : 'den.addVoice'), onclick: () => app.createChannelFlow(s, kind) }, icon('plus', { size: 16 })),
         ),
       );
-      for (const c of visibleChannels(s.den, kind)) nav.append(kind === 'text' ? textChannel(app, s, c) : voiceChannel(app, s, c));
+      // A collapsed category still shows the open channel and the one I am talking in.
+      const group = h('div', { class: 'cat-list', id: listId });
+      for (const c of visibleChannels(s.den, kind)) {
+        const keep = !collapsed || app.channelId === c.id || app.media.inVoice(s, c.id) || (kind === 'text' && s.unread(c.id).mention);
+        if (keep) group.append(kind === 'text' ? textChannel(app, s, c) : voiceChannel(app, s, c));
+      }
+      nav.append(group);
     }
     parts.push(nav);
   }
@@ -225,22 +217,36 @@ export function renderSide(app, el) {
 
 function channelMenu(app, s, c, anchor) {
   const t = app.t;
-  popover(
-    anchor,
-    menu([
+  openMenu(
+    [
+      c.kind === 'text' ? { label: t('channel.ctx.mute'), icon: 'bell-off', checked: s.isMuted(c.id), run: () => s.setMuted(c.id, !s.isMuted(c.id)) } : null,
+      { label: t('channel.ctx.notifications'), icon: 'bell', items: () => notifyItems(app, s) },
+      '-',
       { label: t('den.renameChannel'), icon: 'edit', run: () => app.renameChannelFlow(s, c) },
       { label: t('den.deleteChannel'), icon: 'trash', danger: true, run: () => app.deleteChannelFlow(s, c) },
-    ]),
-    { placement: 'right' },
+    ],
+    { anchor, placement: 'right', label: c.name },
+  );
+}
+
+function rowTools(app, s, c) {
+  const t = app.t;
+  return h(
+    'span',
+    { class: 'ch-tools' },
+    h('button', { class: 'icon-btn ch-tool', type: 'button', 'aria-label': `${t('den.invite')}: ${c.name}`, 'data-tip': t('den.invite'), onclick: () => app.inviteFlow(s) }, icon('invite', { size: 16 })),
+    h('button', { class: 'icon-btn ch-gear', type: 'button', 'aria-label': `${app.t('den.channelSettings')}: ${c.name}`, 'data-tip': t('den.channelSettings'), 'aria-haspopup': 'menu', onclick: (e) => channelMenu(app, s, c, e.currentTarget) }, icon('gear', { size: 16 })),
   );
 }
 
 function textChannel(app, s, c) {
   const active = app.view === 'chat' && app.channelId === c.id;
   const u = s.unread(c.id);
+  const muted = s.isMuted(c.id);
+  const draft = !active && !!s.den.drafts?.[c.id];
   return h(
     'div',
-    { class: `ch-row${active ? ' active' : ''}${u.count && !active ? ' unread' : ''}` },
+    { class: `ch-row${active ? ' active' : ''}${u.count && !active && !muted ? ' unread' : ''}${muted ? ' muted' : ''}`, dataset: { channel: c.id } },
     h(
       'a',
       {
@@ -254,9 +260,11 @@ function textChannel(app, s, c) {
       },
       icon('hash', { size: 20, cls: 'ch-ico' }),
       h('span', { class: 'ch-name' }, c.name),
+      draft ? icon('edit', { size: 14, cls: 'ch-draft', label: app.t('channel.draft') }) : null,
+      muted ? icon('bell-off', { size: 14, cls: 'ch-muted', label: app.t('channel.ctx.muted') }) : null,
       u.mention && !active ? h('span', { class: 'badge-count', 'aria-label': `${u.mention}` }, String(u.mention)) : null,
     ),
-    h('button', { class: 'icon-btn ch-gear', type: 'button', 'aria-label': `${app.t('den.channelSettings')}: ${c.name}`, 'aria-haspopup': 'menu', onclick: (e) => channelMenu(app, s, c, e.currentTarget) }, icon('gear', { size: 16 })),
+    rowTools(app, s, c),
   );
 }
 
@@ -266,14 +274,15 @@ function voiceChannel(app, s, c) {
   const people = voiceMembers(app, s, c.id);
   return h(
     'div',
-    { class: `ch-row voice${active ? ' active' : ''}${inHere ? ' joined' : ''}` },
+    { class: `ch-row voice${active ? ' active' : ''}${inHere ? ' joined' : ''}`, dataset: { channel: c.id } },
     h(
       'button',
       { class: 'ch', type: 'button', 'aria-current': active ? 'page' : null, onclick: () => app.openVoice(c.id, true) },
       icon('speaker', { size: 20, cls: 'ch-ico' }),
       h('span', { class: 'ch-name' }, c.name),
+      people.length ? h('span', { class: 'ch-count', 'aria-label': app.t('app.switch.inVoice', { n: people.length }) }, String(people.length)) : null,
     ),
-    h('button', { class: 'icon-btn ch-gear', type: 'button', 'aria-label': `${app.t('den.channelSettings')}: ${c.name}`, 'aria-haspopup': 'menu', onclick: (e) => channelMenu(app, s, c, e.currentTarget) }, icon('gear', { size: 16 })),
+    rowTools(app, s, c),
     people.length
       ? h(
           'ul',
@@ -281,7 +290,7 @@ function voiceChannel(app, s, c) {
           people.map((p) =>
             h(
               'li',
-              { class: `vc-user${app.media.isSpeaking(p.id) && app.media.inVoice(s, c.id) ? ' speaking' : ''}` },
+              { class: `vc-user${app.media.isSpeaking(p.id) && app.media.inVoice(s, c.id) ? ' speaking' : ''}`, tabindex: '0', dataset: { member: p.self ? app.profile.id : p.id, memberName: p.name } },
               avatarImg(p.avatar, { size: 24 }),
               h('span', { class: 'vc-name' }, p.name),
               p.rec ? h('span', { class: 'rec-dot', role: 'img', 'aria-label': app.t('voice.rec.tag'), title: app.t('voice.rec.tag') }) : null,
@@ -315,6 +324,9 @@ function voicePanel(app) {
   if (!cur) return null;
   const s = cur.session;
   const ch = s.den.channels.find((c) => c.id === cur.channel);
+  const m = app.media;
+  const quiet = m.processing === 'off';
+  const tile = (label, ico, onclick, on, extra = {}) => h('button', { class: `vp-btn${on ? ' on' : ''}`, type: 'button', 'aria-label': label, 'data-tip': label, 'aria-pressed': on == null ? null : String(!!on), onclick, ...extra }, icon(ico, { size: 20 }));
   return h(
     'div',
     { class: 'voice-panel' },
@@ -325,16 +337,78 @@ function voicePanel(app) {
         'button',
         { class: 'vp-info', type: 'button', onclick: () => app.openDen(s.id, cur.channel) },
         h('span', { class: 'vp-status' }, icon('signal', { size: 16 }), t('voice.connected')),
-        h('span', { class: 'vp-where' }, `${ch?.name || ''} / ${s.den.name}`),
+        h('span', { class: 'vp-where' }, s.isDirect ? s.den.name : `${ch?.name || ''} / ${s.den.name}`),
       ),
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('voice.disconnect'), 'data-tip': t('voice.disconnect'), onclick: () => app.media.leave() }, icon('hangup', { size: 20 })),
+      h('span', { class: `vp-wave${quiet ? '' : ' on'}`, role: 'img', 'aria-label': t(`voice.noise.${m.processing === 'music' ? 'off' : m.processing || 'strong'}`), title: t('voice.ctx.noise', { mode: t(`voice.noise.${m.processing === 'music' ? 'off' : m.processing || 'strong'}`) }) }, icon('wave', { size: 18 })),
+      h('button', { class: 'icon-btn vp-hang', type: 'button', 'aria-label': t('voice.disconnect'), 'data-tip': t('voice.disconnect'), onclick: () => app.media.leave() }, icon('hangup', { size: 20 })),
     ),
     h(
       'div',
       { class: 'vp-actions' },
-      h('button', { class: `vp-btn${app.media.camera ? ' on' : ''}`, type: 'button', 'aria-pressed': String(!!app.media.camera), 'aria-label': t(app.media.camera ? 'voice.cameraOff' : 'voice.camera'), onclick: () => app.media.toggleCamera() }, icon(app.media.camera ? 'camera' : 'camera-off', { size: 18 })),
-      h('button', { class: `vp-btn${app.media.screen ? ' on' : ''}`, type: 'button', 'aria-pressed': String(!!app.media.screen), 'aria-label': t(app.media.screen ? 'voice.screenOff' : 'voice.screen'), onclick: () => app.media.toggleScreen() }, icon('screen', { size: 18 })),
+      tile(t(m.camera ? 'voice.cameraOff' : 'voice.camera'), m.camera ? 'camera' : 'camera-off', () => m.toggleCamera(), !!m.camera),
+      tile(t(m.screen ? 'voice.screenOff' : 'voice.screen'), 'screen', () => m.toggleScreen(), !!m.screen),
+      tile(t('voice.react'), 'react', (e) => app.burstBar?.(e.currentTarget, s), null, { 'aria-haspopup': 'menu' }),
+      tile(t('voice.popout'), 'popout', () => app.popOutCall?.(), !!app.callPopped?.()),
     ),
+  );
+}
+
+/** Choose the microphone, the speakers or the camera, from the call controls or the user panel. */
+export async function deviceMenu(app, anchor, kind) {
+  const t = app.t;
+  const m = app.media;
+  const d = await m.devices();
+  const s = app.settings;
+  const pick = (list, key, apply, fallback) => {
+    const items = list.filter((x) => x.deviceId && x.deviceId !== 'default' && x.deviceId !== 'communications');
+    return [
+      { label: t('voice.ctx.systemDefault'), checked: !s[key], radio: true, run: () => apply('') },
+      ...items.map((x, i) => ({ label: x.label || `${fallback} ${i + 1}`, checked: s[key] === x.deviceId, radio: true, run: () => apply(x.deviceId) })),
+    ];
+  };
+  const items =
+    kind === 'camera'
+      ? [{ heading: t('settings.cameraDevice') }, ...pick(d.videoinput, 'cameraId', async (v) => ((s.cameraId = v), app.saveSettings(), m.camera && (await m.toggleCamera(), await m.toggleCamera())), t('settings.cameraDevice')), '-', { label: t('voice.ctx.voiceSettings'), icon: 'gear', run: () => app.openSettings('voice') }]
+      : [
+          { heading: t('settings.input') },
+          ...pick(d.audioinput, 'inputId', (v) => ((s.inputId = v), app.saveSettings(), m.restartMic()), t('settings.input')),
+          '-',
+          { heading: t('settings.output') },
+          ...pick(d.audiooutput, 'outputId', (v) => m.setOutput(v), t('settings.output')),
+          '-',
+          { label: t('voice.noise.title'), icon: 'wave', items: () => ['off', 'standard', 'strong'].map((k) => ({ label: t(`voice.noise.${k}`), checked: m.noiseMode === k, radio: true, run: () => ((s.noiseMode = k), app.saveSettings(), m.restartMic()) })) },
+          { label: t('voice.ctx.voiceSettings'), icon: 'gear', run: () => app.openSettings('voice') },
+        ];
+  openMenu(items, { anchor, placement: anchor.closest('.stage') ? 'above' : 'right', label: kind === 'camera' ? t('settings.cameraDevice') : t('settings.input'), className: 'device-menu' });
+}
+
+/** The menu on my own card: status, do not disturb, profile. */
+function meMenu(app, anchor) {
+  const t = app.t;
+  const p = app.profile;
+  const set = (status, minutes) => app.updateProfile({ status, statusUntil: minutes ? Date.now() + minutes * 60000 : 0 });
+  const status = activeStatus(p);
+  openMenu(
+    [
+      { heading: status ? t('user.ctx.statusNow', { status }) : t('user.online') },
+      { label: t(status ? 'user.ctx.editStatus' : 'user.ctx.setStatus'), icon: 'chat', run: async () => {
+        const v = await promptDialog(t, { title: t('user.ctx.setStatus'), label: t('profile.status'), value: status, ok: t('common.save'), maxlength: 128 });
+        if (v != null) set(v.trim(), 0);
+      } },
+      status ? { label: t('user.ctx.clearStatus'), icon: 'x', run: () => set('', 0) } : null,
+      { label: t('user.ctx.quickStatus'), icon: 'clock', items: () => [
+        { label: t('user.ctx.qsBrb'), run: () => set(t('user.ctx.qsBrb'), 30) },
+        { label: t('user.ctx.qsFocus'), run: () => set(t('user.ctx.qsFocus'), 60) },
+        { label: t('user.ctx.qsGaming'), run: () => set(t('user.ctx.qsGaming'), 240) },
+        { label: t('user.ctx.qsAway'), run: () => set(t('user.ctx.qsAway'), 0) },
+      ] },
+      '-',
+      { label: t('sound.dnd'), icon: 'bell-off', checked: !!app.settings.dnd, run: () => ((app.settings.dnd = !app.settings.dnd), app.saveSettings(), app.render()) },
+      '-',
+      { label: t('members.ctx.editProfile'), icon: 'user', run: () => app.openSettings('profile') },
+      { label: t('app.keys.title'), icon: 'keyboard', keys: 'Ctrl+/', run: () => app.shortcuts?.() },
+    ],
+    { anchor, placement: 'above', label: p.name },
   );
 }
 
@@ -342,19 +416,26 @@ function userPanel(app) {
   const t = app.t;
   const m = app.media;
   const ptt = app.settings.inputMode === 'ptt';
+  const status = activeStatus(app.profile);
+  const muted = m.muted || m.deafened;
   return h(
     'section',
     { class: 'user-panel', 'aria-label': t('user.settings') },
     h(
       'button',
-      { class: 'up-me', type: 'button', onclick: () => app.openSettings('profile') },
+      { class: 'up-me', type: 'button', 'aria-haspopup': 'menu', 'aria-label': t('user.ctx.title', { name: app.profile.name }), onclick: (e) => meMenu(app, e.currentTarget), dataset: { member: app.profile.id } },
       h('span', { class: 'avatar-wrap s32' }, avatarImg(app.profile.avatar, { size: 32, speaking: m.isSpeaking(app.profile.id) && !!m.current }), h('span', { class: `status-dot ${app.settings.dnd ? 'dnd' : 'on'}` })),
-      h('span', { class: 'up-text' }, h('span', { class: 'up-name' }, app.profile.name), h('span', { class: 'up-sub' }, app.settings.dnd ? t('sound.dnd') : ptt ? t('voice.pttHint', { key: keyName(app.settings.pttKey) }) : t('user.online'))),
+      h('span', { class: 'up-text' }, h('span', { class: 'up-name' }, app.profile.name), h('span', { class: 'up-sub' }, app.settings.dnd ? t('sound.dnd') : ptt ? t('voice.pttHint', { key: keyName(app.settings.pttKey) }) : status || t('user.online'))),
     ),
     h(
       'div',
       { class: 'up-actions' },
-      h('button', { class: `icon-btn${m.muted || m.deafened ? ' red' : ''}`, type: 'button', 'aria-pressed': String(m.muted || m.deafened), 'aria-label': t(m.muted || m.deafened ? 'voice.unmute' : 'voice.mute'), 'data-tip': t(m.muted || m.deafened ? 'voice.unmute' : 'voice.mute'), onclick: () => m.toggleMute() }, icon(m.muted || m.deafened ? 'mic-off' : 'mic', { size: 20 })),
+      h(
+        'span',
+        { class: `up-split${muted ? ' red' : ''}` },
+        h('button', { class: `icon-btn${muted ? ' red' : ''}`, type: 'button', 'aria-pressed': String(muted), 'aria-label': t(muted ? 'voice.unmute' : 'voice.mute'), 'data-tip': t(muted ? 'voice.unmute' : 'voice.mute'), onclick: () => m.toggleMute() }, icon(muted ? 'mic-off' : 'mic', { size: 20 })),
+        h('button', { class: 'icon-btn up-chev', type: 'button', 'aria-haspopup': 'menu', 'aria-label': t('voice.ctx.devices'), 'data-tip': t('voice.ctx.devices'), onclick: (e) => deviceMenu(app, e.currentTarget, 'mic') }, icon('chevron-up', { size: 14 })),
+      ),
       h('button', { class: `icon-btn${m.deafened ? ' red' : ''}`, type: 'button', 'aria-pressed': String(m.deafened), 'aria-label': t(m.deafened ? 'voice.undeafen' : 'voice.deafen'), 'data-tip': t(m.deafened ? 'voice.undeafen' : 'voice.deafen'), onclick: () => m.toggleDeafen() }, icon(m.deafened ? 'headphones-off' : 'headphones', { size: 20 })),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('user.settings'), 'data-tip': t('user.settings'), onclick: () => app.openSettings() }, icon('gear', { size: 20 })),
     ),
@@ -372,17 +453,20 @@ export function keyName(code) {
 function denMenu(app, anchor) {
   const t = app.t;
   const s = app.activeDen;
-  popover(
-    anchor,
-    menu([
+  const u = s.unreadTotal();
+  openMenu(
+    [
       { label: t('den.invite'), icon: 'invite', brand: true, run: () => app.inviteFlow(s) },
       { label: t('den.settings'), icon: 'gear', run: () => app.denSettingsFlow(s) },
       { label: t('den.createChannel'), icon: 'plus', run: () => app.createChannelFlow(s, 'text') },
       '-',
+      { label: t('channel.ctx.markAllRead'), icon: 'check', disabled: !u.count && !u.mention, run: () => s.markAllRead() },
+      { label: t('channel.ctx.notifications'), icon: 'bell', items: () => notifyItems(app, s) },
+      '-',
       s.status !== 'offline' ? { label: t('den.disconnect'), icon: 'logout', run: () => s.leave() } : null,
       { label: t('den.remove'), icon: 'trash', danger: true, run: () => app.removeDenFlow(s) },
-    ]),
-    { className: 'den-menu' },
+    ],
+    { anchor, label: s.den.name, className: 'den-menu' },
   );
 }
 
@@ -417,7 +501,7 @@ export function renderHeader(app, el) {
     h('span', { class: `hd-count${s.onlineCount >= s.maxMembers ? ' full' : ''}`, title: t('den.countLabel', { count: s.onlineCount, max: s.maxMembers }), 'aria-label': t('den.countLabel', { count: s.onlineCount, max: s.maxMembers }) }, icon('members', { size: 14 }), t('den.count', { count: s.onlineCount, max: s.maxMembers })),
     h('span', { class: 'hd-spacer' }),
     app.view === 'chat' ? chatTools(app) : null,
-    h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('den.invite'), 'data-tip': t('den.invite'), onclick: () => app.inviteFlow(s) }, icon('invite', { size: 22 })),
+    h('button', { class: 'icon-btn hd-invite', type: 'button', 'aria-label': t('den.invite'), 'data-tip': t('den.invite'), onclick: () => app.inviteFlow(s) }, icon('invite', { size: 22 })),
     h('button', { class: `icon-btn${app.showMembers ? ' on' : ''}`, type: 'button', 'aria-pressed': String(app.showMembers), 'aria-label': t('members.toggle'), 'data-tip': t('members.toggle'), onclick: () => app.toggleMembers() }, icon('members', { size: 22 })),
   );
 }
@@ -427,15 +511,108 @@ export function chatTools(app) {
   const t = app.t;
   const open = app.chatPanelKind?.();
   const tool = (kind, ico, label) => h('button', { class: `icon-btn hd-tool tool-${kind}${open === kind ? ' on' : ''}`, type: 'button', 'aria-pressed': String(open === kind), 'aria-label': label, 'data-tip': label, onclick: () => app.chatPanel(kind) }, icon(ico, { size: 22 }));
-  const item = (kind, ico, label) => h('button', { class: 'hl-menu-item', type: 'button', role: 'menuitem', onclick: () => (closePopover(), app.chatPanel(kind)) }, h('span', null, label), icon(ico, { size: 16 }));
   return [
     tool('search', 'search', t('search.title')),
     tool('pins', 'pin', t('pins.title')),
-    h('button', { class: `icon-btn hd-tool${open === 'gallery' || open === 'saved' ? ' on' : ''}`, type: 'button', 'aria-haspopup': 'menu', 'aria-label': t('chat.moreTools'), 'data-tip': t('chat.moreTools'), onclick: (e) => popover(e.currentTarget, h('div', { class: 'hl-menu', role: 'menu' }, item('pins', 'pin', t('pins.title')), item('gallery', 'image', t('gallery.title')), item('saved', 'bookmark', t('saved.title'))), { placement: 'below' }) }, icon('dots', { size: 22 })),
+    h(
+      'button',
+      {
+        class: `icon-btn hd-tool${open === 'gallery' || open === 'saved' ? ' on' : ''}`,
+        type: 'button',
+        'aria-haspopup': 'menu',
+        'aria-label': t('chat.moreTools'),
+        'data-tip': t('chat.moreTools'),
+        onclick: (e) =>
+          openMenu(
+            [
+              { label: t('pins.title'), icon: 'pin', run: () => app.chatPanel('pins') },
+              { label: t('gallery.title'), icon: 'image', run: () => app.chatPanel('gallery') },
+              { label: t('saved.title'), icon: 'bookmark', run: () => app.chatPanel('saved') },
+              '-',
+              { label: t('app.switch.title'), icon: 'search', keys: 'Ctrl+K', run: () => app.switcher?.() },
+              { label: t('app.keys.title'), icon: 'keyboard', keys: 'Ctrl+/', run: () => app.shortcuts?.() },
+            ],
+            { anchor: e.currentTarget, label: t('chat.moreTools') },
+          ),
+      },
+      icon('dots', { size: 22 }),
+    ),
   ];
 }
 
-// Member list
+// Info panel: the den or friend, notifications, shared media and the member list
+
+function sharedMedia(app, s) {
+  const t = app.t;
+  const tab = app.infoTab || 'media';
+  const recs = [...s.messages.values()].filter((r) => !r.deleted && r.files?.length).sort((a, b) => b.ts - a.ts);
+  const images = [];
+  const files = [];
+  for (const r of recs) for (const f of r.files) (/^image\//.test(f.type) && !f.voice ? images : files).push({ r, f });
+  const tabBtn = (key, label, n) => h('button', { class: `info-tab${tab === key ? ' active' : ''}`, type: 'button', role: 'tab', 'aria-selected': String(tab === key), onclick: () => ((app.infoTab = key), app.render()) }, label, n ? h('span', { class: 'info-n' }, String(n)) : null);
+  let body;
+  if (tab === 'media') {
+    const shown = images.slice(0, 6);
+    const more = images.length - shown.length;
+    body = shown.length
+      ? h(
+          'div',
+          { class: 'info-media' },
+          shown.map(({ f }, i) => {
+            const url = s.fileUrl(f.id);
+            const last = more > 0 && i === shown.length - 1;
+            return h(
+              'button',
+              { class: 'info-thumb', type: 'button', 'aria-label': last ? t('info.more', { n: more }) : f.name, dataset: { file: f.id, den: s.id }, onclick: () => (last ? app.chatPanel('gallery') : url ? app.lightbox?.(f, url) : null) },
+              f.thumb || url ? h('img', { src: url || f.thumb, alt: '', loading: 'lazy' }) : icon('image', { size: 22 }),
+              last ? h('span', { class: 'img-more' }, `+${more}`) : null,
+            );
+          }),
+        )
+      : h('p', { class: 'info-empty' }, t('info.noMedia'));
+  } else {
+    body = files.length
+      ? h(
+          'ul',
+          { class: 'info-files' },
+          files.slice(0, 6).map(({ f }) => h('li', { dataset: { file: f.id, den: s.id } }, icon(f.voice ? 'mic' : 'file', { size: 18 }), h('span', { class: 'info-file-name' }, f.voice ? t('voice.msg.title') : f.name), h('small', { class: 'muted' }, formatBytes(f.size)))),
+        )
+      : h('p', { class: 'info-empty' }, t('info.noFiles'));
+  }
+  return h('section', { class: 'info-sec' }, h('h3', { class: 'info-title' }, t('info.shared')), h('div', { class: 'info-tabs', role: 'tablist' }, tabBtn('media', t('info.media'), images.length), tabBtn('files', t('info.files'), files.length)), body);
+}
+
+function formatBytes(n) {
+  if (!n) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
+
+function infoHead(app, s) {
+  const t = app.t;
+  const level = s.notifyLevel;
+  const on = level !== 'none';
+  const notify = h(
+    'label',
+    { class: 'info-row' },
+    icon(on ? 'bell' : 'bell-off', { size: 18 }),
+    h('span', null, t('info.notifications')),
+    h('input', { class: 'toggle', type: 'checkbox', checked: on, 'aria-label': t('info.notifications'), onchange: (e) => (s.setLocal('notify', e.target.checked ? 'default' : 'none'), s.emit('unread')) }),
+  );
+  if (s.isDirect) {
+    const f = app.friends.get(s.den.peer) || s.member(s.den.peer) || { id: s.den.peer, name: s.den.name };
+    return [
+      h('div', { class: 'info-hero' }, h('span', { class: 'avatar-wrap s80' }, avatarImg(f.avatar || f.id, { size: 72 })), h('h2', { class: 'info-name' }, f.name), activeStatus(f) ? h('p', { class: 'info-sub' }, activeStatus(f)) : null),
+      h('section', { class: 'info-sec' }, notify),
+    ];
+  }
+  const hue = avatarTraits(s.id).hue;
+  return [
+    h('div', { class: 'info-hero' }, h('span', { class: 'info-den', style: { '--den-hue': hue } }, initials(s.den.name)), h('h2', { class: 'info-name' }, s.den.name), h('p', { class: 'info-sub' }, t('info.members', { n: s.members().length, max: s.maxMembers }))),
+    h('section', { class: 'info-sec' }, notify, h('button', { class: 'info-row', type: 'button', onclick: () => app.inviteFlow(s) }, icon('invite', { size: 18 }), h('span', null, t('den.invite')), icon('chevron-right', { size: 16 }))),
+  ];
+}
 
 export function renderMembers(app, el) {
   const t = app.t;
@@ -450,7 +627,7 @@ export function renderMembers(app, el) {
       null,
       h(
         'button',
-        { class: `member${m.online ? '' : ' away'}`, type: 'button', 'aria-haspopup': 'dialog', onclick: (e) => memberCard(app, s, m, e.currentTarget) },
+        { class: `member${m.online ? '' : ' away'}`, type: 'button', 'aria-haspopup': 'dialog', dataset: { member: m.id, memberName: m.name }, onclick: (e) => memberCard(app, s, m, e.currentTarget) },
         avatarWithStatus(m, 32, app),
         h(
           'span',
@@ -464,10 +641,12 @@ export function renderMembers(app, el) {
     );
   replace(
     el,
-    h('h2', { class: 'members-head', 'aria-label': t('den.countLabel', { count: online.length, max: s.maxMembers }) }, t('members.online', { n: t('den.count', { count: online.length, max: s.maxMembers }) })),
-    h('ul', { class: 'member-list' }, online.map(row)),
-    offline.length ? h('h2', { class: 'members-head' }, t('members.offline', { n: offline.length })) : null,
-    offline.length ? h('ul', { class: 'member-list' }, offline.map(row)) : null,
+    infoHead(app, s),
+    sharedMedia(app, s),
+    s.isDirect ? null : h('h2', { class: 'members-head', 'aria-label': t('den.countLabel', { count: online.length, max: s.maxMembers }) }, t('members.online', { n: t('den.count', { count: online.length, max: s.maxMembers }) })),
+    s.isDirect ? null : h('ul', { class: 'member-list' }, online.map(row)),
+    offline.length && !s.isDirect ? h('h2', { class: 'members-head' }, t('members.offline', { n: offline.length })) : null,
+    offline.length && !s.isDirect ? h('ul', { class: 'member-list' }, offline.map(row)) : null,
   );
 }
 

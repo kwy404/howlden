@@ -4,7 +4,6 @@
 
 import { h, replace } from './dom.js';
 import { icon } from './icons.js';
-import { closePopover, popover } from './ui-shell.js';
 import { modal, toast } from './ui-modal.js';
 import { render as renderMarkdown } from '../core/markdown.js';
 import { POLL_LIMITS, WAVE_POINTS, pollResults } from '../core/history.js';
@@ -421,7 +420,8 @@ export function forwardModal(app, s, rec) {
 
 // Reminders
 
-export function remindMenu(app, s, rec, anchor) {
+/** Reminder choices for a message, as menu items. */
+export function remindItems(app, s, rec) {
   const t = app.t;
   const at = (minutes) => Date.now() + minutes * 60000;
   const tomorrow = () => {
@@ -431,10 +431,13 @@ export function remindMenu(app, s, rec, anchor) {
     return d.getTime();
   };
   const set = (when) => {
-    closePopover();
     s.remind(rec.id, when);
     toast(t('remind.set', { when: new Date(when).toLocaleString(app.lang, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) }), 'ok');
   };
-  const item = (label, when) => h('button', { class: 'hl-menu-item', type: 'button', role: 'menuitem', onclick: () => set(when()) }, h('span', null, label));
-  popover(anchor, h('div', { class: 'hl-menu', role: 'menu', 'aria-label': t('remind.title') }, h('p', { class: 'menu-label' }, t('remind.title')), item(t('remind.in20'), () => at(20)), item(t('remind.in1h'), () => at(60)), item(t('remind.in3h'), () => at(180)), item(t('remind.tomorrow'), tomorrow)), { placement: 'left' });
+  return [
+    { label: t('remind.in20'), run: () => set(at(20)) },
+    { label: t('remind.in1h'), run: () => set(at(60)) },
+    { label: t('remind.in3h'), run: () => set(at(180)) },
+    { label: t('remind.tomorrow'), run: () => set(tomorrow()) },
+  ];
 }

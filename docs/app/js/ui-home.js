@@ -2,8 +2,7 @@
 
 import { h, replace } from './dom.js';
 import { icon } from './icons.js';
-import { avatarImg, chatTools, closePopover, popover } from './ui-shell.js';
-import { confirmDialog } from './ui-modal.js';
+import { avatarImg, chatTools } from './ui-shell.js';
 import { stickerEl } from './stickers.js';
 import { season, seasonAvailable, seasonLabel, setSeasonOff } from './seasonal.js';
 import { avatarTraits } from '../core/avatar.js';
@@ -41,7 +40,7 @@ export function renderHomeSide(app) {
             const active = app.activeDen === s;
             return h(
               'button',
-              { class: `ch dm-link${active ? ' active' : ''}${u.count && !active ? ' unread' : ''}`, type: 'button', 'aria-current': active ? 'page' : null, onclick: () => app.openSession(s) },
+              { class: `ch dm-link${active ? ' active' : ''}${u.count && !active ? ' unread' : ''}`, type: 'button', 'aria-current': active ? 'page' : null, dataset: { den: s.id }, onclick: () => app.openSession(s) },
               h('span', { class: 'avatar-wrap s32' }, avatarImg(f.avatar || f.id, { size: 32 }), h('span', { class: `status-dot ${online ? 'on' : 'off'}` })),
               h('span', { class: 'dm-text' }, h('span', { class: 'ch-name' }, f.name), activeStatus(f) ? h('span', { class: 'dm-sub' }, activeStatus(f)) : null),
               u.count && !active ? h('span', { class: 'badge-count' }, String(u.count)) : null,
@@ -120,7 +119,7 @@ export function renderHome(app, el) {
               const on = app.friends.isOnline(f.id);
               return h(
                 'li',
-                { class: 'friend' },
+                { class: 'friend', dataset: { friend: f.id } },
                 h('button', { class: 'friend-main', type: 'button', onclick: () => app.messageFriend(f) }, h('span', { class: 'avatar-wrap s32' }, avatarImg(f.avatar || f.id, { size: 32 }), h('span', { class: `status-dot ${on ? 'on' : 'off'}` })), h('span', { class: 'friend-text' }, h('span', { class: 'friend-name' }, f.name, h('span', { class: 'friend-tag' }, `#${f.tag}`)), h('span', { class: 'friend-sub' }, activeStatus(f) || (on ? t('home.connected') : t('home.lastSeen', { when: ago(app, f.lastSeen) }))))),
                 h('span', { class: 'verified', title: t('id.verifiedHint') }, icon('shield', { size: 14 }), t('id.verified')),
                 h(
@@ -136,29 +135,11 @@ export function renderHome(app, el) {
                       type: 'button',
                       'aria-label': t('home.more'),
                       'aria-haspopup': 'menu',
-                      onclick: (e) =>
-                        popover(
-                          e.currentTarget,
-                          h(
-                            'div',
-                            { class: 'hl-menu', role: 'menu' },
-                            h(
-                              'button',
-                              {
-                                class: 'hl-menu-item danger',
-                                type: 'button',
-                                role: 'menuitem',
-                                onclick: async () => {
-                                  closePopover();
-                                  if (await confirmDialog(t, { title: t('home.removeFriend'), text: t('home.removeFriendText', { name: f.name }), ok: t('common.remove'), danger: true })) app.friends.remove(f.id);
-                                },
-                              },
-                              h('span', null, t('home.removeFriend')),
-                              icon('trash', { size: 16 }),
-                            ),
-                          ),
-                          { placement: 'left' },
-                        ),
+                      onclick: (e) => {
+                        const li = e.currentTarget.closest('.friend');
+                        const r = e.currentTarget.getBoundingClientRect();
+                        li.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: Math.round(r.left), clientY: Math.round(r.bottom + 6), button: 2 }));
+                      },
                     },
                     icon('dots', { size: 18 }),
                   ),
@@ -204,8 +185,9 @@ export function renderDmHeader(app, el, s) {
     h('span', { class: 'hd-status' }, online ? t('home.connected') : t('home.notConnected')),
     h('span', { class: 'hd-spacer' }),
     chatTools(app),
-    h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('call.voice', { name: f.name }), 'data-tip': t('call.voiceShort'), onclick: () => app.callFriend(f, false) }, icon('speaker', { size: 22 })),
+    h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('call.voice', { name: f.name }), 'data-tip': t('call.voiceShort'), onclick: () => app.callFriend(f, false) }, icon('phone', { size: 22 })),
     h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('call.video', { name: f.name }), 'data-tip': t('call.videoShort'), onclick: () => app.callFriend(f, true) }, icon('camera', { size: 22 })),
+    h('button', { class: `icon-btn${app.settings.dmInfo ? ' on' : ''}`, type: 'button', 'aria-pressed': String(!!app.settings.dmInfo), 'aria-label': t('info.toggle'), 'data-tip': t('info.toggle'), onclick: () => app.toggleDmInfo() }, icon('info', { size: 22 })),
     online ? null : h('button', { class: 'btn btn-brand btn-sm', type: 'button', onclick: () => app.reconnectFriend(f) }, icon('link', { size: 16 }), t('call.reconnect')),
   );
   el.style.setProperty('--den-hue', avatarTraits(f.avatar || f.id).hue);

@@ -8,10 +8,12 @@ import { icon, reactionIcon } from './icons.js';
 import { stickerEl } from './stickers.js';
 import { avatarImg, closePopover, colorOf, idBadge, memberCard, popover } from './ui-shell.js';
 import { confirmDialog, modal, promptDialog, toast } from './ui-modal.js';
-import { forwardModal, formatBar, historyModal, pollBlock, pollDialog, recordVoice, remindMenu, voicePlayer } from './ui-chat-kinds.js';
+import { forwardModal, formatBar, historyModal, pollBlock, pollDialog, recordVoice, remindItems, voicePlayer } from './ui-chat-kinds.js';
+import { contextMenu, openMenu } from './menu.js';
+import { copyImage } from './ui-context.js';
 import { pickableReactions, pickableStickers, season } from './seasonal.js';
 import { plainText, render as renderMarkdown } from '../core/markdown.js';
-import { REACTIONS, isPinned, reactors } from '../core/history.js';
+import { BASE_REACTIONS, REACTIONS, isPinned, reactors } from '../core/history.js';
 import { formatSize, MAX_FILE } from '../core/chunks.js';
 import { COMMANDS, parseCommand, suggestCommands } from '../core/commands.js';
 import { HAS, emptySearch, matchRecord, parseSearch } from '../core/search.js';
@@ -27,6 +29,10 @@ export function createChat(app) {
   const t = (k, v) => app.t(k, v);
   const list = h('div', { class: 'messages', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', tabindex: '0' });
   const jumpBar = h('button', { class: 'jump-bar', type: 'button', hidden: true });
+  const presentBtn = h('button', { class: 'present-btn', type: 'button', hidden: true });
+  const selectBar = h('div', { class: 'select-bar', role: 'toolbar', hidden: true });
+  const preview = h('div', { class: 'composer-preview', hidden: true, 'aria-live': 'polite' });
+  const seenEl = h('div', { class: 'seen-by', hidden: true });
   const scroller = h('div', { class: 'scroller' }, list);
   const typingLine = h('div', { class: 'typing', 'aria-live': 'polite' });
   const replyBar = h('div', { class: 'reply-bar', hidden: true });
@@ -41,11 +47,13 @@ export function createChat(app) {
   const formatBtn = h('button', { class: 'icon-btn composer-format', type: 'button', 'aria-pressed': 'false', onclick: () => toggleFormat() }, icon('text', { size: 22 }));
   const toolbar = formatBar(app, input);
   toolbar.hidden = true;
+  const previewBtn = h('button', { class: 'icon-btn format-preview', type: 'button', 'aria-pressed': 'false', onmousedown: (e) => e.preventDefault(), onclick: () => togglePreview() }, icon('eye', { size: 18 }));
+  toolbar.append(h('span', { class: 'format-sep', 'aria-hidden': 'true' }), previewBtn);
   const box = h('div', { class: 'composer-box' }, attachBtn, input, formatBtn, stickerBtn, micBtn, sendBtn);
-  const form = h('form', { class: 'composer' }, replyBar, attachBar, suggest, toolbar, box, fileInput, typingLine);
+  const form = h('form', { class: 'composer' }, selectBar, replyBar, attachBar, suggest, preview, toolbar, box, fileInput, typingLine);
   const dropHint = h('div', { class: 'drop-hint', hidden: true }, h('div', null, icon('file', { size: 40 }), h('p', null, '')));
   const panel = h('aside', { class: 'chat-panel', hidden: true });
-  const el = h('section', { class: 'hl-chat' }, jumpBar, scroller, form, dropHint, panel);
+  const el = h('section', { class: 'hl-chat' }, jumpBar, scroller, presentBtn, form, dropHint, panel);
 
   const state = {
     session: null,
@@ -65,6 +73,11 @@ export function createChat(app) {
     // The side panel: { kind: 'thread' | 'pins' | 'search' | 'gallery' | 'saved', root, query }.
     panel: null,
     recording: null,
+    // Messages picked with "Select", and a channel kept unread by "Mark unread".
+    selected: null,
+    holdUnread: false,
+    awayCount: 0,
+    awaySince: 0,
   };
 
   const memberName = (id) => state.session?.member(id)?.name || t('chat.unknown');
@@ -96,6 +109,8 @@ export function createChat(app) {
       btn.dataset.tip = t(key);
     }
     sendBtn.setAttribute('aria-label', t('chat.send'));
+    previewBtn.setAttribute('aria-label', t('format.preview'));
+    previewBtn.dataset.tip = t('format.preview');
     dropHint.querySelector('p').textContent = t('chat.dropHere');
     updateSendMode();
   }
@@ -123,7 +138,7 @@ export function createChat(app) {
     const author = s.member(rec.author);
     const prog = rec.files?.map((f) => `${s.progress.get(f.id) ?? ''}${s.blobUrls.has(f.id) ? 'u' : ''}`).join(',');
     const ids = s.identityOf(rec.author);
-    return JSON.stringify([rec.text, rec.editedAt, rec.deleted, rec.reactions, rec.votes, rec.pin, grouped, author?.name, author?.avatar, author?.accent, ids?.status, ids?.friend, prog, extra, app.lang, rec.reply && s.messages.get(rec.reply)?.text, threadInfo(rec), s.isSaved(rec.id)]);
+    return JSON.stringify([rec.text, rec.editedAt, rec.deleted, rec.reactions, rec.votes, rec.pin, grouped, author?.name, author?.avatar, author?.accent, ids?.status, ids?.friend, prog, extra, app.lang, rec.reply && s.messages.get(rec.reply)?.text, threadInfo(rec), s.isSaved(rec.id), state.selected ? state.selected.has(rec.id) : null, quickReactions(3).join()]);
   }
 
   function reactionRow(rec) {
@@ -172,33 +187,72 @@ export function createChat(app) {
     const progress = s.progress.get(f.id);
     const isImage = /^image\//.test(f.type) && (f.thumb || url);
     const status = progress != null ? h('span', { class: 'file-progress' }, h('span', { class: 'bar', style: { width: `${Math.round(progress * 100)}%` } }), h('span', { class: 'file-pct' }, t('chat.receiving', { pct: Math.round(progress * 100) }))) : null;
-    const getBtn = !url && progress == null ? h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => (s.requestFile(f.id, rec.author) ? null : toast(t('chat.unavailable'), 'error')) }, icon('download', { size: 16 }), t('chat.request')) : null;
+    const getBtn = !url && progress == null ? h('button', { class: 'btn btn-sm btn-ghost file-get', type: 'button', onclick: () => (s.requestFile(f.id, rec.author) ? null : toast(t('chat.unavailable'), 'error')) }, icon('download', { size: 16 }), t('chat.request')) : null;
     if (isImage) {
       const ratio = f.w && f.h ? Math.min(1, 400 / f.w, 300 / f.h) : 1;
       const img = h('img', { class: 'file-img', src: url || f.thumb, alt: f.name, loading: 'lazy', width: f.w ? Math.round(f.w * ratio) : null, height: f.h ? Math.round(f.h * ratio) : null });
       return h(
         'figure',
-        { class: `file-image${url ? '' : ' preview'}` },
-        h('button', { class: 'file-open', type: 'button', 'aria-label': f.name, onclick: () => (url ? lightbox(f, url) : getBtn?.click()) }, img),
+        { class: `file-image${url ? '' : ' preview'}`, dataset: { file: f.id } },
+        h('button', { class: 'file-open', type: 'button', 'aria-label': f.name, onclick: () => (url ? lightbox(f, url, rec) : getBtn?.click()) }, img),
         url ? null : h('figcaption', { class: 'file-overlay' }, status || getBtn),
       );
     }
     return h(
       'div',
-      { class: 'file-card' },
+      { class: 'file-card', dataset: { file: f.id } },
       icon('file', { size: 32, cls: 'file-ico' }),
       h('div', { class: 'file-meta' }, url ? h('a', { class: 'file-name', href: url, download: f.name }, f.name) : h('span', { class: 'file-name' }, f.name), h('span', { class: 'file-size' }, formatSize(f.size)), status),
       url ? h('a', { class: 'icon-btn', href: url, download: f.name, 'aria-label': `${t('chat.download')} ${f.name}` }, icon('download', { size: 20 })) : getBtn,
     );
   }
 
-  function lightbox(f, url) {
-    modal({
+  /** Images around one: the images of the message, or of the whole channel from the gallery. */
+  function imagesOf(rec) {
+    const s = state.session;
+    const recs = rec ? [rec] : s.channelMessages(state.channel).filter((r) => !r.deleted);
+    return recs.flatMap((r) => (r.files || []).filter((f) => /^image\//.test(f.type) && s.fileUrl(f.id)).map((f) => ({ f, url: s.fileUrl(f.id) })));
+  }
+
+  function lightbox(f, url, rec = null) {
+    const list = imagesOf(rec);
+    let i = Math.max(0, list.findIndex((x) => x.f.id === f.id));
+    if (!list.length) list.push({ f, url });
+    const img = h('img', { alt: '' });
+    const name = h('span', { class: 'lightbox-name' });
+    const count = h('span', { class: 'lightbox-count muted' });
+    const save = h('a', { class: 'btn btn-ghost btn-sm' }, icon('download', { size: 16 }), t('chat.download'));
+    const copy = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => copyImage(app, list[i].url) }, icon('copy', { size: 16 }), t('chat.ctx.copyImage'));
+    const show = () => {
+      const cur = list[i];
+      img.src = cur.url;
+      img.alt = cur.f.name;
+      name.textContent = `${cur.f.name}, ${formatSize(cur.f.size)}`;
+      count.textContent = list.length > 1 ? `${i + 1} / ${list.length}` : '';
+      save.href = cur.url;
+      save.download = cur.f.name;
+    };
+    const go = (d) => {
+      i = (i + d + list.length) % list.length;
+      show();
+    };
+    const nav = list.length > 1;
+    const m = modal({
       className: 'hl-lightbox',
       closeLabel: t('common.close'),
-      body: [h('img', { src: url, alt: f.name }), h('div', { class: 'lightbox-bar' }, h('span', null, `${f.name}, ${formatSize(f.size)}`), h('a', { class: 'btn btn-ghost btn-sm', href: url, download: f.name }, icon('download', { size: 16 }), t('chat.download')))],
+      body: [
+        h('div', { class: 'lightbox-stage' }, nav ? h('button', { class: 'round-btn lightbox-prev', type: 'button', 'aria-label': t('chat.ctx.prevImage'), onclick: () => go(-1) }, icon('arrow-left', { size: 20 })) : null, img, nav ? h('button', { class: 'round-btn lightbox-next', type: 'button', 'aria-label': t('chat.ctx.nextImage'), onclick: () => go(1) }, icon('chevron-right', { size: 22 })) : null),
+        h('div', { class: 'lightbox-bar' }, name, count, h('span', { class: 'hd-spacer' }), typeof ClipboardItem !== 'undefined' ? copy : null, save),
+      ],
     });
+    m.el.addEventListener('keydown', (e) => {
+      if (!nav) return;
+      if (e.key === 'ArrowRight') go(1);
+      else if (e.key === 'ArrowLeft') go(-1);
+    });
+    show();
   }
+  app.lightbox = (f, url) => lightbox(f, url, null);
 
   /** A one line summary of a record, for replies, pins, search and saved lists. */
   function summary(rec) {
@@ -238,22 +292,26 @@ export function createChat(app) {
         content.append(' ', rec.history?.length ? h('button', { class: 'msg-edited link-like', type: 'button', title: timeLabel(rec.editedAt), onclick: () => historyModal(app, rec, resolveMention) }, t('chat.edited')) : h('span', { class: 'msg-edited', title: timeLabel(rec.editedAt) }, t('chat.edited')));
       }
     }
+    const quick = quickReactions(3);
     const actions = rec.deleted
       ? null
       : h(
           'div',
           { class: 'msg-actions', role: 'toolbar', 'aria-label': t('chat.actions') },
+          quick.map((key) => h('button', { class: 'icon-btn quick-react', type: 'button', 'aria-label': t('chat.ctx.reactWith', { name: t(`chat.reaction.${key}`) }), 'data-tip': t(`chat.reaction.${key}`), onclick: () => react(rec, key) }, reactionIcon(key, { size: 18 }))),
+          quick.length ? h('span', { class: 'act-sep', 'aria-hidden': 'true' }) : null,
           h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.react'), 'data-tip': t('chat.react'), onclick: (e) => reactionPicker(rec, e.currentTarget) }, icon('react', { size: 18 })),
-          inPanel ? null : h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.reply'), 'data-tip': t('chat.reply'), onclick: () => startReply(rec) }, icon('reply', { size: 18 })),
-          inPanel || rec.thread ? null : h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.thread'), 'data-tip': t('chat.thread'), onclick: () => openPanel('thread', { root: rec.id }) }, icon('thread', { size: 18 })),
+          inPanel ? null : h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.reply'), 'data-tip': `${t('chat.reply')} (R)`, onclick: () => startReply(rec) }, icon('reply', { size: 18 })),
+          inPanel || rec.thread ? null : h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.thread'), 'data-tip': `${t('chat.thread')} (T)`, onclick: () => openPanel('thread', { root: rec.id }) }, icon('thread', { size: 18 })),
+          editable(rec) ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.edit'), 'data-tip': `${t('chat.edit')} (E)`, onclick: () => startEdit(rec.id) }, icon('edit', { size: 18 })) : null,
           h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('chat.more'), 'data-tip': t('chat.more'), 'aria-haspopup': 'menu', onclick: (e) => messageMenu(rec, e.currentTarget) }, icon('dots', { size: 18 })),
         );
-    const nameBtn = h('button', { class: 'msg-author', type: 'button', style: { color: colorOf(author, rec.author) }, onclick: (e) => memberCard(app, s, { ...(author || { id: rec.author, name: t('chat.unknown') }), id: rec.author, online: !!author?.online || mine }, e.currentTarget) }, author?.name || t('chat.unknown'));
+    const nameBtn = h('button', { class: 'msg-author', type: 'button', 'data-member': rec.author, style: { color: colorOf(author, rec.author) }, onclick: (e) => memberCard(app, s, { ...(author || { id: rec.author, name: t('chat.unknown') }), id: rec.author, online: !!author?.online || mine }, e.currentTarget) }, author?.name || t('chat.unknown'));
     const tags = [isPinned(rec) ? h('span', { class: 'msg-tag pin', title: t('pins.pinned') }, icon('pin', { size: 12 }), t('pins.pinned')) : null, s.isSaved(rec.id) ? h('span', { class: 'msg-tag saved', title: t('saved.saved') }, icon('bookmark', { size: 12 })) : null];
     const header = grouped ? null : h('header', { class: 'msg-head' }, nameBtn, mine ? null : idBadge(app, s, rec.author), h('time', { class: 'msg-time', datetime: new Date(rec.ts).toISOString() }, timeLabel(rec.ts)), tags);
     const side = grouped
       ? h('time', { class: 'msg-side-time', datetime: new Date(rec.ts).toISOString() }, new Date(rec.ts).toLocaleTimeString(app.lang, { hour: '2-digit', minute: '2-digit' }))
-      : h('button', { class: 'msg-avatar-btn', type: 'button', tabindex: '-1', 'aria-hidden': 'true', onclick: (e) => nameBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) || e.preventDefault() }, avatarImg(author?.avatar || rec.author, { size: 40, cls: 'msg-avatar' }));
+      : h('button', { class: 'msg-avatar-btn', type: 'button', tabindex: '-1', 'aria-hidden': 'true', 'data-member': rec.author, onclick: (e) => nameBtn.dispatchEvent(new MouseEvent('click', { bubbles: true })) || e.preventDefault() }, avatarImg(author?.avatar || rec.author, { size: 40, cls: 'msg-avatar' }));
     const info = inPanel ? null : threadInfo(rec);
     const threadLink = info
       ? h(
@@ -269,13 +327,57 @@ export function createChat(app) {
         )
       : null;
     const fwd = rec.fwd && !rec.deleted ? h('p', { class: 'msg-fwd' }, icon('forward', { size: 14 }), rec.fwd.from ? t('forward.fromIn', { name: rec.fwd.name, from: rec.fwd.from }) : t('forward.from', { name: rec.fwd.name })) : null;
+    const bare = rec.deleted || rec.sticker || rec.poll || (!rec.text && !rec.me);
     return h(
       'article',
-      { class: `msg${grouped ? ' grouped' : ''}${mentioned ? ' mentioned' : ''}${rec.reply && !rec.deleted ? ' has-reply' : ''}${isPinned(rec) ? ' pinned' : ''}`, dataset: { id: rec.id }, 'aria-label': `${author?.name || ''}, ${timeLabel(rec.ts)}` },
+      {
+        class: `msg${grouped ? ' grouped' : ''}${mine ? ' mine' : ''}${bare ? ' bare' : ''}${mentioned ? ' mentioned' : ''}${rec.reply && !rec.deleted ? ' has-reply' : ''}${isPinned(rec) ? ' pinned' : ''}${state.selected?.has(rec.id) ? ' selected' : ''}`,
+        dataset: { id: rec.id },
+        tabindex: '-1',
+        'aria-label': `${author?.name || ''}, ${timeLabel(rec.ts)}`,
+      },
       rec.reply && !rec.deleted ? replyPreview(rec) : null,
-      h('div', { class: 'msg-row' }, h('div', { class: 'msg-gutter' }, side), h('div', { class: 'msg-body' }, header, fwd, content, rec.deleted ? null : h('div', { class: 'msg-files' }, (rec.files || []).map((f) => fileBlock(rec, f))), rec.deleted ? null : reactionRow(rec), threadLink)),
+      h('div', { class: 'msg-row' }, h('div', { class: 'msg-gutter' }, side), h('div', { class: 'msg-body' }, header, fwd, content, rec.deleted ? null : filesBlock(rec), rec.deleted ? null : reactionRow(rec), threadLink)),
       actions,
     );
+  }
+
+  /** Files of a message: two or more images become a grid with a "+N" tile for the rest. */
+  function filesBlock(rec) {
+    const files = rec.files || [];
+    const images = files.filter((f) => /^image\//.test(f.type) && !f.voice);
+    const rest = files.filter((f) => !images.includes(f));
+    if (images.length < 2) return h('div', { class: 'msg-files' }, files.map((f) => fileBlock(rec, f)));
+    const shown = images.slice(0, 4);
+    const more = images.length - shown.length;
+    return h(
+      'div',
+      { class: 'msg-files' },
+      h(
+        'div',
+        { class: `img-group n${shown.length}` },
+        shown.map((f, i) => {
+          const block = fileBlock(rec, f);
+          if (more && i === shown.length - 1) block.append(h('span', { class: 'img-more', 'aria-hidden': 'true' }, `+${more}`));
+          return block;
+        }),
+      ),
+      rest.map((f) => fileBlock(rec, f)),
+    );
+  }
+
+  /** The reactions I use most, for the hover bar. */
+  function quickReactions(n) {
+    const pick = pickableReactions();
+    const use = app.settings.reactUse || {};
+    const top = Object.keys(use)
+      .filter((k) => pick.includes(k) && use[k] > 0)
+      .sort((a, b) => use[b] - use[a]);
+    return [...new Set([...top, ...BASE_REACTIONS])].filter((k) => pick.includes(k)).slice(0, n);
+  }
+
+  function editable(rec) {
+    return rec.author === app.profile.id && !rec.deleted && !rec.sticker && !rec.poll && !rec.files?.some((f) => f.voice);
   }
 
   function welcomeBlock() {
@@ -325,7 +427,10 @@ export function createChat(app) {
         const sig = signature(rec, extra, state.editing === rec.id);
         if (!node || node.sig !== sig) {
           const el2 = state.editing === rec.id ? editBox(rec) : buildMessage(rec, extra, !node && state.primed);
+          // A message that had keyboard focus keeps it when it is redrawn.
+          const hadFocus = node?.el === document.activeElement;
           node?.el.replaceWith(el2);
+          if (hadFocus) el2.focus({ preventScroll: true });
           node = { el: el2, sig };
           state.nodes.set(key, node);
         }
@@ -347,15 +452,38 @@ export function createChat(app) {
       if (node !== cursor) list.insertBefore(node, cursor);
       else cursor = cursor.nextSibling;
     }
+    state.awayCount = stick || !state.awaySince ? 0 : records.filter((r) => r.ts > state.awaySince && r.author !== app.profile.id && !r.deleted).length;
+    renderSeen(shown);
     if (keepScroll) scroller.scrollTop = scroller.scrollHeight - before;
     else if (stick) scrollBottom();
     state.primed = true;
     maybeRead();
     updateJump();
+    updatePresent();
     renderPanel();
   }
 
+  /** Read receipts: faces under my last message of people who have read it (only with receipts on). */
+  function renderSeen(shown) {
+    const s = state.session;
+    const last = [...shown].reverse().find((r) => !r.deleted);
+    const mineLast = last && last.author === app.profile.id ? last : null;
+    const who = mineLast ? s.seenBy(state.channel, mineLast.ts) : [];
+    const host = mineLast && state.nodes.get(mineLast.id)?.el.querySelector('.msg-body');
+    if (!who.length || !host) {
+      seenEl.hidden = true;
+      return;
+    }
+    seenEl.hidden = false;
+    const names = who.map(memberName);
+    seenEl.setAttribute('aria-label', t('chat.seenBy', { names: names.join(', ') }));
+    seenEl.title = t('chat.seenBy', { names: names.join(', ') });
+    replace(seenEl, icon('seen', { size: 14 }), h('span', { class: 'seen-faces' }, who.slice(0, 5).map((id) => avatarImg(s.member(id)?.avatar || id, { size: 16 }))), h('span', null, s.isDirect ? t('chat.seen') : t('chat.seenN', { n: who.length })));
+    if (seenEl.parentNode !== host) host.append(seenEl);
+  }
+
   function maybeRead() {
+    if (state.holdUnread) return;
     if (state.session && document.visibilityState === 'visible' && nearBottom() && app.view === 'chat') state.session.markRead(state.channel);
   }
 
@@ -376,9 +504,35 @@ export function createChat(app) {
 
   let pinned = true;
   scroller.addEventListener('scroll', () => {
+    const was = pinned;
     pinned = nearBottom();
-    if (pinned) maybeRead();
+    if (pinned) {
+      state.awayCount = 0;
+      state.awaySince = 0;
+      maybeRead();
+    } else if (was && state.session) {
+      state.awaySince = state.session.timeline(state.channel).at(-1)?.ts || Date.now();
+    }
     updateJump();
+    updatePresent();
+  });
+
+  /** "Jump to present" once the newest messages are more than a screen away. */
+  function updatePresent() {
+    const far = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > scroller.clientHeight * 0.9;
+    presentBtn.hidden = !far;
+    if (far) replace(presentBtn, state.awayCount ? h('span', { class: 'present-count' }, t(state.awayCount === 1 ? 'chat.newOne' : 'chat.newN', { n: state.awayCount })) : null, h('span', null, t('chat.jumpPresent')), icon('chevron-down', { size: 16 }));
+  }
+
+  function toPresent() {
+    state.limit = PAGE;
+    sync();
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    state.awayCount = 0;
+  }
+  presentBtn.addEventListener('click', () => {
+    toPresent();
+    input.focus({ preventScroll: true });
   });
   // Keep the newest message in view while images and files finish loading.
   if (typeof ResizeObserver !== 'undefined') {
@@ -386,6 +540,51 @@ export function createChat(app) {
       if (pinned) scrollBottom();
     }).observe(list);
   }
+
+  // Keyboard on messages: arrows move between them, letters act on the focused one.
+  list.addEventListener('keydown', (e) => {
+    if (e.target.closest('input, textarea, .msg-actions') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const all = [...list.querySelectorAll('.msg[data-id]')];
+    const cur = e.target.closest('.msg[data-id]');
+    const i = cur ? all.indexOf(cur) : -1;
+    const focusAt = (k) => {
+      const n = all[Math.max(0, Math.min(all.length - 1, k))];
+      if (!n) return;
+      e.preventDefault();
+      n.focus({ preventScroll: true });
+      n.scrollIntoView({ block: 'nearest' });
+    };
+    if (e.key === 'ArrowUp') return focusAt(i < 0 ? all.length - 1 : i - 1);
+    if (e.key === 'ArrowDown') return i >= 0 && i === all.length - 1 ? (e.preventDefault(), input.focus()) : focusAt(i + 1);
+    if (e.key === 'Home' && e.target === list) return focusAt(0);
+    if (e.key === 'End') return focusAt(all.length - 1);
+    if (e.key === 'Escape') {
+      if (state.selected) return clearSelection();
+      e.preventDefault();
+      return input.focus();
+    }
+    const rec = cur && state.session?.messages.get(cur.dataset.id);
+    if (!rec || rec.deleted) return;
+    const k = e.key.toLowerCase();
+    const run = {
+      r: () => startReply(rec),
+      e: () => editable(rec) && startEdit(rec.id),
+      t: () => !rec.thread && openPanel('thread', { root: rec.id }),
+      p: () => state.session.pin(rec.id, !isPinned(rec)),
+      u: () => markUnread(rec),
+      s: () => toggleSelect(rec.id),
+      c: async () => rec.text && (await copyText(plainText(rec.text, resolveMention))) && toast(t('notice.copied'), 'ok', 2000),
+      '+': () => reactionPicker(rec, cur.querySelector('.msg-body')),
+      delete: () => rec.author === app.profile.id && deleteMessage(rec),
+      backspace: () => rec.author === app.profile.id && deleteMessage(rec),
+      enter: () => state.selected && toggleSelect(rec.id),
+      ' ': () => state.selected && toggleSelect(rec.id),
+    }[k];
+    if (run) {
+      e.preventDefault();
+      run();
+    }
+  });
 
   function flash(node) {
     node.classList.remove('flash');
@@ -458,28 +657,153 @@ export function createChat(app) {
     );
   }
 
-  function messageMenu(rec, anchor) {
+  /** Everything you can do with a message: the hover menu, right click, long press and the Menu key. */
+  function messageItems(rec, { inPanel = false } = {}) {
     const s = state.session;
+    if (!s || !rec) return [];
     const mine = rec.author === app.profile.id;
-    const item = (label, ico, run, cls = '') => h('button', { class: `hl-menu-item${cls}`, type: 'button', role: 'menuitem', onclick: () => (closePopover(), run()) }, h('span', null, label), icon(ico, { size: 16 }));
-    popover(
-      anchor,
+    if (rec.deleted) return [{ label: t('chat.ctx.copyLink'), icon: 'link', run: () => copyMessageLink(rec) }];
+    const quick = quickReactions(5);
+    return [
+      {
+        row: [
+          ...quick.map((key) => ({ label: t(`chat.reaction.${key}`), node: reactionIcon(key, { size: 22 }), pressed: reactors(rec, key).includes(app.profile.id), run: () => react(rec, key) })),
+          { label: t('chat.react'), icon: 'react', run: () => reactionPicker(rec, nodeOf(rec.id)?.querySelector('.msg-body') || el) },
+        ],
+        label: t('chat.react'),
+      },
+      '-',
+      inPanel || rec.thread ? null : { label: t('chat.reply'), icon: 'reply', keys: 'R', run: () => startReply(rec) },
+      rec.thread ? null : { label: t('chat.ctx.startThread'), icon: 'thread', keys: 'T', run: () => openPanel('thread', { root: rec.id }) },
+      editable(rec) ? { label: t('chat.edit'), icon: 'edit', keys: 'E', run: () => startEdit(rec.id) } : null,
+      { label: t('forward.title'), icon: 'forward', run: () => forwardModal(app, s, rec) },
+      '-',
+      { label: t(isPinned(rec) ? 'pins.unpin' : 'pins.pin'), icon: 'pin', keys: 'P', run: () => s.pin(rec.id, !isPinned(rec)) },
+      rec.thread ? null : { label: t('chat.ctx.markUnread'), icon: 'unread', keys: 'U', run: () => markUnread(rec) },
+      { label: t(s.isSaved(rec.id) ? 'saved.remove' : 'saved.add'), icon: 'bookmark', run: () => toast(t(s.toggleSaved(rec.id) ? 'saved.added' : 'saved.removed'), 'ok') },
+      { label: t('remind.title'), icon: 'clock', items: () => remindItems(app, s, rec) },
+      '-',
+      rec.text ? { label: t('chat.copyText'), icon: 'copy', keys: 'C', run: async () => (await copyText(plainText(rec.text, resolveMention))) && toast(t('notice.copied'), 'ok', 2000) } : null,
+      { label: t('chat.ctx.copyLink'), icon: 'link', run: () => copyMessageLink(rec) },
+      rec.history?.length ? { label: t('chat.historyTitle'), icon: 'history', run: () => historyModal(app, rec, resolveMention) } : null,
+      inPanel || rec.thread ? null : { label: t('chat.ctx.select'), icon: 'select', keys: 'S', run: () => toggleSelect(rec.id, true) },
+      mine ? '-' : null,
+      mine ? { label: t('chat.delete'), icon: 'trash', danger: true, keys: 'Del', run: () => deleteMessage(rec) } : null,
+    ];
+  }
+
+  function messageMenu(rec, anchor) {
+    openMenu(messageItems(rec, { inPanel: !!anchor.closest('.chat-panel') }), { anchor, placement: 'left', label: t('chat.more') });
+  }
+
+  const nodeOf = (id) => state.nodes.get(id)?.el || panel.querySelector(`.msg[data-id="${id}"]`);
+
+  async function copyMessageLink(rec) {
+    if (await copyText(app.messageLink(state.session, rec))) toast(t('chat.ctx.linkCopied'), 'ok', 3000);
+  }
+
+  /** Keep a channel unread from a message on, until I leave it or send something. */
+  function markUnread(rec) {
+    state.holdUnread = true;
+    state.session.markUnread(rec.channel, rec.ts);
+    state.newSince = rec.ts - 1;
+    sync();
+    toast(t('chat.ctx.markedUnread'), 'ok', 2500);
+  }
+
+  // Selecting messages: copy, save or delete several at once.
+
+  function toggleSelect(id, on) {
+    state.selected = state.selected || new Set();
+    if (on ?? !state.selected.has(id)) state.selected.add(id);
+    else state.selected.delete(id);
+    if (!state.selected.size) state.selected = null;
+    renderSelectBar();
+    sync();
+  }
+
+  function clearSelection() {
+    if (!state.selected) return;
+    state.selected = null;
+    renderSelectBar();
+    sync();
+  }
+
+  function selectedRecords() {
+    const s = state.session;
+    return state.selected ? s.timeline(state.channel).filter((r) => state.selected.has(r.id)) : [];
+  }
+
+  function renderSelectBar() {
+    el.classList.toggle('selecting', !!state.selected);
+    if (!state.selected) {
+      selectBar.hidden = true;
+      return replace(selectBar);
+    }
+    const recs = selectedRecords();
+    const mineOnly = recs.filter((r) => r.author === app.profile.id && !r.deleted);
+    const s = state.session;
+    selectBar.hidden = false;
+    selectBar.setAttribute('aria-label', t('chat.ctx.selected', { n: recs.length }));
+    replace(
+      selectBar,
+      h('strong', { class: 'select-count' }, t('chat.ctx.selected', { n: recs.length })),
+      h('span', { class: 'hd-spacer' }),
       h(
-        'div',
-        { class: 'hl-menu', role: 'menu', 'aria-label': t('chat.more') },
-        item(t(isPinned(rec) ? 'pins.unpin' : 'pins.pin'), 'pin', () => s.pin(rec.id, !isPinned(rec))),
-        item(t(s.isSaved(rec.id) ? 'saved.remove' : 'saved.add'), 'bookmark', () => toast(t(s.toggleSaved(rec.id) ? 'saved.added' : 'saved.removed'), 'ok')),
-        h('button', { class: 'hl-menu-item', type: 'button', role: 'menuitem', onclick: (e) => remindMenu(app, s, rec, e.currentTarget) }, h('span', null, t('remind.title')), icon('clock', { size: 16 })),
-        item(t('forward.title'), 'forward', () => forwardModal(app, s, rec)),
-        rec.thread ? null : item(t('chat.thread'), 'thread', () => openPanel('thread', { root: rec.id })),
-        rec.text ? item(t('chat.copyText'), 'copy', async () => (await copyText(plainText(rec.text, resolveMention))) && toast(t('notice.copied'), 'ok')) : null,
-        rec.history?.length ? item(t('chat.historyTitle'), 'history', () => historyModal(app, rec, resolveMention)) : null,
-        mine && !rec.sticker && !rec.poll && !rec.files?.some((f) => f.voice) ? item(t('chat.edit'), 'edit', () => startEdit(rec.id)) : null,
-        mine ? item(t('chat.delete'), 'trash', () => deleteMessage(rec), ' danger') : null,
+        'button',
+        {
+          class: 'btn btn-ghost btn-sm',
+          type: 'button',
+          onclick: async () => {
+            const text = recs.map((r) => `${memberName(r.author)}: ${summary(r)}`).join('\n');
+            if (await copyText(text)) toast(t('notice.copied'), 'ok', 2000);
+          },
+        },
+        icon('copy', { size: 16 }),
+        t('chat.ctx.copyAll'),
       ),
-      { placement: 'left' },
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => (recs.forEach((r) => !s.isSaved(r.id) && s.toggleSaved(r.id)), toast(t('saved.added'), 'ok', 2000), clearSelection()) }, icon('bookmark', { size: 16 }), t('chat.ctx.saveAll')),
+      mineOnly.length
+        ? h(
+            'button',
+            {
+              class: 'btn btn-danger btn-soft btn-sm',
+              type: 'button',
+              onclick: async () => {
+                if (await confirmDialog(t, { title: t('chat.delete'), text: t('chat.ctx.deleteMine', { n: mineOnly.length }), ok: t('common.delete'), danger: true })) {
+                  for (const r of mineOnly) await s.remove(r.id);
+                  clearSelection();
+                }
+              },
+            },
+            icon('trash', { size: 16 }),
+            t('chat.ctx.deleteMineShort', { n: mineOnly.length }),
+          )
+        : null,
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('common.cancel'), 'data-tip': t('common.cancel'), onclick: () => clearSelection() }, icon('x', { size: 18 })),
     );
   }
+
+  // A click on a message while selecting picks it.
+  list.addEventListener(
+    'click',
+    (e) => {
+      if (!state.selected) return;
+      const node = e.target.closest('.msg[data-id]');
+      if (!node || e.target.closest('a, .reaction, .poll-opt, .vm, .file-open')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSelect(node.dataset.id);
+    },
+    true,
+  );
+
+  // Right click, long press and the Menu key on a message.
+  contextMenu('.hl-chat .msg[data-id]', (node) => {
+    if (node.classList.contains('editing')) return [];
+    const rec = state.session?.messages.get(node.dataset.id);
+    return messageItems(rec, { inPanel: !!node.closest('.chat-panel') });
+  }, { label: () => t('chat.actions') });
 
   function stickerPicker() {
     const s = state.session;
@@ -519,8 +843,15 @@ export function createChat(app) {
   }
 
   function attachMenu(anchor) {
-    const item = (label, ico, run) => h('button', { class: 'hl-menu-item', type: 'button', role: 'menuitem', onclick: () => (closePopover(), run()) }, icon(ico, { size: 18 }), h('span', null, label));
-    popover(anchor, h('div', { class: 'hl-menu', role: 'menu', 'aria-label': t('chat.attach') }, item(t('chat.uploadFile'), 'file', () => fileInput.click()), item(t('poll.title'), 'poll', () => createPoll()), item(t('voice.msg.record'), 'mic', () => startVoice())), { placement: 'above' });
+    openMenu(
+      [
+        { label: t('chat.uploadFile'), icon: 'file', hint: t('chat.uploadHint'), run: () => fileInput.click() },
+        { label: t('poll.title'), icon: 'poll', run: () => createPoll() },
+        { label: t('voice.msg.record'), icon: 'mic', run: () => startVoice() },
+        { label: t('chat.stickers'), icon: 'sticker', run: () => stickerPicker() },
+      ],
+      { anchor, placement: 'above', label: t('chat.attach'), className: 'attach-menu' },
+    );
   }
 
   async function createPoll() {
@@ -689,7 +1020,34 @@ export function createChat(app) {
     else if (p.kind === 'saved') renderSaved(body);
   }
 
-  function miniItem(sess, rec, { channelName = '', extra = null } = {}) {
+  /** Text with every search word marked. */
+  function marked(text, words) {
+    if (!words?.length) return text;
+    const fold = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const plain = fold(text);
+    const hits = [];
+    for (const w of words) {
+      if (!w) continue;
+      let i = plain.indexOf(w);
+      while (i >= 0 && hits.length < 40) {
+        hits.push([i, i + w.length]);
+        i = plain.indexOf(w, i + w.length);
+      }
+    }
+    if (!hits.length) return text;
+    hits.sort((a, b) => a[0] - b[0]);
+    const out = [];
+    let at = 0;
+    for (const [a, b] of hits) {
+      if (a < at) continue;
+      out.push(text.slice(at, a), h('mark', null, text.slice(a, b)));
+      at = b;
+    }
+    out.push(text.slice(at));
+    return out;
+  }
+
+  function miniItem(sess, rec, { channelName = '', extra = null, words = null } = {}) {
     const author = sess.member(rec.author);
     return h(
       'li',
@@ -698,7 +1056,7 @@ export function createChat(app) {
         'button',
         { class: 'mini-main', type: 'button', onclick: () => jumpTo(rec.id, sess) },
         avatarImg(author?.avatar || rec.author, { size: 28 }),
-        h('span', { class: 'mini-text' }, h('span', { class: 'mini-head' }, h('strong', { style: { color: colorOf(author, rec.author) } }, author?.name || t('chat.unknown')), channelName ? h('span', { class: 'mini-where' }, channelName) : null, h('time', null, timeLabel(rec.ts))), h('span', { class: 'mini-sum' }, summary(rec))),
+        h('span', { class: 'mini-text' }, h('span', { class: 'mini-head' }, h('strong', { style: { color: colorOf(author, rec.author) } }, author?.name || t('chat.unknown')), channelName ? h('span', { class: 'mini-where' }, channelName) : null, h('time', null, timeLabel(rec.ts))), h('span', { class: 'mini-sum' }, marked(summary(rec), words))),
       ),
       extra,
     );
@@ -805,6 +1163,26 @@ export function createChat(app) {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(runSearch, 120);
   });
+  // Enter opens the newest hit, the arrows walk the results.
+  searchInput.addEventListener('keydown', (e) => {
+    const first = searchResults.querySelector('.mini-main');
+    if (e.key === 'Enter' && first) {
+      e.preventDefault();
+      first.click();
+    } else if (e.key === 'ArrowDown' && first) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
+  searchResults.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const all = [...searchResults.querySelectorAll('.mini-main')];
+    const i = all.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    if (e.key === 'ArrowUp' && i === 0) return searchInput.focus();
+    all[Math.max(0, Math.min(all.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))].focus();
+  });
 
   function renderSearch(body, focus) {
     searchInput.placeholder = t('search.placeholder');
@@ -841,7 +1219,7 @@ export function createChat(app) {
       .filter((r) => matchRecord(r, q, { text: plainText(r.text, resolveMention), author: memberName(r.author), me: r.author === app.profile.id }))
       .sort((a, b) => b.ts - a.ts)
       .slice(0, 100);
-    replace(searchResults, h('p', { class: 'muted search-count' }, t(hits.length === 1 ? 'search.count1' : 'search.count', { n: hits.length })), hits.length ? h('ul', { class: 'mini-list' }, hits.map((r) => miniItem(s, r, { channelName: s.isDirect ? '' : `#${channelName(r.channel)}` }))) : null);
+    replace(searchResults, h('p', { class: 'muted search-count' }, t(hits.length === 1 ? 'search.count1' : 'search.count', { n: hits.length })), hits.length ? h('ul', { class: 'mini-list' }, hits.map((r) => miniItem(s, r, { channelName: s.isDirect ? '' : `#${channelName(r.channel)}`, words: q.words }))) : emptyPanel('search', t('search.none')));
   }
 
   // Gallery
@@ -946,6 +1324,22 @@ export function createChat(app) {
     toolbar.hidden = force === undefined ? !toolbar.hidden : !force;
     formatBtn.setAttribute('aria-pressed', String(!toolbar.hidden));
     formatBtn.classList.toggle('on', !toolbar.hidden);
+    if (toolbar.hidden && !preview.hidden) togglePreview(false);
+  }
+
+  /** A live preview of the formatted message above the composer. */
+  function togglePreview(force) {
+    const on = force === undefined ? preview.hidden : force;
+    preview.hidden = !on;
+    previewBtn.setAttribute('aria-pressed', String(on));
+    previewBtn.classList.toggle('on', on);
+    renderPreview();
+  }
+
+  function renderPreview() {
+    if (preview.hidden) return;
+    const text = fromEditable(input.value);
+    replace(preview, h('span', { class: 'preview-label' }, t('format.preview')), text.trim() ? h('div', { class: 'msg-content' }, renderMarkdown(text, { document, resolveMention })) : h('p', { class: 'muted' }, t('format.previewEmpty')));
   }
 
   /** The microphone button takes the send button's place while the composer is empty. */
@@ -1097,6 +1491,7 @@ export function createChat(app) {
       }
     }
     if (raw.startsWith('//')) raw = raw.slice(1);
+    state.holdUnread = false;
     const text = fromEditable(raw);
     const reply = state.reply;
     const files = state.files;
@@ -1160,12 +1555,23 @@ export function createChat(app) {
     } else if (e.key === 'Escape' && state.reply) {
       state.reply = null;
       renderReplyBar();
+    } else if (e.key === 'Escape' && state.selected) {
+      clearSelection();
+    } else if (e.key === 'Escape') {
+      // Back to the newest message, and read.
+      state.holdUnread = false;
+      toPresent();
+      maybeRead();
+    } else if ((e.key === 'PageUp' || e.key === 'PageDown') && !e.shiftKey) {
+      e.preventDefault();
+      scroller.scrollBy({ top: (e.key === 'PageUp' ? -1 : 1) * scroller.clientHeight * 0.85, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     }
   });
 
   input.addEventListener('input', () => {
     autosize(input);
     saveDraft();
+    renderPreview();
     if (input.value.trim() && !input.value.startsWith('/')) state.session?.sendTyping(state.channel);
     updateSuggest();
     updateSendMode();
@@ -1383,6 +1789,12 @@ export function createChat(app) {
         state.editing = null;
         state.counts.clear();
         state.primed = false;
+        state.holdUnread = false;
+        state.selected = null;
+        state.awayCount = 0;
+        state.awaySince = 0;
+        renderSelectBar();
+        el.dataset.den = session.id;
         state.newSince = session.den.lastRead?.[channelId] || 0;
         input.value = session.den.drafts?.[channelId] || '';
         autosize(input);
@@ -1394,6 +1806,8 @@ export function createChat(app) {
         pinned = true;
         scrollBottom();
         updateJump();
+        updatePresent();
+        renderPreview();
       }
       renderTyping();
     },
@@ -1426,6 +1840,13 @@ export function createChat(app) {
     panelKind: () => state.panel?.kind || null,
     jumpTo,
     markRead: maybeRead,
+    toPresent() {
+      if (state.selected) return clearSelection();
+      state.holdUnread = false;
+      toPresent();
+      maybeRead();
+    },
+    messageItems: (rec) => messageItems(rec),
   };
 }
 

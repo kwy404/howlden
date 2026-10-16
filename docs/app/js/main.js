@@ -25,6 +25,9 @@ import {
   scanModal,
 } from './ui-flows.js';
 import { openSettings, restoreModal } from './ui-settings.js';
+import { initContextMenus } from './menu.js';
+import { initContexts } from './ui-context.js';
+import { initKeys, quickSwitcher, shortcutsSheet } from './ui-keys.js';
 import { inviteModal, joinEntryModal, joinWordsModal } from './ui-pair.js';
 import { wordsFromLink, resolvePhrase } from '../core/words.js';
 import { buildIceServers, RtcLink } from '../core/rtc.js';
@@ -71,6 +74,7 @@ app.applyTheme = () => {
   const theme = settings.theme === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : settings.theme;
   root.dataset.theme = theme;
   root.classList.toggle('compact', !!settings.compact);
+  root.classList.toggle('bubbles', settings.bubbles !== false && !settings.compact);
   $('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f1effb' : '#0c0a20');
 };
 
@@ -104,6 +108,7 @@ async function boot() {
   document.documentElement.lang = app.lang === 'pt' ? 'pt-BR' : 'en';
   staticText();
   registerWorker();
+  messageHash();
   // A QR code opens the app with the six words in the address.
   const hashWords = wordsFromLink(location.hash);
   if (hashWords) {
@@ -192,6 +197,11 @@ async function enter(acc) {
     app.pendingWords = null;
     joinWordsModal(app, words);
   }
+  if (app.pendingMessage) {
+    const j = app.pendingMessage;
+    app.pendingMessage = null;
+    app.openMessageLink(j);
+  }
 }
 
 // Sessions
@@ -258,6 +268,7 @@ function wireSession(s) {
   });
   s.on('incoming', (rec) => notify(s, rec));
   s.on('burst', (b) => isActive() && voice.burst(s, b));
+  s.on('reads', () => isActive() && app.view === 'chat' && chat.refresh());
 }
 
 /** Join, leave and screen share sounds for the voice channel I am in. */
@@ -286,16 +297,42 @@ function voiceSounds(s) {
   s._voiceSeenChannel = mine;
 }
 
-function notify(s, rec) {
+/** Quiet hours: like Do not disturb between two times of day, every day. */
+app.quietNow = (now = new Date()) => {
+  const q = settings.quiet;
+  if (!q?.on || !q.from || !q.to || q.from === q.to) return false;
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const [fh, fm] = q.from.split(':').map(Number);
+  const [th, tm] = q.to.split(':').map(Number);
+  const from = fh * 60 + fm;
+  const to = th * 60 + tm;
+  return from < to ? mins >= from && mins < to : mins >= from || mins < to;
+};
+
+/** What a new message should do here: 'all', 'mention' or nothing, from the den level, the channel mute and my default. */
+function wants(s, rec) {
   const mention = s.isDirect || s.mentionsMe(rec);
+  const level = s.notifyLevel === 'default' ? settings.notifyLevel || 'mentions' : s.notifyLevel;
+  if (level === 'none') return null;
+  if (mention) return 'mention';
+  if (s.isMuted(rec.channel)) return null;
+  return level === 'all' ? 'all' : 'quiet';
+}
+
+function notify(s, rec) {
+  const want = wants(s, rec);
+  const mention = want === 'mention';
   const viewing = app.activeDen === s && app.channelId === rec.channel && document.visibilityState === 'visible' && document.hasFocus();
-  if (mention) app.sounds.play('mention');
-  else if (!viewing) app.sounds.play('message');
-  if (!mention || viewing || !settings.notify || settings.dnd || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if (!want) return;
+  const quiet = settings.dnd || app.quietNow();
+  if (mention && !quiet) app.sounds.play('mention');
+  else if (!viewing && !quiet) app.sounds.play('message');
+  if (want === 'quiet' || viewing || !settings.notify || quiet || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const author = s.member(rec.author)?.name || app.t('chat.unknown');
   const channel = s.den.channels.find((c) => c.id === rec.channel)?.name || '';
-  const title = s.isDirect ? author : app.t('notice.mention', { name: author, channel });
-  const body = rec.sticker ? app.t('chat.stickerSent') : plainText(rec.text, (id) => s.member(id)).slice(0, 140) || rec.files?.[0]?.name || '';
+  const title = s.isDirect ? author : mention ? app.t('notice.mention', { name: author, channel }) : app.t('notice.message', { name: author, channel });
+  const text = rec.sticker ? app.t('chat.stickerSent') : plainText(rec.text, (id) => s.member(id)).slice(0, 140) || rec.files?.[0]?.name || '';
+  const body = settings.notifyPreview === false ? app.t('settings.notifyHidden') : text;
   const opts = { body, tag: rec.id, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { den: s.id, channel: rec.channel } };
   navigator.serviceWorker?.ready.then((reg) => reg.showNotification(title, opts)).catch(() => new Notification(title, opts));
 }
@@ -397,10 +434,42 @@ app.answerInvite = async (invite, passphrase) => {
   return { session: s, reply };
 };
 
+// Links to a message: they open the message on a device that has it, nothing more.
+
+app.messageLink = (s, rec) => `${app.baseUrl}#m=${s.id}.${rec.channel}.${rec.id}`;
+
+app.parseMessageLink = (href) => {
+  try {
+    const url = new URL(href, location.href);
+    const m = /^#m=([\w-]{4,64})\.([\w-]{4,64})\.([\w-]{4,64})$/.exec(url.hash);
+    if (!m || url.origin !== location.origin || !url.pathname.startsWith(new URL(app.baseUrl).pathname)) return null;
+    return { den: m[1], channel: m[2], id: m[3] };
+  } catch {
+    return null;
+  }
+};
+
+app.openMessageLink = (j) => {
+  const s = app.sessions.get(j.den);
+  if (!s || !s.messages.get(j.id)) return toast(app.t('chat.ctx.linkMissing'), 'info', 6000);
+  app.openDen(s.id, j.channel);
+  setTimeout(() => chat.jumpTo(j.id, s), 80);
+};
+
+function messageHash() {
+  const j = app.parseMessageLink(location.href);
+  if (!j) return false;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (app.profile) app.openMessageLink(j);
+  else app.pendingMessage = j;
+  return true;
+}
+
 /** Invite and reply links came from older versions; invites are six words now. */
 app.handleCode = (found, { onError = (m) => toast(m, 'error') } = {}) => onError(app.t('fail.oldLink'));
 
 window.addEventListener('hashchange', () => {
+  if (messageHash()) return;
   const words = wordsFromLink(location.hash);
   if (words && app.profile) {
     history.replaceState(null, '', location.pathname + location.search);
@@ -487,6 +556,13 @@ app.drawer = (side) => {
   else delete el.dataset.drawer;
 };
 
+app.toggleDmInfo = () => {
+  if (matchMedia('(max-width: 1023px)').matches) return app.drawer($('#app').dataset.drawer === 'right' ? null : 'right');
+  settings.dmInfo = !settings.dmInfo;
+  app.saveSettings();
+  app.render();
+};
+
 app.toggleMembers = () => {
   if (matchMedia('(max-width: 1023px)').matches) return app.drawer($('#app').dataset.drawer === 'right' ? null : 'right');
   app.showMembers = !app.showMembers;
@@ -550,6 +626,11 @@ app.discardEmptyDen = async (s) => {
   await store.deleteDen(s.id);
   if (app.activeDen === s) app.openHome();
   else app.render();
+};
+
+app.removeFriendFlow = async (f) => {
+  const t = app.t;
+  if (await confirmDialog(t, { title: t('home.removeFriend'), text: t('home.removeFriendText', { name: f.name }), ok: t('common.remove'), danger: true })) app.friends.remove(f.id);
 };
 
 app.messageFriend = async (friend) => {
@@ -704,6 +785,20 @@ function reminderCard(s, rec, author, text) {
 function setupShell() {
   chat = createChat(app);
   voice = createVoice(app);
+  initContextMenus();
+  initContexts(app);
+  initKeys(app);
+  app.switcher = () => quickSwitcher(app);
+  app.shortcuts = () => shortcutsSheet(app);
+  app.chatToPresent = () => chat.toPresent();
+  // A link to a message inside the chat opens the message here instead of a new tab.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest?.('.msg-content a[href]');
+    const j = a && app.parseMessageLink(a.href);
+    if (!j || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    app.openMessageLink(j);
+  });
   setInterval(tick, 15000);
   setTimeout(tick, 2000);
   window.addEventListener('howlden:season', () => app.render());
@@ -748,7 +843,7 @@ app.render = frameThrottle(() => {
   const el = $('#app');
   const hasCall = s?.isDirect && (app.media.inVoice(s, DM_CALL) || s.voice.get(s.den.peer)?.channel === DM_CALL);
   el.dataset.view = !s ? 'home' : s.isDirect ? (hasCall ? 'dm-call' : 'dm') : app.view;
-  el.classList.toggle('no-members', !app.showMembers || !s || s.isDirect);
+  el.classList.toggle('no-members', !s || (s.isDirect ? !settings.dmInfo || hasCall : !app.showMembers));
   renderRail(app, $('#rail'));
   renderSide(app, $('#side'));
   const header = $('#header');
