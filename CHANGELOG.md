@@ -4,6 +4,8 @@ All notable changes to howlden are documented here. The format follows [Keep a C
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-17
+
 ### Added
 
 - A big "Call a friend" button on the home screen: one tap makes the six words, opens the share menu (or copies the words where there is none), and starts a voice call as soon as the friend types them; the friend's phone rings.
@@ -48,6 +50,12 @@ All notable changes to howlden are documented here. The format follows [Keep a C
 - Invites are six words and a QR code only. No link or URL text is shown anywhere, and sharing sends the words as text. The QR code still holds the words so a phone camera opens the app with them.
 - The invite link and reply link mode ("Zero third parties") is gone from the app and from Settings. Opening an invite link from an older version explains that six words are needed now.
 - With reduced motion, the new animations stay still; reactions over a call fade in place instead of flying.
+- The website opens with one short line, three steps and a two window demo of Luna and Nova connecting with six words, then a 30 second tour and the live app preview. It keeps four plain guides in English and two in Portuguese, describes six word invites only, and dresses up for special dates with the pack in costume and an off switch.
+- Shorter READMEs, package description and keywords, with no references to other brands.
+
+### Fixed
+
+- A phrase pasted into the six word boxes now spreads over all six even when a phone keyboard inserts it without a paste event.
 
 ## [0.1.1] - 2026-10-14
 
@@ -67,6 +75,7 @@ All notable changes to howlden are documented here. The format follows [Keep a C
 - A guest who is refused no longer ends up in either friends list.
 - The landing preview, the mesh illustration and a guide still said 8 people: everything now says 5.
 
+[0.2.0]: https://github.com/kwy404/howlden/releases/tag/v0.2.0
 [0.1.1]: https://github.com/kwy404/howlden/releases/tag/v0.1.1
 
 ## [0.1.0] - 2026-10-14

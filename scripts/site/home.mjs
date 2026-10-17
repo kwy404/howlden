@@ -490,7 +490,7 @@ export function homeJsonLd(guides) {
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       isAccessibleForFree: true,
       license: 'https://opensource.org/licenses/MIT',
-      softwareVersion: '0.1.0',
+      softwareVersion: '0.2.0',
       featureList: ['Local profile with a cryptographic identity key, no email or password', 'Text channels', 'Voice channels', 'Video calls', 'Screen share', 'File sharing', 'Reactions and stickers', 'Six word invites with a QR code', 'Push to talk', 'Music mode', 'Local call recording with a notice for everyone', 'End to end encryption with WebRTC', 'Optional passphrase', 'Connection fingerprint', 'Installable PWA', 'Up to 5 people per den'],
       screenshot: `${SITE}og.png`,
       image: `${SITE}assets/mascot.svg`,

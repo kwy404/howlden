@@ -6,7 +6,7 @@ import { markSymbol } from './extras.mjs';
 import { seasonSymbols } from './seasons-art.mjs';
 
 export const SITE = 'https://kwy404.github.io/howlden/';
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 export const GITHUB = 'https://github.com/kwy404/howlden';
 export const AUTHOR_GH = 'https://github.com/kwy404';
 export const AUTHOR_IN = 'https://www.linkedin.com/in/alexandre-silva-173687256/';

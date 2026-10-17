@@ -1,6 +1,6 @@
 {
   "name": "howlden",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Group chat, voice and video between browsers, with no account and no server of ours.",
   "keywords": [
